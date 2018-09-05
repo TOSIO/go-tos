@@ -2,7 +2,7 @@
 
 export GOROOT=/usr/local/go
 export GOPATH=$PWD
-cd src/github.com/tos
+cd src/github.com/TOSIO
 
 echo "go get github.com/mattn/go-colorable"
 go get github.com/mattn/go-colorable
