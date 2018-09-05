@@ -42,7 +42,7 @@ import (
 	"fmt"
 	"hash"
 
-	ethcrypto "github.com/tos/go-tos/devbase/crypto"
+	ethcrypto "github.com/TOSIO/go-tos/devbase/crypto"
 )
 
 var (

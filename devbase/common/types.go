@@ -26,8 +26,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/tos/go-tos/crypto/sha3"
-	"github.com/tos/go-tos/devbase/common/hexutil"
+	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
+	"github.com/TOSIO/go-tos/devbase/common/hexutil"
 )
 
 // Lengths of hashes and addresses in bytes.

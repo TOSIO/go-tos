@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tos/go-tos/devbase/common"
-	"github.com/tos/go-tos/devbase/common/hexutil"
-	"github.com/tos/go-tos/devbase/common/math"
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/common/hexutil"
+	"github.com/TOSIO/go-tos/devbase/common/math"
 )
 
 var (
