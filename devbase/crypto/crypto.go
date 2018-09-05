@@ -28,10 +28,10 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/tos/go-tos/devbase/common"
-	"github.com/tos/go-tos/devbase/common/math"
-	"github.com/tos/go-tos/devbase/crypto/sha3"
-	"github.com/tos/go-tos/devbase/rlp"
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/common/math"
+	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
+	"github.com/TOSIO/go-tos/devbase/rlp"
 )
 
 var (

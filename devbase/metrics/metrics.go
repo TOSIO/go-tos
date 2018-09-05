@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tos/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/log"
 )
 
 // Enabled is checked by the constructor functions for all of the

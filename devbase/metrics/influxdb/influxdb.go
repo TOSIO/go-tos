@@ -5,8 +5,8 @@ import (
 	uurl "net/url"
 	"time"
 
-	"github.com/tos/go-tos/devbase/log"
-	"github.com/tos/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/metrics"
 	"github.com/influxdata/influxdb/client"
 )
 

@@ -40,7 +40,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/tos/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/crypto"
 )
 
 var dumpEnc bool

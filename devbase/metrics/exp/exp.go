@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/tos/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/devbase/metrics"
 )
 
 type exp struct {

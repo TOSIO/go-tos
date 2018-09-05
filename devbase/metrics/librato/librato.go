@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/tos/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/devbase/metrics"
 )
 
 // a regexp for extracting the unit from time.Duration.String
