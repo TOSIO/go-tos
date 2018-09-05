@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/tos/go-tos/devbase/common/hexutil"
+	"github.com/TOSIO/go-tos/devbase/common/hexutil"
 )
 
 type MyType [5]byte
