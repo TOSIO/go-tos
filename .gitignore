@@ -3,3 +3,5 @@ src/github.com/go-stack/
 src/github.com/mattn/
 /pkg
 *.test
+debug
+!.gitkeep
