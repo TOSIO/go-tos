@@ -31,7 +31,6 @@ type block interface {
 }
 
 type BlockHeader struct {
-	Version uint32
 	Type uint32
 	Time uint64
 	GasPrice *big.Int
