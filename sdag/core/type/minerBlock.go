@@ -14,7 +14,7 @@ type BlockNonce [8]byte
 type MinerBlock struct {
 	Header BlockHeader
 	Links []common.Hash
-	Miner common.Address
+	Sender common.Address
 	Nonce BlockNonce
 
 	// Signature values
@@ -22,3 +22,6 @@ type MinerBlock struct {
 	R *big.Int `json:"r" gencodec:"required"`
 	S *big.Int `json:"s" gencodec:"required"`
 }
+
+
+// block interface

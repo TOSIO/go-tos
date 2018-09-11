@@ -27,3 +27,6 @@ type TxBlock struct {
 	R *big.Int `json:"r" gencodec:"required"`
 	S *big.Int `json:"s" gencodec:"required"`
 }
+
+
+// block interface
