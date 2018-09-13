@@ -61,6 +61,7 @@ func (s *Simulated) Run(d time.Duration) {
 	s.now = end
 }
 
+//ActiveTimers return the length of scheduled of Simulated
 func (s *Simulated) ActiveTimers() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -68,6 +69,7 @@ func (s *Simulated) ActiveTimers() int {
 	return len(s.scheduled)
 }
 
+//WaitForTimers wait until  the length of scheduled of Simulated =n
 func (s *Simulated) WaitForTimers(n int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
