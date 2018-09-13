@@ -4,4 +4,5 @@ src/github.com/mattn/
 /pkg
 *.test
 debug
+*.exe
 !.gitkeep
