@@ -1,0 +1,428 @@
+// Copyright 2015 The go-ethereum Authors
+// This file is part of go-ethereum.
+//
+// go-ethereum is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// go-ethereum is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+
+// Package utils contains internal helper functions for go-ethereum commands.
+package utils
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/TOSIO/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/node"
+	"gopkg.in/urfave/cli.v1"
+)
+
+var (
+	CommandHelpTemplate = `{{.cmd.Name}}{{if .cmd.Subcommands}} command{{end}}{{if .cmd.Flags}} [command options]{{end}} [arguments...]
+{{if .cmd.Description}}{{.cmd.Description}}
+{{end}}{{if .cmd.Subcommands}}
+SUBCOMMANDS:
+	{{range .cmd.Subcommands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
+	{{end}}{{end}}{{if .categorizedFlags}}
+{{range $idx, $categorized := .categorizedFlags}}{{$categorized.Name}} OPTIONS:
+{{range $categorized.Flags}}{{"\t"}}{{.}}
+{{end}}
+{{end}}{{end}}`
+)
+
+func init() {
+	cli.AppHelpTemplate = `{{.Name}} {{if .Flags}}[global options] {{end}}command{{if .Flags}} [command options]{{end}} [arguments...]
+
+VERSION:
+   {{.Version}}
+
+COMMANDS:
+   {{range .Commands}}{{.Name}}{{with .ShortName}}, {{.}}{{end}}{{ "\t" }}{{.Usage}}
+   {{end}}{{if .Flags}}
+GLOBAL OPTIONS:
+   {{range .Flags}}{{.}}
+   {{end}}{{end}}
+`
+
+	cli.CommandHelpTemplate = CommandHelpTemplate
+}
+
+// NewApp creates an app with sane defaults.
+func NewApp(gitCommit, usage string) *cli.App {
+	app := cli.NewApp()
+	app.Name = filepath.Base(os.Args[0])
+	app.Author = ""
+	//app.Authors = nil
+	app.Email = ""
+	app.Version = params.VersionWithMeta
+	if len(gitCommit) >= 8 {
+		app.Version += "-" + gitCommit[:8]
+	}
+	app.Usage = usage
+	return app
+}
+
+// These are all the command line flags we support.
+// If you add to this list, please remember to include the
+// flag in the appropriate command definition.
+//
+// The flags are defined here so their names and help texts
+// are the same for all commands.
+
+var (
+	// General settings
+	DataDirFlag = DirectoryFlag{
+		Name:  "datadir",
+		Usage: "Data directory for the databases and keystore",
+		Value: DirectoryString{node.DefaultDataDir()},
+	}
+	KeyStoreDirFlag = DirectoryFlag{
+		Name:  "keystore",
+		Usage: "Directory for the keystore (default = inside the datadir)",
+	}
+	NoUSBFlag = cli.BoolFlag{
+		Name:  "nousb",
+		Usage: "Disables monitoring for and managing USB hardware wallets",
+	}
+	NetworkIdFlag = cli.Uint64Flag{
+		Name:  "networkid",
+		Usage: "Network identifier (integer, 1=Frontier, 2=Morden (disused), 3=Ropsten, 4=Rinkeby)",
+		Value: eth.DefaultConfig.NetworkId,
+	}
+	TestnetFlag = cli.BoolFlag{
+		Name:  "testnet",
+		Usage: "Ropsten network: pre-configured proof-of-work test network",
+	}
+	RinkebyFlag = cli.BoolFlag{
+		Name:  "rinkeby",
+		Usage: "Rinkeby network: pre-configured proof-of-authority test network",
+	}
+	DeveloperFlag = cli.BoolFlag{
+		Name:  "dev",
+		Usage: "Ephemeral proof-of-authority network with a pre-funded developer account, mining enabled",
+	}
+	DeveloperPeriodFlag = cli.IntFlag{
+		Name:  "dev.period",
+		Usage: "Block period to use in developer mode (0 = mine only if transaction pending)",
+	}
+	IdentityFlag = cli.StringFlag{
+		Name:  "identity",
+		Usage: "Custom node name",
+	}
+	DocRootFlag = DirectoryFlag{
+		Name:  "docroot",
+		Usage: "Document Root for HTTPClient file scheme",
+		Value: DirectoryString{homeDir()},
+	}
+	/* 	defaultSyncMode = eth.DefaultConfig.SyncMode
+	   	SyncModeFlag    = TextMarshalerFlag{
+	   		Name:  "syncmode",
+	   		Usage: `Blockchain sync mode ("fast", "full", or "light")`,
+	   		Value: &defaultSyncMode,
+	   	} */
+	GCModeFlag = cli.StringFlag{
+		Name:  "gcmode",
+		Usage: `Blockchain garbage collection mode ("full", "archive")`,
+		Value: "full",
+	}
+	LightServFlag = cli.IntFlag{
+		Name:  "lightserv",
+		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
+		Value: 0,
+	}
+	/* 	LightPeersFlag = cli.IntFlag{
+		Name:  "lightpeers",
+		Usage: "Maximum number of LES client peers",
+		Value: eth.DefaultConfig.LightPeers,
+	} */
+	/* LightKDFFlag = cli.BoolFlag{
+		Name:  "lightkdf",
+		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
+	} */
+	// Dashboard settings
+	DashboardEnabledFlag = cli.BoolFlag{
+		Name:  metrics.DashboardEnabledFlag,
+		Usage: "Enable the dashboard",
+	}
+	DashboardAddrFlag = cli.StringFlag{
+		Name:  "dashboard.addr",
+		Usage: "Dashboard listening interface",
+		Value: dashboard.DefaultConfig.Host,
+	}
+	DashboardPortFlag = cli.IntFlag{
+		Name:  "dashboard.host",
+		Usage: "Dashboard listening port",
+		Value: dashboard.DefaultConfig.Port,
+	}
+	DashboardRefreshFlag = cli.DurationFlag{
+		Name:  "dashboard.refresh",
+		Usage: "Dashboard metrics collection refresh rate",
+		Value: dashboard.DefaultConfig.Refresh,
+	}
+
+	// Performance tuning settings
+	CacheFlag = cli.IntFlag{
+		Name:  "cache",
+		Usage: "Megabytes of memory allocated to internal caching",
+		Value: 1024,
+	}
+	CacheDatabaseFlag = cli.IntFlag{
+		Name:  "cache.database",
+		Usage: "Percentage of cache memory allowance to use for database io",
+		Value: 75,
+	}
+	CacheGCFlag = cli.IntFlag{
+		Name:  "cache.gc",
+		Usage: "Percentage of cache memory allowance to use for trie pruning",
+		Value: 25,
+	}
+	TrieCacheGenFlag = cli.IntFlag{
+		Name:  "trie-cache-gens",
+		Usage: "Number of trie node generations to keep in memory",
+		Value: int(state.MaxTrieCacheGen),
+	}
+	// Miner settings
+
+	// Account settings
+
+	// Logging and debug settings
+	EthStatsURLFlag = cli.StringFlag{
+		Name:  "ethstats",
+		Usage: "Reporting URL of a ethstats service (nodename:secret@host:port)",
+	}
+	FakePoWFlag = cli.BoolFlag{
+		Name:  "fakepow",
+		Usage: "Disables proof-of-work verification",
+	}
+	NoCompactionFlag = cli.BoolFlag{
+		Name:  "nocompaction",
+		Usage: "Disables db compaction after import",
+	}
+	// RPC settings
+	RPCEnabledFlag = cli.BoolFlag{
+		Name:  "rpc",
+		Usage: "Enable the HTTP-RPC server",
+	}
+	RPCListenAddrFlag = cli.StringFlag{
+		Name:  "rpcaddr",
+		Usage: "HTTP-RPC server listening interface",
+		Value: node.DefaultHTTPHost,
+	}
+	RPCPortFlag = cli.IntFlag{
+		Name:  "rpcport",
+		Usage: "HTTP-RPC server listening port",
+		Value: node.DefaultHTTPPort,
+	}
+	RPCCORSDomainFlag = cli.StringFlag{
+		Name:  "rpccorsdomain",
+		Usage: "Comma separated list of domains from which to accept cross origin requests (browser enforced)",
+		Value: "",
+	}
+	RPCVirtualHostsFlag = cli.StringFlag{
+		Name:  "rpcvhosts",
+		Usage: "Comma separated list of virtual hostnames from which to accept requests (server enforced). Accepts '*' wildcard.",
+		Value: strings.Join(node.DefaultConfig.HTTPVirtualHosts, ","),
+	}
+	RPCApiFlag = cli.StringFlag{
+		Name:  "rpcapi",
+		Usage: "API's offered over the HTTP-RPC interface",
+		Value: "",
+	}
+	IPCDisabledFlag = cli.BoolFlag{
+		Name:  "ipcdisable",
+		Usage: "Disable the IPC-RPC server",
+	}
+	IPCPathFlag = DirectoryFlag{
+		Name:  "ipcpath",
+		Usage: "Filename for IPC socket/pipe within the datadir (explicit paths escape it)",
+	}
+	WSEnabledFlag = cli.BoolFlag{
+		Name:  "ws",
+		Usage: "Enable the WS-RPC server",
+	}
+	WSListenAddrFlag = cli.StringFlag{
+		Name:  "wsaddr",
+		Usage: "WS-RPC server listening interface",
+		Value: node.DefaultWSHost,
+	}
+	WSPortFlag = cli.IntFlag{
+		Name:  "wsport",
+		Usage: "WS-RPC server listening port",
+		Value: node.DefaultWSPort,
+	}
+	WSApiFlag = cli.StringFlag{
+		Name:  "wsapi",
+		Usage: "API's offered over the WS-RPC interface",
+		Value: "",
+	}
+	WSAllowedOriginsFlag = cli.StringFlag{
+		Name:  "wsorigins",
+		Usage: "Origins from which to accept websockets requests",
+		Value: "",
+	}
+	ExecFlag = cli.StringFlag{
+		Name:  "exec",
+		Usage: "Execute JavaScript statement",
+	}
+	PreloadJSFlag = cli.StringFlag{
+		Name:  "preload",
+		Usage: "Comma separated list of JavaScript files to preload into the console",
+	}
+
+	// Network Settings
+	MaxPeersFlag = cli.IntFlag{
+		Name:  "maxpeers",
+		Usage: "Maximum number of network peers (network disabled if set to 0)",
+		Value: 25,
+	}
+	MaxPendingPeersFlag = cli.IntFlag{
+		Name:  "maxpendpeers",
+		Usage: "Maximum number of pending connection attempts (defaults used if set to 0)",
+		Value: 0,
+	}
+	ListenPortFlag = cli.IntFlag{
+		Name:  "port",
+		Usage: "Network listening port",
+		Value: 30303,
+	}
+	BootnodesFlag = cli.StringFlag{
+		Name:  "bootnodes",
+		Usage: "Comma separated enode URLs for P2P discovery bootstrap (set v4+v5 instead for light servers)",
+		Value: "",
+	}
+	BootnodesV4Flag = cli.StringFlag{
+		Name:  "bootnodesv4",
+		Usage: "Comma separated enode URLs for P2P v4 discovery bootstrap (light server, full nodes)",
+		Value: "",
+	}
+	BootnodesV5Flag = cli.StringFlag{
+		Name:  "bootnodesv5",
+		Usage: "Comma separated enode URLs for P2P v5 discovery bootstrap (light server, light nodes)",
+		Value: "",
+	}
+	NodeKeyFileFlag = cli.StringFlag{
+		Name:  "nodekey",
+		Usage: "P2P node key file",
+	}
+	NodeKeyHexFlag = cli.StringFlag{
+		Name:  "nodekeyhex",
+		Usage: "P2P node key as hex (for testing)",
+	}
+	NATFlag = cli.StringFlag{
+		Name:  "nat",
+		Usage: "NAT port mapping mechanism (any|none|upnp|pmp|extip:<IP>)",
+		Value: "any",
+	}
+	NoDiscoverFlag = cli.BoolFlag{
+		Name:  "nodiscover",
+		Usage: "Disables the peer discovery mechanism (manual peer addition)",
+	}
+	DiscoveryV5Flag = cli.BoolFlag{
+		Name:  "v5disc",
+		Usage: "Enables the experimental RLPx V5 (Topic Discovery) mechanism",
+	}
+	NetrestrictFlag = cli.StringFlag{
+		Name:  "netrestrict",
+		Usage: "Restricts network communication to the given IP networks (CIDR masks)",
+	}
+
+	// ATM the url is left to the user and deployment to
+
+	// Gas price oracle settings
+
+	// Metrics flags
+
+	// The `host` tag is part of every measurement sent to InfluxDB. Queries on tags are faster in InfluxDB.
+	// It is used so that we can group all nodes and average a measurement across all of them, but also so
+	// that we can select a specific node and inspect its measurements.
+	// https://docs.influxdata.com/influxdb/v1.4/concepts/key_concepts/#tag-key
+	MetricsInfluxDBHostTagFlag = cli.StringFlag{
+		Name:  "metrics.influxdb.host.tag",
+		Usage: "InfluxDB `host` tag attached to all measurements",
+		Value: "localhost",
+	}
+)
+
+func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
+	/* 	SetP2PConfig(ctx, &cfg.P2P)
+	   	setIPC(ctx, cfg)
+	   	setHTTP(ctx, cfg)
+	   	setWS(ctx, cfg)
+	   	setNodeUserIdent(ctx, cfg) */
+
+	switch {
+	case ctx.GlobalIsSet(DataDirFlag.Name):
+		cfg.DataDir = ctx.GlobalString(DataDirFlag.Name)
+	case ctx.GlobalBool(DeveloperFlag.Name):
+		cfg.DataDir = "" // unless explicitly requested, use memory databases
+	case ctx.GlobalBool(TestnetFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testnet")
+	case ctx.GlobalBool(RinkebyFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "rinkeby")
+	}
+
+	if ctx.GlobalIsSet(KeyStoreDirFlag.Name) {
+		cfg.KeyStoreDir = ctx.GlobalString(KeyStoreDirFlag.Name)
+	}
+	if ctx.GlobalIsSet(LightKDFFlag.Name) {
+		cfg.UseLightweightKDF = ctx.GlobalBool(LightKDFFlag.Name)
+	}
+	if ctx.GlobalIsSet(NoUSBFlag.Name) {
+		cfg.NoUSB = ctx.GlobalBool(NoUSBFlag.Name)
+	}
+}
+
+func SetSdagConfig(ctx *cli.Context, cfg *node.Config) {
+
+}
+
+// MakeDataDir retrieves the currently requested data directory, terminating
+// if none (or the empty string) is specified. If the node is starting a testnet,
+// the a subdirectory of the specified datadir will be used.
+func MakeDataDir(ctx *cli.Context) string {
+	if path := ctx.GlobalString(DataDirFlag.Name); path != "" {
+		if ctx.GlobalBool(TestnetFlag.Name) {
+			return filepath.Join(path, "testnet")
+		}
+		if ctx.GlobalBool(RinkebyFlag.Name) {
+			return filepath.Join(path, "rinkeby")
+		}
+		return path
+	}
+	Fatalf("Cannot determine default data directory, please set manually (--datadir)")
+	return ""
+}
+
+// MigrateFlags sets the global flag from a local flag when it's set.
+// This is a temporary function used for migrating old command/flags to the
+// new format.
+//
+// e.g. geth account new --keystore /tmp/mykeystore --lightkdf
+//
+// is equivalent after calling this method with:
+//
+// geth --keystore /tmp/mykeystore --lightkdf account new
+//
+// This allows the use of the existing configuration functionality.
+// When all flags are migrated this function can be removed and the existing
+// configuration functionality must be changed that is uses local flags
+func MigrateFlags(action func(ctx *cli.Context) error) func(*cli.Context) error {
+	return func(ctx *cli.Context) error {
+		for _, name := range ctx.FlagNames() {
+			if ctx.IsSet(name) {
+				ctx.GlobalSet(name, ctx.String(name))
+			}
+		}
+		return action(ctx)
+	}
+}

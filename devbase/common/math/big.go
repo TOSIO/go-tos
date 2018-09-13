@@ -148,6 +148,21 @@ func bigEndianByteAt(bigint *big.Int, n int) byte {
 	return byte(word >> shift)
 }
 
+//BigEndianByteAt SD
+func BigEndianByteAt(bigint *big.Int, n int) byte {
+	words := bigint.Bits()
+	// Check word-bucket the byte will reside in
+	i := n / wordBytes
+	if i >= len(words) {
+		return byte(0)
+	}
+	word := words[i]
+	// Offset of the byte
+	shift := 8 * uint(n%wordBytes)
+
+	return byte(word >> shift)
+}
+
 // Byte returns the byte at position n,
 // with the supplied padlength in Little-Endian encoding.
 // n==0 returns the MSB
