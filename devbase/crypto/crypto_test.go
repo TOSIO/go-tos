@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -64,6 +65,7 @@ func TestUnmarshalPubkey(t *testing.T) {
 		t.Fatalf("expected error, got %v, %v", err, key)
 	}
 	key, err = UnmarshalPubkey([]byte{1, 2, 3})
+	fmt.Println(key)
 	if err != errInvalidPubkey || key != nil {
 		t.Fatalf("expected error, got %v, %v", err, key)
 	}
@@ -77,6 +79,7 @@ func TestUnmarshalPubkey(t *testing.T) {
 		}
 	)
 	key, err = UnmarshalPubkey(enc)
+	fmt.Println(key)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
