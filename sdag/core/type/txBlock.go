@@ -41,6 +41,25 @@ type TxBlock struct {
 	S *big.Int `json:"s" gencodec:"required"`
 }
 
+
+func (tx *TxBlock) CopyHeader(h *BlockHeader) *BlockHeader {
+	cpy := *h
+	if cpy.Time = new(big.Int); h.Time != nil {
+		cpy.Time.Set(h.Time)
+	}
+	if cpy.Difficulty = new(big.Int); h.Difficulty != nil {
+		cpy.Difficulty.Set(h.Difficulty)
+	}
+	if cpy.Number = new(big.Int); h.Number != nil {
+		cpy.Number.Set(h.Number)
+	}
+	if len(h.Extra) > 0 {
+		cpy.Extra = make([]byte, len(h.Extra))
+		copy(cpy.Extra, h.Extra)
+	}
+	return &cpy
+}
+
 func (tx *TxBlock) Hash() []common.Hash {
 	return tx.Links
 }
@@ -94,8 +113,7 @@ func (tx *TxBlock) WithSignature(signer Signer, sig []byte) (*TxBlock, error) {
 	if err != nil {
 		return nil, err
 	}
-	cpy := &TxBlock{R: r, S: s, V: v}
-	//	cpy.data.R, cpy.data.S, cpy.data.V = r, s, v
+	cpy := &TxBlock{R: r,S:s,V:v}
 	return cpy, nil
 }
 
@@ -109,21 +127,15 @@ func SignatureValues(tx *TxBlock, sig []byte) (r, s, v *big.Int, err error) {
 	return r, s, v, nil
 }
 
-//crypto.Sign(hash, key.PrivateKey)
 
-// EncodeRLP implements rlp.Encoder
-func (tx *TxBlock) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, tx)
+func (tx TxBlock) EncodeRLP(val interface{}) ([]byte,error) {
+	b,err :=rlp.EncodeToBytes(&val) 
+	return b,err
 }
 
 // DecodeRLP implements rlp.Decoder
-func (tx *TxBlock) DecodeRLP(s *rlp.Stream) error {
-	//	_, size, _ := s.Kind()
-	err := s.Decode(tx)
-	if err == nil {
-		//tx.size.Store(common.StorageSize(rlp.ListSize(size)))
-	}
-	return err
+func (tx TxBlock) DecodeRLP(b []byte,val interface{}) error {
+	return rlp.DecodeBytes(b,&val)
 }
 
 // block interface
