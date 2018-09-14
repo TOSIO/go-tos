@@ -177,7 +177,11 @@ func (tx *TxBlock) Header() *Header {
 }
 */
 
+<<<<<<< HEAD
 /*
+=======
+
+>>>>>>> eb89d4091e11c4b16bb7267706a29185b5d70b8c
 func (tx *TxBlock) CopyHeader(h *BlockHeader) *BlockHeader {
 	cpy := *h
 	if cpy.Time = new(big.Int); h.Time != nil {
@@ -195,8 +199,12 @@ func (tx *TxBlock) CopyHeader(h *BlockHeader) *BlockHeader {
 	}
 	return &cpy
 }
+<<<<<<< HEAD
 */
 /*
+=======
+
+>>>>>>> eb89d4091e11c4b16bb7267706a29185b5d70b8c
 func (tx *TxBlock) Hash() []common.Hash {
 	return tx.Links
 }
@@ -246,10 +254,15 @@ func (tx *TxBlock) WithSignature(sig []byte) (*TxBlock, error) {
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD
 	tx.R=r
 	tx.S=s
 	tx.V=v
 	return tx, nil
+=======
+	cpy := &TxBlock{R: r,S:s,V:v}
+	return cpy, nil
+>>>>>>> eb89d4091e11c4b16bb7267706a29185b5d70b8c
 }
 
 
