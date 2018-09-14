@@ -39,26 +39,20 @@ var (
 	// flags that configure the node
 	nodeFlags = []cli.Flag{
 		utils.IdentityFlag,
-		utils.UnlockedAccountFlag,
-		utils.PasswordFileFlag,
+
 		utils.BootnodesFlag,
 		utils.BootnodesV4Flag,
 		utils.BootnodesV5Flag,
 		utils.DataDirFlag,
 		utils.KeyStoreDirFlag,
 		utils.NoUSBFlag,
-		utils.DashboardEnabledFlag,
-		utils.DashboardAddrFlag,
-		utils.DashboardPortFlag,
-		utils.DashboardRefreshFlag,
 
-		utils.SyncModeFlag,
 		utils.GCModeFlag,
 
 		utils.CacheFlag,
 		utils.CacheDatabaseFlag,
 		utils.CacheGCFlag,
-		utils.TrieCacheGenFlag,
+
 		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
@@ -73,12 +67,12 @@ var (
 		utils.DeveloperPeriodFlag,
 		utils.TestnetFlag,
 		utils.RinkebyFlag,
-		utils.VMEnableDebugFlag,
+
 		utils.NetworkIdFlag,
 		utils.RPCCORSDomainFlag,
 		utils.RPCVirtualHostsFlag,
 		utils.EthStatsURLFlag,
-		utils.MetricsEnabledFlag,
+
 		utils.FakePoWFlag,
 		utils.NoCompactionFlag,
 
@@ -99,14 +93,7 @@ var (
 		utils.IPCPathFlag,
 	}
 
-	metricsFlags = []cli.Flag{
-		utils.MetricsEnableInfluxDBFlag,
-		utils.MetricsInfluxDBEndpointFlag,
-		utils.MetricsInfluxDBDatabaseFlag,
-		utils.MetricsInfluxDBUsernameFlag,
-		utils.MetricsInfluxDBPasswordFlag,
-		utils.MetricsInfluxDBHostTagFlag,
-	}
+	metricsFlags = []cli.Flag{}
 )
 
 func init() {
@@ -132,7 +119,7 @@ func init() {
 
 	app.Flags = append(app.Flags, nodeFlags...)
 	app.Flags = append(app.Flags, rpcFlags...)
-	app.Flags = append(app.Flags, consoleFlags...)
+	//app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, metricsFlags...)
 
@@ -140,7 +127,7 @@ func init() {
 
 	app.After = func(ctx *cli.Context) error {
 		debug.Exit()
-		console.Stdin.Close() // Resets terminal mode.
+		//console.Stdin.Close() // Resets terminal mode.
 		return nil
 	}
 }

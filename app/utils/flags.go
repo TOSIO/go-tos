@@ -24,6 +24,8 @@ import (
 
 	"github.com/TOSIO/go-tos/devbase/metrics"
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/sdag"
+	"github.com/TOSIO/go-tos/services/p2p"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -64,7 +66,7 @@ func NewApp(gitCommit, usage string) *cli.App {
 	app.Author = ""
 	//app.Authors = nil
 	app.Email = ""
-	app.Version = params.VersionWithMeta
+	app.Version = "-unstable"
 	if len(gitCommit) >= 8 {
 		app.Version += "-" + gitCommit[:8]
 	}
@@ -97,7 +99,7 @@ var (
 	NetworkIdFlag = cli.Uint64Flag{
 		Name:  "networkid",
 		Usage: "Network identifier (integer, 1=Frontier, 2=Morden (disused), 3=Ropsten, 4=Rinkeby)",
-		Value: eth.DefaultConfig.NetworkId,
+		Value: sdag.DefaultConfig.NetworkId,
 	}
 	TestnetFlag = cli.BoolFlag{
 		Name:  "testnet",
@@ -149,25 +151,11 @@ var (
 		Name:  "lightkdf",
 		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
 	} */
+
 	// Dashboard settings
 	DashboardEnabledFlag = cli.BoolFlag{
 		Name:  metrics.DashboardEnabledFlag,
 		Usage: "Enable the dashboard",
-	}
-	DashboardAddrFlag = cli.StringFlag{
-		Name:  "dashboard.addr",
-		Usage: "Dashboard listening interface",
-		Value: dashboard.DefaultConfig.Host,
-	}
-	DashboardPortFlag = cli.IntFlag{
-		Name:  "dashboard.host",
-		Usage: "Dashboard listening port",
-		Value: dashboard.DefaultConfig.Port,
-	}
-	DashboardRefreshFlag = cli.DurationFlag{
-		Name:  "dashboard.refresh",
-		Usage: "Dashboard metrics collection refresh rate",
-		Value: dashboard.DefaultConfig.Refresh,
 	}
 
 	// Performance tuning settings
@@ -186,11 +174,7 @@ var (
 		Usage: "Percentage of cache memory allowance to use for trie pruning",
 		Value: 25,
 	}
-	TrieCacheGenFlag = cli.IntFlag{
-		Name:  "trie-cache-gens",
-		Usage: "Number of trie node generations to keep in memory",
-		Value: int(state.MaxTrieCacheGen),
-	}
+
 	// Miner settings
 
 	// Account settings
@@ -353,12 +337,17 @@ var (
 	}
 )
 
-func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
-	/* 	SetP2PConfig(ctx, &cfg.P2P)
-	   	setIPC(ctx, cfg)
-	   	setHTTP(ctx, cfg)
-	   	setWS(ctx, cfg)
-	   	setNodeUserIdent(ctx, cfg) */
+func updateP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
+
+}
+
+// 为node模块应用命令行参数
+func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
+	updateP2PConfig(ctx, &cfg.P2P)
+	/*   	setIPC(ctx, cfg)
+	setHTTP(ctx, cfg)
+	setWS(ctx, cfg)
+	setNodeUserIdent(ctx, cfg) */
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -374,15 +363,39 @@ func SetNodeConfig(ctx *cli.Context, cfg *node.Config) {
 	if ctx.GlobalIsSet(KeyStoreDirFlag.Name) {
 		cfg.KeyStoreDir = ctx.GlobalString(KeyStoreDirFlag.Name)
 	}
-	if ctx.GlobalIsSet(LightKDFFlag.Name) {
+	/* 	if ctx.GlobalIsSet(LightKDFFlag.Name) {
 		cfg.UseLightweightKDF = ctx.GlobalBool(LightKDFFlag.Name)
-	}
+	} */
 	if ctx.GlobalIsSet(NoUSBFlag.Name) {
 		cfg.NoUSB = ctx.GlobalBool(NoUSBFlag.Name)
 	}
 }
 
-func SetSdagConfig(ctx *cli.Context, cfg *node.Config) {
+// 为sdag模块应用命令行参数
+func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
+	if ctx.GlobalIsSet(NetworkIdFlag.Name) {
+		cfg.NetworkId = ctx.GlobalUint64(NetworkIdFlag.Name)
+	}
+
+	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheDatabaseFlag.Name) {
+		cfg.DatabaseCache = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
+	}
+
+	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
+		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
+	}
+
+	// Override any default configs for hard coded networks.
+	switch {
+	case ctx.GlobalBool(TestnetFlag.Name):
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkId = 3
+		}
+	case ctx.GlobalBool(RinkebyFlag.Name):
+		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+			cfg.NetworkId = 4
+		}
+	}
 
 }
 

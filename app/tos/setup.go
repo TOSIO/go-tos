@@ -2,24 +2,37 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	godebug "runtime/debug"
+	"strconv"
+	"time"
 
-	"github.com/TOSIO/go-tos/internal/debug"
+	"github.com/TOSIO/go-tos/sdag"
+	"github.com/elastic/gosigar"
+
 	"github.com/TOSIO/go-tos/app/utils"
 	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/internal/debug"
 	"github.com/TOSIO/go-tos/node"
 	cli "gopkg.in/urfave/cli.v1"
 )
 
+func defaultNodeConfig() node.Config {
+	cfg := node.DefaultConfig
+	return cfg
+}
+
 //读取配置文件、各模块应用命令行参数进行配置初始化
 //返回节点对象
-func makeConfigNode(ctx *cli.Context) (*node.Node, TOSConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	// Load defaults.
-	cfg := TOSConfig{
+	cfg := tosConfig{
 		// 各模块config变量初始化
+		Sdag: sdag.DefaultConfig,
+		Node: defaultNodeConfig(),
 		//Dashboard: dashboard.DefaultConfig,
-
 	}
 
 	// Load config file.
@@ -30,18 +43,20 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, TOSConfig) {
 	}
 
 	// Apply flags.应用命令行传递进来的参数（参数封装在ctx中）
-	utils.SetNodeConfig(ctx, &cfg.Node)
+	utils.ApplyNodeFlags(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)
 	if err != nil {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 
-	// 其他模块config设置
+	utils.ApplySdagFlags(ctx, &cfg.Sdag)
 
+	// 其他模块config设置
+	fmt.Printf("makeConfigNode | warning other moduler config is not yet been")
 	return stack, cfg
 }
 
-func activePPROF(ctx *cli.Context)error {
+func activePPROF(ctx *cli.Context) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	logdir := ""
@@ -81,7 +96,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
 
 	// 服务注册
-	//utils.RegisterEthService(stack, &cfg.Eth)
+	utils.RegisterSdagService(stack, &cfg.Sdag)
 
 	//if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 	//	utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
@@ -91,18 +106,17 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 //启动账户相关服务
 func activeAccount(ctx *cli.Context, stack *node.Node) {
-	
+	fmt.Printf("activeAccount | called.")
 }
 
 //启动辅助服务
-func startAuxservice(ctx *cli.Context, stack *node.Node){
-
+func startAuxservice(ctx *cli.Context, stack *node.Node) {
+	fmt.Printf("startAuxservice | called.")
 }
 
 //钱包循环
-func walletloop(stack *node.Node)
-{
-
+func walletloop(stack *node.Node) {
+	fmt.Printf("walletloop | called.")
 }
 
 // startNode boots up the system node and all registered protocols, after which
@@ -119,7 +133,7 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	activeAccount(ctx, stack)
 
 	// 钱包相关
-	go walletloop()
+	go walletloop(stack)
 
 	// 启动辅助服务（如挖矿、内存交易池等）
 	// Start auxiliary services if enabled
