@@ -1,15 +1,14 @@
 package types
 
 import (
-	"fmt"
-	"math/big"
-	"crypto/ecdsa"
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/crypto"
-	"github.com/TOSIO/go-tos/devbase/rlp"
+	"math/big"
 	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
-	"errors"
+	"github.com/TOSIO/go-tos/devbase/rlp"
+	"crypto/ecdsa"
+	"fmt"
 )
+
 var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
@@ -148,7 +147,7 @@ type TxOut struct {
 //交易区块
 type TxBlock struct {
 	Header BlockHeader
-	Links []common.Hash //外部參數
+	Links []common.Hash
 	AccountNonce uint64
 	Outs []TxOut
 	Payload []byte
