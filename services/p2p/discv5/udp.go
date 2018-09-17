@@ -239,7 +239,7 @@ func ListenUDP(priv *ecdsa.PrivateKey, conn conn, realaddr *net.UDPAddr, nodeDBP
 	if err != nil {
 		return nil, err
 	}
-	log.Info("UDP listener up", "net", net.tab.self)
+	log.Info("dicvs5-UDP listener up", "net", net.tab.self)
 	transport.net = net
 	go transport.readLoop()
 	return net, nil
@@ -327,6 +327,7 @@ func (t *udp) sendTopicNodes(remote *Node, queryHash common.Hash, nodes []*Node)
 }
 
 func (t *udp) sendPacket(toid NodeID, toaddr *net.UDPAddr, ptype byte, req interface{}) (hash []byte, err error) {
+	log.Trace("udp.sendPacket-discv5 | sendPacket,", "toid", toid, "toaddr", toaddr, "ptype", ptype, "req", req)
 	//fmt.Println("sendPacket", nodeEvent(ptype), toaddr.String(), toid.String())
 	packet, hash, err := encodePacket(t.priv, ptype, req)
 	if err != nil {
@@ -334,6 +335,7 @@ func (t *udp) sendPacket(toid NodeID, toaddr *net.UDPAddr, ptype byte, req inter
 		return hash, err
 	}
 	log.Trace(fmt.Sprintf(">>> %v to %x@%v", nodeEvent(ptype), toid[:8], toaddr))
+	log.Trace("udp.sendPacket-discv5 | sendPacket,", "toid", toid, "toaddr", toaddr, "ptype", ptype, "req", req, "packet", packet)
 	if nbytes, err := t.conn.WriteToUDP(packet, toaddr); err != nil {
 		log.Trace(fmt.Sprint("UDP send failed:", err))
 	} else {
@@ -376,6 +378,7 @@ func (t *udp) readLoop() {
 	buf := make([]byte, 1280)
 	for {
 		nbytes, from, err := t.conn.ReadFromUDP(buf)
+		log.Trace("func udp.readLoop-discv5 | read message:", "from", from, "msg", buf[:nbytes])
 		ingressTrafficMeter.Mark(int64(nbytes))
 		if netutil.IsTemporaryError(err) {
 			// Ignore temporary read errors.
@@ -391,6 +394,7 @@ func (t *udp) readLoop() {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
+	log.Debug("udp.handlePacket-discv5 | receive message,", "from", from, "packet", buf)
 	pkt := ingressPacket{remoteAddr: from}
 	if err := decodePacket(buf, &pkt); err != nil {
 		log.Debug(fmt.Sprintf("Bad packet from %v: %v", from, err))

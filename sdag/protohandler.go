@@ -102,13 +102,13 @@ func (pm *ProtocolManager) initProtocols() error {
 }
 
 func (pm *ProtocolManager) removePeer(id string) {
-	fmt.Println("ProtocolManager.removePeer called.")
+	log.Info("ProtocolManager.removePeer called.")
 	// Short circuit if the peer was already removed
 	peer := pm.peers.Peer(id)
 	if peer == nil {
 		return
 	}
-	log.Debug("Removing TOS peer", "peer", id)
+	log.Info("Removing TOS peer", "peer", id)
 
 	// Unregister the peer from the downloader and TOS peer set
 	if err := pm.peers.Unregister(id); err != nil {
@@ -121,12 +121,11 @@ func (pm *ProtocolManager) removePeer(id string) {
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
-	fmt.Println("ProtocolManager.Start called.")
-
+	log.Info("ProtocolManager.Start called.")
 }
 
 func (pm *ProtocolManager) Stop() {
-	fmt.Println("ProtocolManager.Stop called.")
+	log.Info("ProtocolManager.Stop called.")
 
 	log.Info("Stopping TOS protocol")
 
@@ -151,12 +150,12 @@ func (pm *ProtocolManager) Stop() {
 }
 
 func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
-	fmt.Println("ProtocolManager.newPeer called.")
+	p.Log().Info("ProtocolManager.newPeer called.")
 	return newPeer(pv, p, rw)
 }
 
 func (pm *ProtocolManager) handle(p *peer) error {
-	fmt.Println("ProtocolManager.handle called.")
+	p.Log().Info("ProtocolManager.handle called.")
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
@@ -192,7 +191,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 func (pm *ProtocolManager) handleMsg(p *peer) error {
-	fmt.Println("ProtocolManager.handleMsg called.")
+	p.Log().Info("ProtocolManager.handleMsg called.")
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
@@ -201,13 +200,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
 	defer msg.Discard()
-	fmt.Println("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
+	p.Log().Info("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
 	return nil
 }
 
 // NodeInfo retrieves some protocol metadata about the running host node.
 func (pm *ProtocolManager) NodeInfo() *NodeInfo {
-	fmt.Println("ProtocolManager.NodeInfo called.")
 	return &NodeInfo{
 		Network:    pm.networkID,
 		Difficulty: nil,

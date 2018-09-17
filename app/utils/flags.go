@@ -18,14 +18,23 @@
 package utils
 
 import (
+	"crypto/ecdsa"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/metrics"
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag"
 	"github.com/TOSIO/go-tos/services/p2p"
+	"github.com/TOSIO/go-tos/services/p2p/discover"
+	"github.com/TOSIO/go-tos/services/p2p/discv5"
+	"github.com/TOSIO/go-tos/services/p2p/nat"
+	"github.com/TOSIO/go-tos/services/p2p/netutil"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -337,10 +346,6 @@ var (
 	}
 )
 
-func updateP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
-
-}
-
 // 为node模块应用命令行参数
 func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 	updateP2PConfig(ctx, &cfg.P2P)
@@ -437,5 +442,162 @@ func MigrateFlags(action func(ctx *cli.Context) error) func(*cli.Context) error 
 			}
 		}
 		return action(ctx)
+	}
+}
+
+func updateP2PConfig(ctx *cli.Context, cfg *p2p.Config) {
+	setNodeKey(ctx, cfg)
+	setNAT(ctx, cfg)
+	setListenAddress(ctx, cfg)
+	setBootstrapNodes(ctx, cfg)
+	setBootstrapNodesV5(ctx, cfg)
+
+	if ctx.GlobalIsSet(MaxPeersFlag.Name) {
+		cfg.MaxPeers = ctx.GlobalInt(MaxPeersFlag.Name)
+
+	}
+
+	log.Info("Maximum peer count", "sdag", cfg.MaxPeers, "total", cfg.MaxPeers)
+
+	if ctx.GlobalIsSet(MaxPendingPeersFlag.Name) {
+		cfg.MaxPendingPeers = ctx.GlobalInt(MaxPendingPeersFlag.Name)
+	}
+	if ctx.GlobalIsSet(NoDiscoverFlag.Name) {
+		cfg.NoDiscovery = true
+	}
+
+	// if we're running a light client or server, force enable the v5 peer discovery
+	// unless it is explicitly disabled with --nodiscover note that explicitly specifying
+	// --v5disc overrides --nodiscover, in which case the later only disables v4 discovery
+	forceV5Discovery := !ctx.GlobalBool(NoDiscoverFlag.Name)
+	if ctx.GlobalIsSet(DiscoveryV5Flag.Name) {
+		cfg.DiscoveryV5 = ctx.GlobalBool(DiscoveryV5Flag.Name)
+	} else if forceV5Discovery {
+		cfg.DiscoveryV5 = true
+	}
+
+	if netrestrict := ctx.GlobalString(NetrestrictFlag.Name); netrestrict != "" {
+		list, err := netutil.ParseNetlist(netrestrict)
+		if err != nil {
+			Fatalf("Option %q: %v", NetrestrictFlag.Name, err)
+		}
+		cfg.NetRestrict = list
+	}
+
+	if ctx.GlobalBool(DeveloperFlag.Name) {
+		// --dev mode can't use p2p networking.
+		cfg.MaxPeers = 0
+		cfg.ListenAddr = ":0"
+		cfg.NoDiscovery = true
+		cfg.DiscoveryV5 = false
+	}
+}
+
+// setNodeKey creates a node key from set command line flags, either loading it
+// from a file or as a specified hex value. If neither flags were provided, this
+// method returns nil and an emphemeral key is to be generated.
+func setNodeKey(ctx *cli.Context, cfg *p2p.Config) {
+	var (
+		hex  = ctx.GlobalString(NodeKeyHexFlag.Name)
+		file = ctx.GlobalString(NodeKeyFileFlag.Name)
+		key  *ecdsa.PrivateKey
+		err  error
+	)
+	switch {
+	case file != "" && hex != "":
+		Fatalf("Options %q and %q are mutually exclusive", NodeKeyFileFlag.Name, NodeKeyHexFlag.Name)
+	case file != "":
+		if key, err = crypto.LoadECDSA(file); err != nil {
+			Fatalf("Option %q: %v", NodeKeyFileFlag.Name, err)
+		}
+		cfg.PrivateKey = key
+	case hex != "":
+		if key, err = crypto.HexToECDSA(hex); err != nil {
+			Fatalf("Option %q: %v", NodeKeyHexFlag.Name, err)
+		}
+		cfg.PrivateKey = key
+	}
+}
+
+// setNodeUserIdent creates the user identifier from CLI flags.
+func setNodeUserIdent(ctx *cli.Context, cfg *node.Config) {
+	if identity := ctx.GlobalString(IdentityFlag.Name); len(identity) > 0 {
+		cfg.UserIdent = identity
+	}
+}
+
+// setBootstrapNodes creates a list of bootstrap nodes from the command line
+// flags, reverting to pre-configured ones if none have been specified.
+func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
+	urls := params.MainnetBootnodes
+	switch {
+	case ctx.GlobalIsSet(BootnodesFlag.Name) || ctx.GlobalIsSet(BootnodesV4Flag.Name):
+		if ctx.GlobalIsSet(BootnodesV4Flag.Name) {
+			urls = strings.Split(ctx.GlobalString(BootnodesV4Flag.Name), ",")
+		} else {
+			urls = strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",")
+		}
+	case ctx.GlobalBool(TestnetFlag.Name):
+		urls = params.TestnetBootnodes
+	case ctx.GlobalBool(RinkebyFlag.Name):
+		urls = params.RinkebyBootnodes
+	case cfg.BootstrapNodes != nil:
+		return // already set, don't apply defaults.
+	}
+
+	cfg.BootstrapNodes = make([]*discover.Node, 0, len(urls))
+	for _, url := range urls {
+		node, err := discover.ParseNode(url)
+		if err != nil {
+			log.Crit("Bootstrap URL invalid", "enode", url, "err", err)
+		}
+		cfg.BootstrapNodes = append(cfg.BootstrapNodes, node)
+	}
+}
+
+// setBootstrapNodesV5 creates a list of bootstrap nodes from the command line
+// flags, reverting to pre-configured ones if none have been specified.
+func setBootstrapNodesV5(ctx *cli.Context, cfg *p2p.Config) {
+	urls := params.DiscoveryV5Bootnodes
+	switch {
+	case ctx.GlobalIsSet(BootnodesFlag.Name) || ctx.GlobalIsSet(BootnodesV5Flag.Name):
+		if ctx.GlobalIsSet(BootnodesV5Flag.Name) {
+			urls = strings.Split(ctx.GlobalString(BootnodesV5Flag.Name), ",")
+		} else {
+			urls = strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",")
+		}
+	case ctx.GlobalBool(RinkebyFlag.Name):
+		urls = params.RinkebyBootnodes
+	case cfg.BootstrapNodesV5 != nil:
+		return // already set, don't apply defaults.
+	}
+
+	cfg.BootstrapNodesV5 = make([]*discv5.Node, 0, len(urls))
+	for _, url := range urls {
+		node, err := discv5.ParseNode(url)
+		if err != nil {
+			log.Error("Bootstrap URL invalid", "enode", url, "err", err)
+			continue
+		}
+		cfg.BootstrapNodesV5 = append(cfg.BootstrapNodesV5, node)
+	}
+}
+
+// setListenAddress creates a TCP listening address string from set command
+// line flags.
+func setListenAddress(ctx *cli.Context, cfg *p2p.Config) {
+	if ctx.GlobalIsSet(ListenPortFlag.Name) {
+		cfg.ListenAddr = fmt.Sprintf(":%d", ctx.GlobalInt(ListenPortFlag.Name))
+	}
+}
+
+// setNAT creates a port mapper from command line flags.
+func setNAT(ctx *cli.Context, cfg *p2p.Config) {
+	if ctx.GlobalIsSet(NATFlag.Name) {
+		natif, err := nat.Parse(ctx.GlobalString(NATFlag.Name))
+		if err != nil {
+			Fatalf("Option %s: %v", NATFlag.Name, err)
+		}
+		cfg.NAT = natif
 	}
 }

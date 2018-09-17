@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math"
 	"runtime"
 	godebug "runtime/debug"
@@ -52,7 +51,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	utils.ApplySdagFlags(ctx, &cfg.Sdag)
 
 	// 其他模块config设置
-	fmt.Printf("makeConfigNode | warning other moduler config is not yet been")
+	log.Info("makeConfigNode | warning other moduler config is not yet been")
 	return stack, cfg
 }
 
@@ -106,17 +105,17 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 //启动账户相关服务
 func activeAccount(ctx *cli.Context, stack *node.Node) {
-	fmt.Printf("activeAccount | called.")
+	log.Info("activeAccount | called.")
 }
 
 //启动辅助服务
 func startAuxservice(ctx *cli.Context, stack *node.Node) {
-	fmt.Printf("startAuxservice | called.")
+	log.Info("startAuxservice | called.")
 }
 
 //钱包循环
 func walletloop(stack *node.Node) {
-	fmt.Printf("walletloop | called.")
+	log.Info("walletloop | called.")
 }
 
 // startNode boots up the system node and all registered protocols, after which

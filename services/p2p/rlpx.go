@@ -39,6 +39,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto/ecies"
 	"github.com/TOSIO/go-tos/devbase/crypto/secp256k1"
 	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/services/p2p/discover"
 	"github.com/golang/snappy"
@@ -89,6 +90,7 @@ func newRLPX(fd net.Conn) transport {
 }
 
 func (t *rlpx) ReadMsg() (Msg, error) {
+	log.Trace("func rlpx.ReadMsg | called.")
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
 	t.fd.SetReadDeadline(time.Now().Add(frameReadTimeout))
@@ -96,6 +98,7 @@ func (t *rlpx) ReadMsg() (Msg, error) {
 }
 
 func (t *rlpx) WriteMsg(msg Msg) error {
+	log.Trace("func rlpx.WriteMsg | write message,", "msg", msg)
 	t.wmu.Lock()
 	defer t.wmu.Unlock()
 	t.fd.SetWriteDeadline(time.Now().Add(frameWriteTimeout))
@@ -484,6 +487,8 @@ type plainDecoder interface {
 }
 
 func readHandshakeMsg(msg plainDecoder, plainSize int, prv *ecdsa.PrivateKey, r io.Reader) ([]byte, error) {
+	log.Trace("func readHandshakeMsg | called.")
+
 	buf := make([]byte, plainSize)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return buf, err
@@ -597,6 +602,8 @@ func newRLPXFrameRW(conn io.ReadWriter, s secrets) *rlpxFrameRW {
 }
 
 func (rw *rlpxFrameRW) WriteMsg(msg Msg) error {
+	log.Trace("func rlpxFrameRW.WriteMsg | write message,", "msg", msg)
+
 	ptype, _ := rlp.EncodeToBytes(msg.Code)
 
 	// if snappy is enabled, compress message now
@@ -650,6 +657,8 @@ func (rw *rlpxFrameRW) WriteMsg(msg Msg) error {
 }
 
 func (rw *rlpxFrameRW) ReadMsg() (msg Msg, err error) {
+	log.Trace("func rlpxFrameRW.ReadMsg | try to read message...")
+
 	// read the header
 	headbuf := make([]byte, 32)
 	if _, err := io.ReadFull(rw.conn, headbuf); err != nil {

@@ -63,12 +63,12 @@ func (p *peer) close() {
 
 // 节点传输的业务逻辑在此实现
 func (p *peer) broadcast() {
-	fmt.Println("Peer.broadcast() called.")
+	p.Log().Info("Peer.broadcast() called.")
 	for {
 		select {
 
 		case <-p.term:
-			fmt.Println("Peer.broadcast() exit.")
+			p.Log().Info("Peer.broadcast() exit.")
 			return
 		}
 	}
@@ -84,7 +84,7 @@ func (p *peer) Handshake(network uint64) error {
 	}()
 	go func() {
 		msg, err := p.rw.ReadMsg()
-		fmt.Println("recv message : ", msg)
+		p.Log().Info("recv message : ", msg)
 		errc <- err
 	}()
 	timeout := time.NewTimer(handshakeTimeout)

@@ -328,6 +328,7 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 		}
 		return nreceived >= bucketSize
 	})
+	log.Trace("func udp.findnode | send request,", "toid", toid, "toaddr", toaddr, "target", target)
 	t.send(toaddr, findnodePacket, &findnode{
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
@@ -494,6 +495,7 @@ func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) 
 }
 
 func (t *udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
+	log.Trace("func udp.write | write message,", "toaddr", toaddr, "what", what, "packet", packet)
 	_, err := t.conn.WriteToUDP(packet, toaddr)
 	log.Trace(">> "+what, "addr", toaddr, "err", err)
 	return err
@@ -534,6 +536,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 	buf := make([]byte, 1280)
 	for {
 		nbytes, from, err := t.conn.ReadFromUDP(buf)
+		log.Trace("func udp.readLoop-discv4 | read message:", "from", from, "msg", buf[:nbytes])
 		if netutil.IsTemporaryError(err) {
 			// Ignore temporary read errors.
 			log.Debug("Temporary UDP read error", "err", err)
@@ -553,6 +556,8 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
+	log.Debug("udp.handlePacket-discov4 | receive message,", "from", from, "packet", buf)
+
 	packet, fromID, hash, err := decodePacket(buf)
 	if err != nil {
 		log.Debug("Bad discv4 packet", "addr", from, "err", err)
@@ -570,6 +575,7 @@ func decodePacket(buf []byte) (packet, NodeID, []byte, error) {
 	hash, sig, sigdata := buf[:macSize], buf[macSize:headSize], buf[headSize:]
 	shouldhash := crypto.Keccak256(buf[macSize:])
 	if !bytes.Equal(hash, shouldhash) {
+		log.Debug("decodePacket | recevice ", "hash", hash, "shouldhash", shouldhash)
 		return nil, NodeID{}, nil, errBadHash
 	}
 	fromID, err := recoverNodeID(crypto.Keccak256(buf[headSize:]), sig)
@@ -598,6 +604,8 @@ func (req *ping) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte) er
 	if expired(req.Expiration) {
 		return errExpired
 	}
+	log.Trace("func ping.handle | handle ping,", "to", t, "from", from, "mac", mac)
+
 	t.send(from, pongPacket, &pong{
 		To:         makeEndpoint(from, req.From.TCP),
 		ReplyTok:   mac,
@@ -659,12 +667,14 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte
 			p.Nodes = append(p.Nodes, nodeToRPC(n))
 		}
 		if len(p.Nodes) == maxNeighbors {
+			log.Trace("func findnode.handle | send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
 			t.send(from, neighborsPacket, &p)
 			p.Nodes = p.Nodes[:0]
 			sent = true
 		}
 	}
 	if len(p.Nodes) > 0 || !sent {
+		log.Trace("func findnode.handle | send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
 		t.send(from, neighborsPacket, &p)
 	}
 	return nil

@@ -1,7 +1,6 @@
 package sdag
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/TOSIO/go-tos/devbase/log"
@@ -60,7 +59,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 //实现service APIs()接口,返回sdag支持的rpc API接口
 func (s *Sdag) APIs() []interface{} {
-	fmt.Println("Sdag.APIs() called.")
+	log.Debug("Sdag.APIs() called.")
 	return nil
 }
 
@@ -68,7 +67,7 @@ func (s *Sdag) APIs() []interface{} {
 // network protocols to start.
 //实现service Protocols()接口,返回sdag支持的rpc API接口
 func (s *Sdag) Protocols() []p2p.Protocol {
-	fmt.Println("Sdag.Protocols() called.")
+	log.Debug("Sdag.Protocols() called.")
 	return nil
 }
 
@@ -76,11 +75,11 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 // tos protocol implementation.
 //实现service Start()接口,启动协议
 func (s *Sdag) Start(srvr *p2p.Server) error {
-	fmt.Println("Sdag.Start() called.")
+	log.Debug("Sdag.Start() called.")
 	return nil
 }
 
 func (s *Sdag) Stop() error {
-	fmt.Println("Sdag.Stop() called.")
+	log.Debug("Sdag.Stop() called.")
 	return nil
 }

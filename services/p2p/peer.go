@@ -271,6 +271,7 @@ func (p *Peer) readLoop(errc chan<- error) {
 }
 
 func (p *Peer) handle(msg Msg) error {
+	log.Trace("func Peer.handle | handle message,", "msg", msg)
 	switch {
 	case msg.Code == pingMsg:
 		msg.Discard()
@@ -385,6 +386,7 @@ type protoRW struct {
 }
 
 func (rw *protoRW) WriteMsg(msg Msg) (err error) {
+	log.Trace("func protoRW.WriteMsg | write a message,", "msg", msg)
 	if msg.Code >= rw.Length {
 		return newPeerError(errInvalidMsgCode, "not handled")
 	}
@@ -404,6 +406,7 @@ func (rw *protoRW) WriteMsg(msg Msg) (err error) {
 }
 
 func (rw *protoRW) ReadMsg() (Msg, error) {
+	log.Trace("func protoRW.WriteMsg | try to read message...")
 	select {
 	case msg := <-rw.in:
 		msg.Code -= rw.offset

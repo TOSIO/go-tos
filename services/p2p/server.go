@@ -459,7 +459,7 @@ func (srv *Server) Start() (err error) {
 		unhandled chan discover.ReadPacket
 	)
 
-	if !srv.NoDiscovery || srv.DiscoveryV5 {
+	if !srv.NoDiscovery || srv.DiscoveryV5 { //
 		addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
 		if err != nil {
 			return err
@@ -508,8 +508,10 @@ func (srv *Server) Start() (err error) {
 			err  error
 		)
 		if sconn != nil {
+			log.Trace("func Server.Start | use shared udp connection for discovery v5")
 			ntab, err = discv5.ListenUDP(srv.PrivateKey, sconn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
 		} else {
+			log.Trace("func Server.Start | use non-shared udp connection for discovery v5")
 			ntab, err = discv5.ListenUDP(srv.PrivateKey, conn, realaddr, "", srv.NetRestrict) //srv.NodeDatabase)
 		}
 		if err != nil {
