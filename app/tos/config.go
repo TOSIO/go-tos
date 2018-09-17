@@ -20,14 +20,18 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"unicode"
+
+	"github.com/TOSIO/go-tos/node"
 
 	cli "gopkg.in/urfave/cli.v1"
 
 	//"github.com/TOSIO/go-ethereum/dashboard"
 	"github.com/TOSIO/go-tos/app/utils"
+	"github.com/TOSIO/go-tos/sdag"
 
 	//"github.com/TOSIO/go-tos/params"
 	//whisper "github.com/ethereum/go-ethereum/whisper/whisperv6"
@@ -40,7 +44,7 @@ var (
 		Name:        "dumpconfig",
 		Usage:       "Show configuration values",
 		ArgsUsage:   "",
-		Flags:       append(append(nodeFlags, rpcFlags...), whisperFlags...),
+		Flags:       append(append(nodeFlags, rpcFlags...)),
 		Category:    "MISCELLANEOUS COMMANDS",
 		Description: `The dumpconfig command shows configuration values.`,
 	}
@@ -72,12 +76,14 @@ type TOSstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type TOSConfig struct {
+type tosConfig struct {
+	Sdag     sdag.Config
+	Node     node.Config
 	TOSstats TOSstatsConfig
 	//Dashboard dashboard.Config
 }
 
-func loadConfig(file string, cfg *gethConfig) error {
+func loadConfig(file string, cfg *tosConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -143,14 +149,9 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 } */
 
 // dumpConfig is the dumpconfig command.
-/* func dumpConfig(ctx *cli.Context) error {
+func dumpConfig(ctx *cli.Context) error {
 	_, cfg := makeConfigNode(ctx)
 	comment := ""
-
-	if cfg.Eth.Genesis != nil {
-		cfg.Eth.Genesis = nil
-		comment += "# Note: this config doesn't contain the genesis block.\n\n"
-	}
 
 	out, err := tomlSettings.Marshal(&cfg)
 	if err != nil {
@@ -160,4 +161,3 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	os.Stdout.Write(out)
 	return nil
 }
-*/

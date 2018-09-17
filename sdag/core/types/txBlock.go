@@ -1,6 +1,7 @@
 package types
 
 import (
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
@@ -10,6 +11,14 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
 	"github.com/TOSIO/go-tos/devbase/rlp"
+=======
+	"github.com/TOSIO/go-tos/devbase/common"
+	"math/big"
+	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
+	"github.com/TOSIO/go-tos/devbase/rlp"
+	"crypto/ecdsa"
+	"fmt"
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 )
 
 var (
@@ -95,9 +104,14 @@ func (tx1 *TxBlock) Sender(tx *TxBlock) (common.Address, error) {
 func (tx1 *TxBlock) GetPublicKey(sighash common.Hash, sig []byte) ([]byte, error) {
 	pub, err := crypto.Ecrecover(sighash[:], sig)
 	fmt.Println(len(pub))
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 	//return crypto.ToECDSAPub(pub), err
 	//pub1 := crypto.UnmarshalPubkey(pub)
 	return pub, err
+=======
+	//	return crypto.ToECDSAPub(pub),err
+	UnmarshalPubkey(pub)
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 }
 
 func (tx1 *TxBlock) VerifySignature(pubkey, hash, signature []byte) bool {
@@ -149,8 +163,13 @@ type TxOut struct {
 
 //交易区块
 type TxBlock struct {
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 	Header       BlockHeader
 	Links        []common.Hash //外部參數
+=======
+	Header BlockHeader
+	Links []common.Hash
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 	AccountNonce uint64
 	Outs         []TxOut
 	Payload      []byte
@@ -160,8 +179,14 @@ type TxBlock struct {
 	R *big.Int `json:"r" gencodec:"required"`
 	S *big.Int `json:"s" gencodec:"required"`
 
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 	difficulty *big.Int
 	hash       common.Hash
+=======
+	difficulty  *big.Int
+	hash common.Hash
+
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 }
 type TxBlock_T struct {
 	Header       BlockHeader
@@ -208,7 +233,11 @@ func (tx *TxBlock) Diff()  *big.Int {
 }
 
 */
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 func (tx *TxBlock) Time() *big.Int {
+=======
+func (tx *TxBlock) Time() *big.Int  {
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 	return new(big.Int).Set(tx.Header.Time)
 }
 
@@ -246,9 +275,15 @@ func (tx *TxBlock) WithSignature(sig []byte) (*TxBlock, error) {
 	if err != nil {
 		return nil, err
 	}
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 	tx.R = r
 	tx.S = s
 	tx.V = v
+=======
+	tx.R=r
+	tx.S=s
+	tx.V=v
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 	return tx, nil
 }
 
@@ -262,9 +297,16 @@ func (tx *TxBlock) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 	return r, s, v, nil
 }
 
+<<<<<<< HEAD:sdag/core/type/txBlock.go
 func (tx TxBlock) EncodeRLP(val interface{}) ([]byte, error) {
 	b, err := rlp.EncodeToBytes(&val)
 	return b, err
+=======
+
+func (tx TxBlock) EncodeRLP(val interface{}) ([]byte,error) {
+	b,err :=rlp.EncodeToBytes(&val)
+	return b,err
+>>>>>>> e87d0b1cb4f3a632f1b35b33fd683f9916026a7c:sdag/core/types/txBlock.go
 }
 
 // DecodeRLP implements rlp.Decoder

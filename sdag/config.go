@@ -1,5 +1,12 @@
 package sdag
 
+//sdag的参数配置在此定义
 type Config struct {
-	NetworkId uint64 // Network ID to use for selecting peers to connect to
+	NetworkId     uint64 // Network ID to use for selecting peers to connect to
+	DatabaseCache int
+}
+
+var DefaultConfig = Config{
+	NetworkId:     1,
+	DatabaseCache: 768,
 }

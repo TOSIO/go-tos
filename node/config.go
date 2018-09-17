@@ -34,7 +34,7 @@ import (
 	   	"github.com/TOSIO/go-tos/rpc"
 	   	"github.com/ethereum/go-ethereum/accounts"
 	   	"github.com/ethereum/go-ethereum/accounts/keystore"
-	   	"github.com/ethereum/go-ethereum/accounts/usbwallet" */)
+		   "github.com/ethereum/go-ethereum/accounts/usbwallet" */)
 
 const (
 	datadirPrivateKey      = "nodekey"            // Path within the datadir to the node's private key

@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/node"
-	"github.com/TOSIO/go-tos/services/accounts"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
 
@@ -25,13 +23,13 @@ type Sdag struct {
 
 	// Handlers(tx mempool)
 	blockchain      *interface{}
-	protocolManager *interface{} //消息协议管理器（与p2p对接）
+	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
 	// DB interfaces
 	chainDb tosdb.Database // Block chain database
 
-	eventMux       *event.TypeMux
-	accountManager *accounts.Manager
+	eventMux       *interface{}
+	accountManager *interface{}
 
 	miner *interface{} //miner
 
@@ -43,12 +41,19 @@ type Sdag struct {
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
-
 	sdag := &Sdag{
 		//初始化
+		config:       config,
+		shutdownChan: make(chan bool),
+		networkID:    config.NetworkId,
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
+
+	var err error
+	if sdag.protocolManager, err = NewProtocolManager(nil, config.NetworkId); err != nil {
+		return nil, err
+	}
 
 	return sdag, nil
 }
@@ -72,5 +77,10 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 //实现service Start()接口,启动协议
 func (s *Sdag) Start(srvr *p2p.Server) error {
 	fmt.Println("Sdag.Start() called.")
+	return nil
+}
+
+func (s *Sdag) Stop() error {
+	fmt.Println("Sdag.Stop() called.")
 	return nil
 }
