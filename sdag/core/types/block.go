@@ -2,9 +2,15 @@ package types
 import (
 	"math/big"
 
-
 	"github.com/TOSIO/go-tos/devbase/common"
-_	"github.com/TOSIO/go-tos/devbase/rlp"
+
+	"errors"
+
+	"crypto/ecdsa"
+)
+
+var (
+	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
 //定义block公共的接口
@@ -45,25 +51,23 @@ const(
 //挖矿不包括签名，hash
 //**************************
 type Block interface {
-	Hash() common.Hash 		   //获取区块hash,包括签名,tx,miner block is the same
-	Diff() *big.Int	  		   //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
-	CumulativeDiff() *big.Int  //区块累积难度
-	Time() uint64			   //获取区块时间
-	Sender() common.Address    //获取区块发送者，即创建者,从签名获取
-	Links() []common.Address
-	RlpString() []byte 		  //获取区块原始数据
-	Status() BlockStatus   //获取状态
+	GetRlp() []byte 		   //获取区块原始数据
+	GetHash() common.Hash 		   //获取区块hash,包括签名,tx,miner block is the same
+	GetDiff() *big.Int	  		   //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
 
-	SetCumulativeDiff(diff *big.Int)
+	GetCumulativeDiff() *big.Int  //区块累积难度
+	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
+
+	GetTime() uint64			   //获取区块时间
+	GetSender() common.Address    //获取区块发送者，即创建者,从签名获取
+	GetLinks() []common.Address   //获取区块链接组
+
+	GetStatus() BlockStatus       //获取状态
 	SetStatus(status BlockStatus) //设置状态
 
-	Sign()
-	
-	RlpEncode()
-	RlpDecode()
-	Validation()// (check data,校验解签名)
-	//签名
-	//RLP编解码
+	Sign(prv *ecdsa.PrivateKey) (sig []byte, err error) //签名
+
+	Validation() error   // (check data,校验解签名)
 }
 
 type BlockHeader struct {
@@ -72,6 +76,8 @@ type BlockHeader struct {
 	GasPrice *big.Int
 	GasLimit uint64
 }
+
+
 
 
 
