@@ -5,8 +5,10 @@ import (
 
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
+	"github.com/TOSIO/go-tos/internal/tosapi"
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/services/p2p"
+	"github.com/TOSIO/go-tos/services/rpc"
 )
 
 /*
@@ -23,6 +25,9 @@ type Sdag struct {
 	// Handlers(tx mempool)
 	blockchain      *interface{}
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
+
+	APIBackend    *SdagAPIBackend
+	netRPCService *tosapi.PublicNetAPI
 
 	// DB interfaces
 	chainDb tosdb.Database // Block chain database
@@ -53,14 +58,33 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	if sdag.protocolManager, err = NewProtocolManager(nil, config.NetworkId); err != nil {
 		return nil, err
 	}
-
+	sdag.APIBackend = &SdagAPIBackend{sdag}
 	return sdag, nil
 }
 
 //实现service APIs()接口,返回sdag支持的rpc API接口
-func (s *Sdag) APIs() []interface{} {
+func (s *Sdag) APIs() []rpc.API {
 	log.Debug("Sdag.APIs() called.")
-	return nil
+	apis := tosapi.GetAPIs(s.APIBackend)
+
+	// Append all the local APIs and return
+	return append(apis, []rpc.API{
+		{
+			Namespace: "sdag",
+			Version:   "1.0",
+			Service:   NewPublicSdagAPI(s),
+			Public:    true,
+		}, {
+			Namespace: "admin",
+			Version:   "1.0",
+			Service:   NewPrivateAdminAPI(s),
+		}, {
+			Namespace: "net",
+			Version:   "1.0",
+			Service:   s.netRPCService,
+			Public:    true,
+		},
+	}...)
 }
 
 // Protocols implements node.Service, returning all the currently configured
@@ -76,6 +100,9 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 //实现service Start()接口,启动协议
 func (s *Sdag) Start(srvr *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
+	// Start the RPC service
+	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
+
 	return nil
 }
 
@@ -83,3 +110,6 @@ func (s *Sdag) Stop() error {
 	log.Debug("Sdag.Stop() called.")
 	return nil
 }
+
+func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
+func (s *Sdag) NetVersion() uint64 { return s.networkID }

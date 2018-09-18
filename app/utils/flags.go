@@ -349,10 +349,10 @@ var (
 // 为node模块应用命令行参数
 func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 	updateP2PConfig(ctx, &cfg.P2P)
-	/*   	setIPC(ctx, cfg)
+	setIPC(ctx, cfg)
 	setHTTP(ctx, cfg)
 	setWS(ctx, cfg)
-	setNodeUserIdent(ctx, cfg) */
+	setNodeUserIdent(ctx, cfg)
 
 	switch {
 	case ctx.GlobalIsSet(DataDirFlag.Name):
@@ -599,5 +599,110 @@ func setNAT(ctx *cli.Context, cfg *p2p.Config) {
 			Fatalf("Option %s: %v", NATFlag.Name, err)
 		}
 		cfg.NAT = natif
+	}
+}
+
+// setHTTP creates the HTTP RPC listener interface string from the set
+// command line flags, returning empty if the HTTP endpoint is disabled.
+func setHTTP(ctx *cli.Context, cfg *node.Config) {
+	if ctx.GlobalBool(RPCEnabledFlag.Name) && cfg.HTTPHost == "" {
+		cfg.HTTPHost = "127.0.0.1"
+		if ctx.GlobalIsSet(RPCListenAddrFlag.Name) {
+			cfg.HTTPHost = ctx.GlobalString(RPCListenAddrFlag.Name)
+		}
+	}
+
+	if ctx.GlobalIsSet(RPCPortFlag.Name) {
+		cfg.HTTPPort = ctx.GlobalInt(RPCPortFlag.Name)
+	}
+	if ctx.GlobalIsSet(RPCCORSDomainFlag.Name) {
+		cfg.HTTPCors = splitAndTrim(ctx.GlobalString(RPCCORSDomainFlag.Name))
+	}
+	if ctx.GlobalIsSet(RPCApiFlag.Name) {
+		cfg.HTTPModules = splitAndTrim(ctx.GlobalString(RPCApiFlag.Name))
+	}
+	if ctx.GlobalIsSet(RPCVirtualHostsFlag.Name) {
+		cfg.HTTPVirtualHosts = splitAndTrim(ctx.GlobalString(RPCVirtualHostsFlag.Name))
+	}
+}
+
+// setWS creates the WebSocket RPC listener interface string from the set
+// command line flags, returning empty if the HTTP endpoint is disabled.
+func setWS(ctx *cli.Context, cfg *node.Config) {
+	if ctx.GlobalBool(WSEnabledFlag.Name) && cfg.WSHost == "" {
+		cfg.WSHost = "127.0.0.1"
+		if ctx.GlobalIsSet(WSListenAddrFlag.Name) {
+			cfg.WSHost = ctx.GlobalString(WSListenAddrFlag.Name)
+		}
+	}
+
+	if ctx.GlobalIsSet(WSPortFlag.Name) {
+		cfg.WSPort = ctx.GlobalInt(WSPortFlag.Name)
+	}
+	if ctx.GlobalIsSet(WSAllowedOriginsFlag.Name) {
+		cfg.WSOrigins = splitAndTrim(ctx.GlobalString(WSAllowedOriginsFlag.Name))
+	}
+	if ctx.GlobalIsSet(WSApiFlag.Name) {
+		cfg.WSModules = splitAndTrim(ctx.GlobalString(WSApiFlag.Name))
+	}
+}
+
+// setIPC creates an IPC path configuration from the set command line flags,
+// returning an empty string if IPC was explicitly disabled, or the set path.
+func setIPC(ctx *cli.Context, cfg *node.Config) {
+	checkExclusive(ctx, IPCDisabledFlag, IPCPathFlag)
+	switch {
+	case ctx.GlobalBool(IPCDisabledFlag.Name):
+		cfg.IPCPath = ""
+	case ctx.GlobalIsSet(IPCPathFlag.Name):
+		cfg.IPCPath = ctx.GlobalString(IPCPathFlag.Name)
+	}
+}
+
+// splitAndTrim splits input separated by a comma
+// and trims excessive white space from the substrings.
+func splitAndTrim(input string) []string {
+	result := strings.Split(input, ",")
+	for i, r := range result {
+		result[i] = strings.TrimSpace(r)
+	}
+	return result
+}
+
+// checkExclusive verifies that only a single instance of the provided flags was
+// set by the user. Each flag might optionally be followed by a string type to
+// specialize it further.
+func checkExclusive(ctx *cli.Context, args ...interface{}) {
+	set := make([]string, 0, 1)
+	for i := 0; i < len(args); i++ {
+		// Make sure the next argument is a flag and skip if not set
+		flag, ok := args[i].(cli.Flag)
+		if !ok {
+			panic(fmt.Sprintf("invalid argument, not cli.Flag type: %T", args[i]))
+		}
+		// Check if next arg extends current and expand its name if so
+		name := flag.GetName()
+
+		if i+1 < len(args) {
+			switch option := args[i+1].(type) {
+			case string:
+				// Extended flag, expand the name and shift the arguments
+				if ctx.GlobalString(flag.GetName()) == option {
+					name += "=" + option
+				}
+				i++
+
+			case cli.Flag:
+			default:
+				panic(fmt.Sprintf("invalid argument, not cli.Flag or string extension: %T", args[i+1]))
+			}
+		}
+		// Mark the flag if it's set
+		if ctx.GlobalIsSet(flag.GetName()) {
+			set = append(set, "--"+name)
+		}
+	}
+	if len(set) > 1 {
+		Fatalf("Flags %v can't be used at the same time", strings.Join(set, ", "))
 	}
 }

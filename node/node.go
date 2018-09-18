@@ -18,6 +18,8 @@ package node
 
 import (
 	"errors"
+	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -27,6 +29,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/services/p2p"
+	"github.com/TOSIO/go-tos/services/rpc"
 	"github.com/prometheus/prometheus/util/flock"
 )
 
@@ -42,6 +45,22 @@ type Node struct {
 	serviceFuncs []ServiceConstructor     // Service constructors (in dependency order)
 	services     map[reflect.Type]Service // Currently running services
 
+	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
+	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
+
+	ipcEndpoint string       // IPC endpoint to listen at (empty = IPC disabled)
+	ipcListener net.Listener // IPC RPC listener socket to serve API requests
+	ipcHandler  *rpc.Server  // IPC RPC request handler to process the API requests
+
+	httpEndpoint  string       // HTTP endpoint (interface + port) to listen at (empty = HTTP disabled)
+	httpWhitelist []string     // HTTP RPC modules to allow through this endpoint
+	httpListener  net.Listener // HTTP RPC listener socket to server API requests
+	httpHandler   *rpc.Server  // HTTP RPC request handler to process the API requests
+
+	wsEndpoint string       // Websocket endpoint (interface + port) to listen at (empty = websocket disabled)
+	wsListener net.Listener // Websocket RPC listener socket to server API requests
+	wsHandler  *rpc.Server  // Websocket RPC request handler to process the API requests
+
 	ephemeralKeystore string         // if non-empty, the key directory that will be removed by Stop
 	instanceDirLock   flock.Releaser // prevents concurrent use of instance directory
 
@@ -49,6 +68,32 @@ type Node struct {
 	lock sync.RWMutex
 
 	log log.Logger
+}
+
+// apis returns the collection of RPC descriptors this node offers.
+func (n *Node) apis() []rpc.API {
+	return []rpc.API{
+		{
+			Namespace: "admin",
+			Version:   "1.0",
+			Service:   NewPrivateAdminAPI(n),
+		}, {
+			Namespace: "admin",
+			Version:   "1.0",
+			Service:   NewPublicAdminAPI(n),
+			Public:    true,
+		}, {
+			Namespace: "debug",
+			Version:   "1.0",
+			Service:   NewPublicDebugAPI(n),
+			Public:    true,
+		}, {
+			Namespace: "web3",
+			Version:   "1.0",
+			Service:   NewPublicWeb3API(n),
+			Public:    true,
+		},
+	}
 }
 
 // New creates a new P2P node, ready for protocol registration.
@@ -89,6 +134,9 @@ func New(conf *Config) (*Node, error) {
 	return &Node{
 		config:       conf,
 		serviceFuncs: []ServiceConstructor{},
+		ipcEndpoint:  conf.IPCEndpoint(),
+		httpEndpoint: conf.HTTPEndpoint(),
+		wsEndpoint:   conf.WSEndpoint(),
 		log:          conf.Logger,
 	}, nil
 }
@@ -223,8 +271,151 @@ func (n *Node) openDataDir() error {
 // assumptions about the state of the node.
 func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	// Gather all the possible APIs to surface
+	log.Trace("func Node.startRPC | RPC server is starting...")
+	apis := n.apis()
+	for _, service := range services {
+		apis = append(apis, service.APIs()...)
+	}
+	// Start the various API endpoints, terminating all in case of errors
+	if err := n.startInProc(apis); err != nil {
+		return err
+	}
+	if err := n.startIPC(apis); err != nil {
+		n.stopInProc()
+		return err
+	}
+	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
+		n.stopIPC()
+		n.stopInProc()
+		return err
+	}
+	if err := n.startWS(n.wsEndpoint, apis, n.config.WSModules, n.config.WSOrigins, n.config.WSExposeAll); err != nil {
+		n.stopHTTP()
+		n.stopIPC()
+		n.stopInProc()
+		return err
+	}
+	// All API endpoints started successfully
+	n.rpcAPIs = apis
+	log.Trace("func Node.startRPC | RPC server successfully")
+	return nil
+}
+
+// startInProc initializes an in-process RPC endpoint.
+func (n *Node) startInProc(apis []rpc.API) error {
+	// Register all the APIs exposed by the services
+	handler := rpc.NewServer()
+	for _, api := range apis {
+		if err := handler.RegisterName(api.Namespace, api.Service); err != nil {
+			return err
+		}
+		n.log.Debug("InProc registered", "service", api.Service, "namespace", api.Namespace)
+	}
+	n.inprocHandler = handler
+	return nil
+}
+
+// stopInProc terminates the in-process RPC endpoint.
+func (n *Node) stopInProc() {
+	if n.inprocHandler != nil {
+		n.inprocHandler.Stop()
+		n.inprocHandler = nil
+	}
+}
+
+// startIPC initializes and starts the IPC RPC endpoint.
+func (n *Node) startIPC(apis []rpc.API) error {
+	if n.ipcEndpoint == "" {
+		return nil // IPC disabled.
+	}
+	listener, handler, err := rpc.StartIPCEndpoint(n.ipcEndpoint, apis)
+	if err != nil {
+		return err
+	}
+	n.ipcListener = listener
+	n.ipcHandler = handler
+	n.log.Info("IPC endpoint opened", "url", n.ipcEndpoint)
+	return nil
+}
+
+// stopIPC terminates the IPC RPC endpoint.
+func (n *Node) stopIPC() {
+	if n.ipcListener != nil {
+		n.ipcListener.Close()
+		n.ipcListener = nil
+
+		n.log.Info("IPC endpoint closed", "endpoint", n.ipcEndpoint)
+	}
+	if n.ipcHandler != nil {
+		n.ipcHandler.Stop()
+		n.ipcHandler = nil
+	}
+}
+
+// startHTTP initializes and starts the HTTP RPC endpoint.
+func (n *Node) startHTTP(endpoint string, apis []rpc.API, modules []string, cors []string, vhosts []string, timeouts rpc.HTTPTimeouts) error {
+	// Short circuit if the HTTP endpoint isn't being exposed
+	if endpoint == "" {
+		return nil
+	}
+	listener, handler, err := rpc.StartHTTPEndpoint(endpoint, apis, modules, cors, vhosts, timeouts)
+	if err != nil {
+		return err
+	}
+	n.log.Info("HTTP endpoint opened", "url", fmt.Sprintf("http://%s", endpoint), "cors", strings.Join(cors, ","), "vhosts", strings.Join(vhosts, ","))
+	// All listeners booted successfully
+	n.httpEndpoint = endpoint
+	n.httpListener = listener
+	n.httpHandler = handler
 
 	return nil
+}
+
+// stopHTTP terminates the HTTP RPC endpoint.
+func (n *Node) stopHTTP() {
+	if n.httpListener != nil {
+		n.httpListener.Close()
+		n.httpListener = nil
+
+		n.log.Info("HTTP endpoint closed", "url", fmt.Sprintf("http://%s", n.httpEndpoint))
+	}
+	if n.httpHandler != nil {
+		n.httpHandler.Stop()
+		n.httpHandler = nil
+	}
+}
+
+// startWS initializes and starts the websocket RPC endpoint.
+func (n *Node) startWS(endpoint string, apis []rpc.API, modules []string, wsOrigins []string, exposeAll bool) error {
+	// Short circuit if the WS endpoint isn't being exposed
+	if endpoint == "" {
+		return nil
+	}
+	listener, handler, err := rpc.StartWSEndpoint(endpoint, apis, modules, wsOrigins, exposeAll)
+	if err != nil {
+		return err
+	}
+	n.log.Info("WebSocket endpoint opened", "url", fmt.Sprintf("ws://%s", listener.Addr()))
+	// All listeners booted successfully
+	n.wsEndpoint = endpoint
+	n.wsListener = listener
+	n.wsHandler = handler
+
+	return nil
+}
+
+// stopWS terminates the websocket RPC endpoint.
+func (n *Node) stopWS() {
+	if n.wsListener != nil {
+		n.wsListener.Close()
+		n.wsListener = nil
+
+		n.log.Info("WebSocket endpoint closed", "url", fmt.Sprintf("ws://%s", n.wsEndpoint))
+	}
+	if n.wsHandler != nil {
+		n.wsHandler.Stop()
+		n.wsHandler = nil
+	}
 }
 
 // Stop terminates a running node along with all it's services. In the node was

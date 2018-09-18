@@ -22,6 +22,7 @@ import (
 	//"github.com/TOSIO/go-tos/rpc"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/services/p2p"
+	"github.com/TOSIO/go-tos/services/rpc"
 )
 
 // ServiceContext is a collection of service independent options inherited from
@@ -84,7 +85,7 @@ type Service interface {
 	Protocols() []p2p.Protocol
 
 	// APIs retrieves the list of RPC descriptors the service provides
-	//APIs() []rpc.API
+	APIs() []rpc.API
 
 	// Start is called after all services have been constructed and the networking
 	// layer was also initialized to spawn any goroutines required by the service.

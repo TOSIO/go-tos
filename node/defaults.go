@@ -21,6 +21,10 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+
+	"github.com/TOSIO/go-tos/services/p2p"
+	"github.com/TOSIO/go-tos/services/p2p/nat"
+	"github.com/TOSIO/go-tos/services/rpc"
 )
 
 const (
@@ -36,14 +40,14 @@ var DefaultConfig = Config{
 	HTTPPort:         DefaultHTTPPort,
 	HTTPModules:      []string{"net", "web3"},
 	HTTPVirtualHosts: []string{"localhost"},
-	//HTTPTimeouts:     rpc.DefaultHTTPTimeouts,
-	WSPort:    DefaultWSPort,
-	WSModules: []string{"net", "web3"},
-	/* P2P: p2p.Config{
+	HTTPTimeouts:     rpc.DefaultHTTPTimeouts,
+	WSPort:           DefaultWSPort,
+	WSModules:        []string{"net", "web3"},
+	P2P: p2p.Config{
 		ListenAddr: ":30303",
 		MaxPeers:   25,
 		NAT:        nat.Any(),
-	}, */
+	},
 }
 
 // DefaultDataDir is the default data directory to use for the databases and other

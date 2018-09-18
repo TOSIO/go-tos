@@ -29,6 +29,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/p2p/discover"
+	"github.com/TOSIO/go-tos/services/rpc"
 	/* 	"github.com/TOSIO/go-tos/p2p"
 	   	"github.com/TOSIO/go-tos/p2p/discover"
 	   	"github.com/TOSIO/go-tos/rpc"
@@ -122,7 +123,7 @@ type Config struct {
 
 	// HTTPTimeouts allows for customization of the timeout values used by the HTTP RPC
 	// interface.
-	//HTTPTimeouts rpc.HTTPTimeouts
+	HTTPTimeouts rpc.HTTPTimeouts
 
 	// WSHost is the host interface on which to start the websocket RPC server. If
 	// this field is empty, no websocket API endpoint will be started.
