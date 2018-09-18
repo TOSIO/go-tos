@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 	"crypto/ecdsa"
 
@@ -37,15 +36,6 @@ type TxBlock struct {
 
 	hash atomic.Value
 	size atomic.Value
-}
-
-//for sign
-type TxBlock_T struct {
-	Header BlockHeader
-	Links []common.Hash // 外部參數
-	AccountNonce uint64
-	Outs []TxOut
-	Payload []byte
 }
 
 func (tx *TxBlock) data(withSig bool) (x interface{}) {
@@ -106,6 +96,7 @@ func (tx *TxBlock) SetStatus(status BlockStatus) {
 	tx.status = status
 }
 
+//relate sign
 func (tx *TxBlock) GetSender() (common.Address, error){
 	if sender := tx.sender.Load(); sender != nil {
 		return sender.(common.Address), nil
@@ -133,21 +124,6 @@ func (tx *TxBlock) VerifySignature(pubkey, hash, signature []byte) bool {
 	return crypto.VerifySignature(pubkey, hash, signature)
 }
 
-//validate RlpEncoded TxBlock
-func (tx *TxBlock) Validation(tx_in []byte)  error {
-	//TODO
-
-	/*
-	1.区块是 RLP 格式数据，没有多余的后缀字节;
-	2.区块的产生时间不小于Dagger元年；
-	3.区块的所有输出金额加上费用之和必须小于TOS总金额;
-	4.VerifySignature
-	*/
-
-	return nil
-}
-
-
 func (tx *TxBlock) GetLinks() []common.Hash {
 	return tx.Links
 }
@@ -170,4 +146,18 @@ func (tx *TxBlock) DecodeRLP(s *rlp.Stream) error {
 	}
 
 	return err
+}
+
+//validate RlpEncoded TxBlock
+func (tx *TxBlock) Validation(tx_in []byte)  error {
+	//TODO
+
+	/*
+	1.区块是 RLP 格式数据，没有多余的后缀字节;
+	2.区块的产生时间不小于Dagger元年；
+	3.区块的所有输出金额加上费用之和必须小于TOS总金额;
+	4.VerifySignature
+	*/
+
+	return nil
 }

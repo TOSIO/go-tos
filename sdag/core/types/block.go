@@ -1,11 +1,8 @@
 package types
 import (
 	"math/big"
-
 	"github.com/TOSIO/go-tos/devbase/common"
-
 	"errors"
-
 	"crypto/ecdsa"
 )
 
@@ -35,7 +32,7 @@ var (
 //2. 校验数据 - 根据文档6.3描述检查区块数据  1，2， 3，  如果是挖矿区块 sender与vsr中解析中的签名是相同的
 
 //初始化
-//解析接口 -- RLP解码 - 从网络收到字节码，解码成block
+//解析接口 -- RLP解码 - 从网络收到字节码，解码成block  DecodeRLP implements rlp.Decoder
 type BlockStatus uint
 
 const(

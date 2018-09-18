@@ -80,13 +80,3 @@ func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) error {
 	}
 	return bs.WithSignature(sig)
 }
-//
-//func (tx *TxBlock) GetSign(prv *ecdsa.PrivateKey) ([]byte, error) {
-//	h := tx.Hash(false)
-//	sig, err := crypto.Sign(h[:], prv)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return sig, err
-//}
-
