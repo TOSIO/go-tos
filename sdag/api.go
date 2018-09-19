@@ -16,6 +16,11 @@
 
 package sdag
 
+import (
+	"encoding/json"
+	"log"
+)
+
 // PublicEthereumAPI provides an API to access Ethereum full node-related
 // information.
 type PublicSdagAPI struct {
@@ -29,6 +34,19 @@ func NewPublicSdagAPI(s *Sdag) *PublicSdagAPI {
 
 func (api *PublicSdagAPI) DoRequest(data int) int {
 	return data
+}
+
+type TransactionInfo struct {
+	form string
+	to   string
+}
+
+func (api *PublicSdagAPI) Transaction(jsonString string) string {
+	var transaction TransactionInfo
+	if err := json.Unmarshal([]byte(jsonString), &transaction); err != nil {
+		log.Fatalf("JSON unmarshaling failed: %s", err)
+	}
+	return transaction.form
 }
 
 // PrivateAdminAPI is the collection of Ethereum full node-related APIs
