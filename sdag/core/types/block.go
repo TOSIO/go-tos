@@ -55,14 +55,14 @@ type Block interface {
 	GetCumulativeDiff() *big.Int  //区块累积难度
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
 
-	GetTime() uint64			   //获取区块时间
+	GetTime() *big.Int			   //获取区块时间
 	GetSender() (common.Address, error)    //获取区块发送者，即创建者,从签名获取
-	GetLinks() []common.Address   //获取区块链接组
+	GetLinks() []common.Hash   //获取区块链接组
 
 	GetStatus() BlockStatus       //获取状态
 	SetStatus(status BlockStatus) //设置状态
 
-	Sign(prv *ecdsa.PrivateKey) (sig []byte, err error) //签名
+	Sign(prv *ecdsa.PrivateKey)  error //签名
 
 	//Validation() error   // (check data,校验解签名)
 }

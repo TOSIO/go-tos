@@ -73,7 +73,7 @@ func (tx *TxBlock) GetHash() common.Hash {
 }
 
 
-func (tx *TxBlock) GetDiff()  *big.Int {
+func (tx *TxBlock) GetDiff() *big.Int {
 	if tx.difficulty != nil {
 		return tx.difficulty
 	}
@@ -112,7 +112,7 @@ func (tx *TxBlock) GetSender() (common.Address, error){
 	return v, err
 }
 
-func (tx *TxBlock) Sign(prv *ecdsa.PrivateKey) (err error) {
+func (tx *TxBlock) Sign(prv *ecdsa.PrivateKey) error {
 	hash :=  rlpHash(tx.data(false))
 	return tx.SignByHash(hash[:], prv)
 }

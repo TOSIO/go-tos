@@ -7,39 +7,47 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"math/big"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/pkg/errors"
 )
 
 func TestTxBlock(t *testing.T) {
 
 	//tx
-	tx := txBlockExample()
+	tx, errr := txBlockExample()
 
-	//tx.(* Block)
-	
-	rlpByte := tx.GetRlp()
-	fmt.Println("tx: ",tx)
-	fmt.Println("txRLP: ", rlpByte)
+	if errr != nil {
+		t.Errorf("tx err: %s", errr)
+	}
 
-	//sender
-	sender, _ := tx.GetSender()
-	fmt.Println("sender: ",sender)
-
-	//hash
-	hash := tx.GetHash()
-	fmt.Println("hash: ", hash)
-
-	//diff
-	diff := tx.GetDiff()
-	fmt.Println("diff", diff)
-
-	//验证
-	err := new(TxBlock).Validation(tx.GetRlp())
-	if err != nil {
-		t.Errorf("Tx Validation error")
+	if err := blockInterfaceExample(tx); err != nil {
+		t.Errorf("block err: %s", err)
 	}
 }
 
-func txBlockExample() *TxBlock{
+func blockInterfaceExample(b Block) error {
+	rlpByte := b.GetRlp()
+	fmt.Println("tx: ",b)
+	fmt.Println("txRLP: ", rlpByte)
+
+	//sender
+	sender, _ := b.GetSender()
+	fmt.Println("sender: ",sender)
+
+	//hash
+	hash := b.GetHash()
+	fmt.Println("hash: ", hash)
+
+	//diff
+	diff := b.GetDiff()
+	fmt.Println("diff", diff)
+
+	//验证
+	err := new(TxBlock).Validation(b.GetRlp())
+
+	return err
+}
+
+func txBlockExample() (*TxBlock, error){
 
 	//1. set header
 	tx := new(TxBlock)
@@ -78,17 +86,16 @@ func txBlockExample() *TxBlock{
 	//6. sign
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
-		t.Errorf("GenerateKey fail: %s", err)
-		return nil
+		return nil, err
 	}
 	tx.Sign(privateKey)
 
 
 	addr1, _ := tx.GetSender()
 	if addr1 != crypto.PubkeyToAddress(privateKey.PublicKey){
-		t.Errorf("tx.GetSender error")
+		return nil, errors.New("sign err")
 	}
 
-	return tx
+	return tx, nil
 }
 
