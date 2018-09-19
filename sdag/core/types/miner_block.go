@@ -3,13 +3,7 @@ package types
 
 import (
 	"math/big"
-	"fmt"
-	"crypto/ecdsa"
-	"errors"
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/crypto"
-	"github.com/TOSIO/go-tos/devbase/rlp"
-	"github.com/TOSIO/go-tos/devbase/utils"	
 )
 
 type BlockNonce [8]byte

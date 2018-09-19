@@ -9,22 +9,22 @@ import (
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"sync/atomic"
-	"io"
+	"fmt"
 )
 
 //交易输出
 type TxOut struct {
-	receiver common.Address
-	Amount *big.Int
+	Receiver common.Address
+	Amount *big.Int  //tls
 }
 
 //交易区块
 type TxBlock struct {
 	Header BlockHeader
-	Links []common.Hash //外部參數
-	AccountNonce uint64
-	Outs []TxOut
-	Payload []byte
+	Links []common.Hash  // 链接的区块hash
+	AccountNonce uint64  // 100
+	Outs []TxOut         //
+	Payload []byte		// vm code  0x0
 
 	// Signature values
 	BlockSign
@@ -40,6 +40,8 @@ type TxBlock struct {
 
 func (tx *TxBlock) data(withSig bool) (x interface{}) {
 	if withSig {
+		x = tx
+	} else {
 		x = []interface{}{
 			tx.Header,
 			tx.Links,
@@ -47,9 +49,9 @@ func (tx *TxBlock) data(withSig bool) (x interface{}) {
 			tx.Outs,
 			tx.Payload,
 		}
-	} else {
-		x = tx
 	}
+
+	fmt.Println("x: ", x)
 
 	return
 }
@@ -130,22 +132,6 @@ func (tx *TxBlock) GetLinks() []common.Hash {
 
 func (tx *TxBlock) GetTime() *big.Int  {
 	return new(big.Int).Set(tx.Header.Time)
-}
-
-// EncodeRLP implements rlp.Encoder
-func (tx *TxBlock) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, &tx)
-}
-
-// DecodeRLP implements rlp.Decoder
-func (tx *TxBlock) DecodeRLP(s *rlp.Stream) error {
-	_, size, _ := s.Kind()
-	err := s.Decode(tx)
-	if err == nil {
-		tx.size.Store(common.StorageSize(rlp.ListSize(size)))
-	}
-
-	return err
 }
 
 //validate RlpEncoded TxBlock

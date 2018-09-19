@@ -56,7 +56,7 @@ type Block interface {
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
 
 	GetTime() uint64			   //获取区块时间
-	GetSender() common.Address    //获取区块发送者，即创建者,从签名获取
+	GetSender() (common.Address, error)    //获取区块发送者，即创建者,从签名获取
 	GetLinks() []common.Address   //获取区块链接组
 
 	GetStatus() BlockStatus       //获取状态
@@ -64,14 +64,14 @@ type Block interface {
 
 	Sign(prv *ecdsa.PrivateKey) (sig []byte, err error) //签名
 
-	Validation() error   // (check data,校验解签名)
+	//Validation() error   // (check data,校验解签名)
 }
 
 type BlockHeader struct {
-	Type uint32
-	Time *big.Int
-	GasPrice *big.Int
-	GasLimit uint64
+	Type uint32  //1 tx, 2 miner
+	Time *big.Int //ms  timestamp
+	GasPrice *big.Int  //tls
+	GasLimit uint64   //gas max value
 }
 
 

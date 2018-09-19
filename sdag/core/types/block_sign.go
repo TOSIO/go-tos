@@ -55,6 +55,7 @@ type BlockSign struct {
 
 func (bs *BlockSign) WithSignature(sig []byte) error {
 	r, s, v, err := bs.SignatureValues(sig)
+	//fmt.Println("r: ", r, "\n s: ", s , "\n v: ", v )
 	if err != nil {
 		return err
 	}
