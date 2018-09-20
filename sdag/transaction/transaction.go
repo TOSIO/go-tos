@@ -2,81 +2,77 @@ package transaction
 
 import (
 	"container/list"
+	"crypto/ecdsa"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/ethereum/go-ethereum"
-	"github.com/pkg/errors"
+	"github.com/opentracing/opentracing-go/log"
 	"math/big"
-	"time"
 )
 
 var (
 	UnverifiedTransactionList *list.List
+	MaxConfirm                = 11
+)
+
+const (
+	TxBlockType    = 1
+	MinerBlockType = 2
 )
 
 func init() {
 	UnverifiedTransactionList = list.New()
 }
 
+type ReceiverInfo struct {
+	To     common.Address
+	Amount *big.Int
+}
 type transInfo struct {
-	GasPrice *big.Int //tls
-	GasLimit uint64   //gas max value
+	From       common.Address
+	Receiver   []ReceiverInfo
+	GasPrice   *big.Int //tls
+	GasLimit   uint64   //gas max value
+	PrivateKey *ecdsa.PrivateKey
 }
 
-func txBlockConstruction(TI *transInfo) (*types.TxBlock, error) {
+func txBlockConstruction(txRequestInfo *transInfo) (*types.TxBlock, error) {
+	if txRequestInfo.From != crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) {
+		return nil, fmt.Errorf("PrivateKey err")
+	}
 
 	//1. set header
-	var itx types.Block
-	tx := new(types.TxBlock)
-	itx = tx
-	tx.Header = types.BlockHeader{
-		1,
-		big.NewInt(time.Now().Unix()),
-		TI.GasPrice,
-		TI.GasLimit,
+	var itxBlock types.Block
+	txBlock := new(types.TxBlock)
+	itxBlock = txBlock
+	txBlock.Header = types.BlockHeader{
+		TxBlockType,
+		utils.GetTOSTimeStamp(),
+		txRequestInfo.GasPrice,
+		txRequestInfo.GasLimit,
 	}
 
 	//2. links
-	b := []byte{
-		0xb2, 0x6f, 0x2b, 0x34, 0x2a, 0xab, 0x24, 0xbc, 0xf6, 0x3e,
-		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
-		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
-		0x10, 0x00,
-	}
-	var usedH common.Hash
-	usedH.SetBytes(b)
-	tx.Links = []common.Hash{
-		usedH,
-	}
+	Confirm(txBlock.Links)
 
 	//3. accoutnonce
-	tx.AccountNonce = 100
+	txBlock.AccountNonce = 100
 
 	//4. txout
-	var addr common.Address
-	tx.Outs = []TxOut{
-		{addr, big.NewInt(1000)},
+	for _, v := range txRequestInfo.Receiver {
+		txBlock.Outs = append(txBlock.Outs, types.TxOut{Receiver: v.To, Amount: v.Amount})
 	}
 
 	//5. vm code
-	tx.Payload = []byte{0x0, 0x3b}
+	txBlock.Payload = []byte{0x0, 0x3b}
 
 	//6. sign
-	privateKey, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
-	tx.Sign(privateKey)
+	itxBlock.Sign(txRequestInfo.PrivateKey)
 
-	addr1, _ := tx.GetSender()
-	if addr1 != crypto.PubkeyToAddress(privateKey.PublicKey) {
-		return nil, errors.New("sign err")
-	}
-
-	addUnverifiedTransactionList(tx)
-	return tx, nil
+	addUnverifiedTransactionList(itxBlock.GetHash())
+	return txBlock, nil
 }
 
 func addUnverifiedTransactionList(v interface{}) {
@@ -88,5 +84,20 @@ func PopUnverifiedTransactionList() (interface{}, error) {
 		return UnverifiedTransactionList.Remove(UnverifiedTransactionList.Front()), nil
 	} else {
 		return nil, fmt.Errorf("the list is empty")
+	}
+}
+
+func Confirm(links []common.Hash) {
+	listLen := UnverifiedTransactionList.Len()
+	for i := 0; i < listLen && i < MaxConfirm; i++ {
+		ihash, err := PopUnverifiedTransactionList()
+		if err != nil {
+			log.Error(err)
+		}
+		hash, ok := ihash.(common.Hash)
+		if !ok {
+			log.Error(fmt.Errorf("hash.(common.Hash)"))
+		}
+		links = append(links, hash)
 	}
 }
