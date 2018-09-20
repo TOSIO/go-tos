@@ -317,6 +317,7 @@ func (tab *Table) lookup(targetID NodeID, refreshIfEmpty bool) []*Node {
 
 func (tab *Table) findnode(n *Node, targetID NodeID, reply chan<- []*Node) {
 	fails := tab.db.findFails(n.ID)
+	log.Trace("func Table.findnode-discv4 | try to find node,","targetID",targetID)
 	r, err := tab.net.findnode(n.ID, n.addr(), targetID)
 	if err != nil || len(r) == 0 {
 		fails++

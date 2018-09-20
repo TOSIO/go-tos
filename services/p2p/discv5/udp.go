@@ -413,6 +413,8 @@ func decodePacket(buffer []byte, pkt *ingressPacket) error {
 	copy(buf, buffer)
 	prefix, sig, sigdata := buf[:versionPrefixSize], buf[versionPrefixSize:headSize], buf[headSize:]
 	if !bytes.Equal(prefix, versionPrefix) {
+		log.Trace("func decodePacke-discv5 | prefix is not macth,", "prefix", string(prefix), "versionPrefix", string(versionPrefix))
+		log.Trace("func decodePacke-discv5 | prefix is not macth,", "prefix", prefix, "versionPrefix", versionPrefix)
 		return errBadPrefix
 	}
 	fromID, err := recoverNodeID(crypto.Keccak256(buf[headSize:]), sig)

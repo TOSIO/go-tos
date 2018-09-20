@@ -80,7 +80,7 @@ func (p *peer) Handshake(network uint64) error {
 	data := "hello"
 
 	go func() {
-		errc <- p2p.Send(p.rw, StatusMsg, &data)
+		errc <- p2p.Send(p.rw, StatusMsg, &data) //p.rw == protoRW
 	}()
 	go func() {
 		msg, err := p.rw.ReadMsg()

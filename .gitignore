@@ -1,6 +1,8 @@
 /chain
 .idea
 *.test
-debug
+#debug
 *.exe
 !.gitkeep
+settings.json
+launch.json
