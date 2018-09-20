@@ -2,6 +2,7 @@ package utils
 
 import (
 	"time"
+	"fmt"
 )
 
 /*
@@ -10,6 +11,13 @@ import (
 3.
 
  */
-func GetTimeStamp() int64 {
-	return time.Now().UnixNano() / 1e6
+func GetTOSTimeStamp() int64 {
+	t := time.Now().UnixNano() / 1e6
+	//fmt.Println(t)
+	mTime := t >> 16
+	sTime := t & (1 << 16 - 1)
+
+	return mTime * 1e5 + sTime
 }
+
+
