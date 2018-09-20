@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/pkg/errors"
+	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 func TestTxBlock(t *testing.T) {
@@ -53,7 +54,7 @@ func txBlockExample() (*TxBlock, error){
 	tx := new(TxBlock)
 	tx.Header = BlockHeader{
 		1,
-		big.NewInt(1537329982000),
+		utils.GetTimeStamp(),
 		big.NewInt(10),
 		1222,
 	}

@@ -122,16 +122,45 @@ func (tx *TxBlock) GetPublicKey(sighash common.Hash,sig []byte) ([]byte, error){
 	return pub,err
 }
 
-func (tx *TxBlock) VerifySignature(pubkey, hash, signature []byte) bool {
-	return crypto.VerifySignature(pubkey, hash, signature)
-}
-
 func (tx *TxBlock) GetLinks() []common.Hash {
 	return tx.Links
 }
 
-func (tx *TxBlock) GetTime() *big.Int  {
-	return new(big.Int).Set(tx.Header.Time)
+func (tx *TxBlock) GetTime() int64  {
+	return tx.Header.Time
+}
+
+func (tx *TxBlock) parse(tx_in []byte) (*TxBlock, error) {
+
+	/*
+	1.区块是 RLP 格式数据，没有多余的后缀字节;
+	2.区块的产生时间不小于Dagger元年；
+	3.区块的所有输出金额加上费用之和必须小于TOS总金额;
+	4.VerifySignature
+	*/
+
+	newTx := new(TxBlock)
+
+	//1
+	if err := rlp.DecodeBytes(tx_in, newTx); err != nil {
+		return nil, err
+	}
+
+	//2
+	//if tx.Header.Time >
+
+
+
+	//3
+	
+
+
+	//4
+	if _, err := newTx.GetSender(); err != nil {
+		return nil, err
+	}
+
+	return  newTx, nil
 }
 
 //validate RlpEncoded TxBlock

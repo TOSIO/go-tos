@@ -55,7 +55,7 @@ type Block interface {
 	GetCumulativeDiff() *big.Int  //区块累积难度
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
 
-	GetTime() *big.Int			   //获取区块时间
+	GetTime() int64			   //获取区块时间
 	GetSender() (common.Address, error)    //获取区块发送者，即创建者,从签名获取
 	GetLinks() []common.Hash   //获取区块链接组
 
@@ -68,8 +68,8 @@ type Block interface {
 }
 
 type BlockHeader struct {
-	Type uint32  //1 tx, 2 miner
-	Time *big.Int //ms  timestamp
+	Type int32  //1 tx, 2 miner
+	Time int64 //ms  timestamp
 	GasPrice *big.Int  //tls
 	GasLimit uint64   //gas max value
 }

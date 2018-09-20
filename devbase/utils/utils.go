@@ -1,5 +1,8 @@
 package utils
 
+import (
+	"time"
+)
 
 /*
 1. 获取当前时间戳 毫秒
@@ -7,7 +10,6 @@ package utils
 3.
 
  */
-
-func getTimeStamp()  {
-
+func GetTimeStamp() int64 {
+	return time.Now().UnixNano() / 1e6
 }
