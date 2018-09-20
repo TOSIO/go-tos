@@ -63,6 +63,19 @@ func NewProtocolManager(config *interface{}, networkID uint64) (*ProtocolManager
 	return manager, nil
 }
 
+// this function will be removed in future
+func (pm *ProtocolManager) consumeNewPeer() {
+	for {
+		select {
+		case <-pm.newPeerCh:
+			// Make sure we have peers to select from, then sync
+			log.Trace("func ProtocolManager.consumeNewPeer | called.")
+		case <-pm.noMorePeers:
+			return
+		}
+	}
+}
+
 func (pm *ProtocolManager) initProtocols() error {
 	pm.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
 	for i, version := range ProtocolVersions {
@@ -162,7 +175,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	}
 	p.Log().Debug("TOS peer connected", "name", p.Name())
 
-	// Execute the Ethereum handshake
+	// Execute the TOS handshake
 
 	if err := p.Handshake(pm.networkID); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)
@@ -201,6 +214,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	}
 	defer msg.Discard()
 	p.Log().Info("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
+	//dispatch message here
 	return nil
 }
 

@@ -18,3 +18,10 @@ func GetTOSTimeStamp() int64 {
 
 	return mTime*1e5 + sTime
 }
+
+func TOSTimeStampToTime(tosT int64) int64 {
+	mTime := tosT / 1e5
+	sTime := tosT % 1e5
+
+	return (mTime << 16) | sTime
+}

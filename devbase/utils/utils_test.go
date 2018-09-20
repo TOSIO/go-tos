@@ -16,6 +16,8 @@ func TestGetTOSTimeStamp(t *testing.T) {
 		tosTime := GetTOSTimeStamp()
 		fmt.Println(tosTime)
 		time.Sleep(1 * time.Millisecond)
+		t := TOSTimeStampToTime(tosTime)
+		fmt.Println(t)
 	}
 
 }

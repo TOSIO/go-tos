@@ -386,7 +386,7 @@ type protoRW struct {
 }
 
 func (rw *protoRW) WriteMsg(msg Msg) (err error) {
-	log.Trace("func protoRW.WriteMsg | write a message,", "msg", msg)
+	log.Trace("func protoRW.WriteMsg | write a message,", "msg.Code", msg.Code, "msg", msg)
 	if msg.Code >= rw.Length {
 		return newPeerError(errInvalidMsgCode, "not handled")
 	}
@@ -410,6 +410,7 @@ func (rw *protoRW) ReadMsg() (Msg, error) {
 	select {
 	case msg := <-rw.in:
 		msg.Code -= rw.offset
+		log.Trace("func protoRW.WriteMsg | receive a message,", "msg.Code", msg.Code, "msg", msg)
 		return msg, nil
 	case <-rw.closed:
 		return Msg{}, io.EOF
