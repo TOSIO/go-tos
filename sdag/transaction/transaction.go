@@ -1,0 +1,92 @@
+package transaction
+
+import (
+	"container/list"
+	"fmt"
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/sdag/core/types"
+	"github.com/ethereum/go-ethereum"
+	"github.com/pkg/errors"
+	"math/big"
+	"time"
+)
+
+var (
+	UnverifiedTransactionList *list.List
+)
+
+func init() {
+	UnverifiedTransactionList = list.New()
+}
+
+type transInfo struct {
+	GasPrice *big.Int //tls
+	GasLimit uint64   //gas max value
+}
+
+func txBlockConstruction(TI *transInfo) (*types.TxBlock, error) {
+
+	//1. set header
+	var itx types.Block
+	tx := new(types.TxBlock)
+	itx = tx
+	tx.Header = types.BlockHeader{
+		1,
+		big.NewInt(time.Now().Unix()),
+		TI.GasPrice,
+		TI.GasLimit,
+	}
+
+	//2. links
+	b := []byte{
+		0xb2, 0x6f, 0x2b, 0x34, 0x2a, 0xab, 0x24, 0xbc, 0xf6, 0x3e,
+		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
+		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
+		0x10, 0x00,
+	}
+	var usedH common.Hash
+	usedH.SetBytes(b)
+	tx.Links = []common.Hash{
+		usedH,
+	}
+
+	//3. accoutnonce
+	tx.AccountNonce = 100
+
+	//4. txout
+	var addr common.Address
+	tx.Outs = []TxOut{
+		{addr, big.NewInt(1000)},
+	}
+
+	//5. vm code
+	tx.Payload = []byte{0x0, 0x3b}
+
+	//6. sign
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+	tx.Sign(privateKey)
+
+	addr1, _ := tx.GetSender()
+	if addr1 != crypto.PubkeyToAddress(privateKey.PublicKey) {
+		return nil, errors.New("sign err")
+	}
+
+	addUnverifiedTransactionList(tx)
+	return tx, nil
+}
+
+func addUnverifiedTransactionList(v interface{}) {
+	UnverifiedTransactionList.PushFront(v)
+}
+
+func PopUnverifiedTransactionList() (interface{}, error) {
+	if UnverifiedTransactionList.Len() > 0 {
+		return UnverifiedTransactionList.Remove(UnverifiedTransactionList.Front()), nil
+	} else {
+		return nil, fmt.Errorf("the list is empty")
+	}
+}
