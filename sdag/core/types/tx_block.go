@@ -5,7 +5,6 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"sync/atomic"
@@ -51,13 +50,14 @@ func (tx *TxBlock) data(withSig bool) (x interface{}) {
 		}
 	}
 
-	fmt.Println("x: ", x)
-
 	return
 }
 
 func (tx *TxBlock) GetRlp() []byte {
-	enc, _ := rlp.EncodeToBytes(tx.data(true))
+	enc, err := rlp.EncodeToBytes(tx.data(true))
+	if err != nil {
+		fmt.Println("err: ",err)
+	}
 	return enc
 }
 
@@ -117,46 +117,23 @@ func (tx *TxBlock) Sign(prv *ecdsa.PrivateKey) error {
 	return tx.SignByHash(hash[:], prv)
 }
 
-func (tx *TxBlock) GetPublicKey(sighash common.Hash,sig []byte) ([]byte, error){
-	pub, err := crypto.Ecrecover(sighash[:], sig)
-	return pub,err
-}
-
 func (tx *TxBlock) GetLinks() []common.Hash {
 	return tx.Links
 }
 
-func (tx *TxBlock) GetTime() int64  {
+func (tx *TxBlock) GetTime() uint64  {
 	return tx.Header.Time
 }
 
-func (tx *TxBlock) parse(tx_in []byte) (*TxBlock, error) {
-
-	/*
-	1.区块是 RLP 格式数据，没有多余的后缀字节;
-	2.区块的产生时间不小于Dagger元年；
-	3.区块的所有输出金额加上费用之和必须小于TOS总金额;
-	4.VerifySignature
-	*/
+func (tx *TxBlock) UnRlp(txRLP []byte) (*TxBlock, error) {
 
 	newTx := new(TxBlock)
 
-	//1
-	if err := rlp.DecodeBytes(tx_in, newTx); err != nil {
+	if err := rlp.DecodeBytes(txRLP, newTx); err != nil {
 		return nil, err
 	}
 
-	//2
-	//if tx.Header.Time >
-
-
-
-	//3
-	
-
-
-	//4
-	if _, err := newTx.GetSender(); err != nil {
+	if err := newTx.Validation(); err != nil {
 		return nil, err
 	}
 
@@ -164,15 +141,28 @@ func (tx *TxBlock) parse(tx_in []byte) (*TxBlock, error) {
 }
 
 //validate RlpEncoded TxBlock
-func (tx *TxBlock) Validation(tx_in []byte)  error {
+func (tx *TxBlock) Validation()  error {
 	//TODO
 
 	/*
-	1.区块是 RLP 格式数据，没有多余的后缀字节;
 	2.区块的产生时间不小于Dagger元年；
 	3.区块的所有输出金额加上费用之和必须小于TOS总金额;
 	4.VerifySignature
 	*/
+
+	//2
+	//if tx.Header.Time >
+
+
+
+	//3
+
+
+
+	//4
+	if _, err := tx.GetSender(); err != nil {
+		return err
+	}
 
 	return nil
 }

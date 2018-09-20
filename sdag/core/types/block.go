@@ -44,6 +44,12 @@ const(
 	BlockMain
 )
 
+type BlockType uint
+
+const(
+	BlockTypeTx BlockType = 1
+	BlockTypeMiner BlockType = 2
+)
 
 //挖矿不包括签名，hash
 //**************************
@@ -55,7 +61,7 @@ type Block interface {
 	GetCumulativeDiff() *big.Int  //区块累积难度
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
 
-	GetTime() int64			   //获取区块时间
+	GetTime() uint64			   //获取区块时间
 	GetSender() (common.Address, error)    //获取区块发送者，即创建者,从签名获取
 	GetLinks() []common.Hash   //获取区块链接组
 
@@ -64,16 +70,31 @@ type Block interface {
 
 	Sign(prv *ecdsa.PrivateKey)  error //签名
 
-	//Validation() error   // (check data,校验解签名)
+	Validation() error   // (check data,校验解签名)
 }
 
 type BlockHeader struct {
-	Type int32  //1 tx, 2 miner
-	Time int64 //ms  timestamp
+	Type BlockType  //1 tx, 2 miner
+	Time uint64 //ms  timestamp
 	GasPrice *big.Int  //tls
 	GasLimit uint64   //gas max value
 }
 
+//数据解析
+func BlockUpRlp(rlpData []byte) (Block, error){
+	if len(rlpData) < 5 {
+		return nil, errors.New("block up rlp error")
+	}
+
+	ty := BlockType(rlpData[3])
+	if ty == BlockTypeTx {
+		return new(TxBlock).UnRlp(rlpData)
+	}else if ty == BlockTypeMiner {
+		return new(MinerBlock).UnRlp(rlpData)
+	}
+
+	return nil, errors.New("block up rlp error")
+}
 
 
 
