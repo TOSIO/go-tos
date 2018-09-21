@@ -49,7 +49,7 @@ func txBlockConstruction(txRequestInfo *transInfo) (*types.TxBlock, error) {
 	itxBlock = txBlock
 	txBlock.Header = types.BlockHeader{
 		TxBlockType,
-		utils.GetTOSTimeStamp(),
+		utils.GetTimeStamp(),
 		txRequestInfo.GasPrice,
 		txRequestInfo.GasLimit,
 	}

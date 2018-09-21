@@ -154,9 +154,7 @@ func (tx *TxBlock) Validation()  error {
 	//if tx.Header.Time >
 
 
-
 	//3
-
 
 
 	//4

@@ -75,7 +75,7 @@ type Block interface {
 
 type BlockHeader struct {
 	Type BlockType  //1 tx, 2 miner
-	Time uint64 //ms  timestamp
+	Time uint64 	//ms  timestamp
 	GasPrice *big.Int  //tls
 	GasLimit uint64   //gas max value
 }
@@ -83,7 +83,7 @@ type BlockHeader struct {
 //数据解析
 func BlockUpRlp(rlpData []byte) (Block, error){
 	if len(rlpData) < 5 {
-		return nil, errors.New("block up rlp error")
+		return nil, errors.New("rlpData is too short")
 	}
 
 	ty := BlockType(rlpData[3])
@@ -93,7 +93,7 @@ func BlockUpRlp(rlpData []byte) (Block, error){
 		return new(MinerBlock).UnRlp(rlpData)
 	}
 
-	return nil, errors.New("block up rlp error")
+	return nil, errors.New("block upRlp error")
 }
 
 

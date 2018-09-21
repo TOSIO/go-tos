@@ -30,7 +30,7 @@ func txBlockExample() (*TxBlock, error){
 	tx := new(TxBlock)
 	tx.Header = BlockHeader{
 		BlockTypeTx,
-		utils.GetTOSTimeStamp(),
+		utils.GetTimeStamp(),
 		big.NewInt(10),
 		1222,
 	}

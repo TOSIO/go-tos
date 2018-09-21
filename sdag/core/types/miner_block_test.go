@@ -29,7 +29,7 @@ func minerBlockExample() (*MinerBlock, error){
 	mb := new(MinerBlock)
 	mb.Header = BlockHeader{
 		BlockTypeMiner,
-		utils.GetTOSTimeStamp(),
+		utils.GetTimeStamp(),
 		big.NewInt(10),
 		1222,
 	}
