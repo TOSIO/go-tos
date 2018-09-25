@@ -127,8 +127,12 @@ func main() {
 				fromAccount.Address,
 				fromAccount.PrivateKey,
 				toAccount.Address,
+<<<<<<< HEAD
 				amount.String(),
 			)
+=======
+				amount.String())
+>>>>>>> 4530b085fa8a06818ac170e63b52b40b9d4ca0ec
 
 			fmt.Println("send: ", jsonString)
 

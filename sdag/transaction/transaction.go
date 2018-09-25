@@ -1,30 +1,22 @@
 package transaction
 
 import (
-	"container/list"
 	"crypto/ecdsa"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/sdag"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/opentracing/opentracing-go/log"
 	"math/big"
 )
 
-var (
-	UnverifiedTransactionList *list.List
-	MaxConfirm                = 11
-)
-
 const (
-	TxBlockType    = 1
-	MinerBlockType = 2
+	TxBlockType     = 1
+	MinerBlockType  = 2
+	defaultGasPrice = 100
+	defaultGasLimit = 1 << 32
 )
-
-func init() {
-	UnverifiedTransactionList = list.New()
-}
 
 type ReceiverInfo struct {
 	To     common.Address
@@ -44,9 +36,9 @@ func txBlockConstruction(txRequestInfo *transInfo) (*types.TxBlock, error) {
 	}
 
 	//1. set header
-	var itxBlock types.Block
+	var txBlockI types.Block
 	txBlock := new(types.TxBlock)
-	itxBlock = txBlock
+	txBlockI = txBlock
 	txBlock.Header = types.BlockHeader{
 		TxBlockType,
 		utils.GetTimeStamp(),
@@ -55,7 +47,7 @@ func txBlockConstruction(txRequestInfo *transInfo) (*types.TxBlock, error) {
 	}
 
 	//2. links
-	Confirm(txBlock.Links)
+	sdag.Confirm(txBlock.Links)
 
 	//3. accoutnonce
 	txBlock.AccountNonce = 100
@@ -69,35 +61,9 @@ func txBlockConstruction(txRequestInfo *transInfo) (*types.TxBlock, error) {
 	txBlock.Payload = []byte{0x0, 0x3b}
 
 	//6. sign
-	itxBlock.Sign(txRequestInfo.PrivateKey)
+	txBlockI.Sign(txRequestInfo.PrivateKey)
 
-	addUnverifiedTransactionList(itxBlock.GetHash())
+	txBlockI.GetCumulativeDiff()
+
 	return txBlock, nil
-}
-
-func addUnverifiedTransactionList(v interface{}) {
-	UnverifiedTransactionList.PushFront(v)
-}
-
-func PopUnverifiedTransactionList() (interface{}, error) {
-	if UnverifiedTransactionList.Len() > 0 {
-		return UnverifiedTransactionList.Remove(UnverifiedTransactionList.Front()), nil
-	} else {
-		return nil, fmt.Errorf("the list is empty")
-	}
-}
-
-func Confirm(links []common.Hash) {
-	listLen := UnverifiedTransactionList.Len()
-	for i := 0; i < listLen && i < MaxConfirm; i++ {
-		ihash, err := PopUnverifiedTransactionList()
-		if err != nil {
-			log.Error(err)
-		}
-		hash, ok := ihash.(common.Hash)
-		if !ok {
-			log.Error(fmt.Errorf("hash.(common.Hash)"))
-		}
-		links = append(links, hash)
-	}
 }

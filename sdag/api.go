@@ -18,7 +18,7 @@ package sdag
 
 import (
 	"encoding/json"
-	"log"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"strings"
 )
 
@@ -55,7 +55,7 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var transaction TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transaction); err != nil {
-		log.Fatalf("JSON unmarshaling failed: %s", err)
+		log.Error("JSON unmarshaling failed: %s", err)
 	}
 	return transaction.To
 }
