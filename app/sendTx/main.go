@@ -7,7 +7,9 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+	"os"
 
+	configfile "github.com/TOSIO/go-tos/app/sendTx/configFile"
 	"github.com/TOSIO/go-tos/app/sendTx/httpSend"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
@@ -15,12 +17,13 @@ import (
 
 var (
 	//8545
-	urlString        = "http://localhost:8545"
+	urlStrings, _    = configfile.ReadConf("./configFile/config.toml")
+	urlString        = urlStrings.Urlstring
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
 "method":"sdag_transaction",
-"params":["{\"Form\":{\"Address\" :\"%s\",\"PublicKey\" :\"%s\",\"PrivateKey\"  :\"%s\"},\"To\":\"%s\",\"Amount\":\"%s\"}"],
+"params":["{\"Form\":{\"Address\" :\"%s\",\"PrivateKey\"  :\"%s\"},\"To\":\"%s\",\"Amount\":\"%s\"}"],
 "id":1
 }`
 	passphrase = "12345"
@@ -29,7 +32,6 @@ var (
 
 type accountInfo struct {
 	Address    string
-	PublicKey  string
 	PrivateKey string
 	Balance    *big.Int
 }
@@ -46,6 +48,13 @@ type resultInfo struct {
 	Result  string
 }
 
+type informations struct {
+	keyjson    []byte
+	Key        *keystore.Key
+	errRead    error
+	errDecrypt error
+}
+
 func main() {
 	{
 		allAccountList := make([]accountInfo, 0, 10000)
@@ -54,33 +63,51 @@ func main() {
 
 		//noBalanceAccountList:=make([]accountInfo,0,10000)
 
-		files, err := ioutil.ReadDir("./keyStore/")
+		var (
+			files []os.FileInfo
+			err   error
+		)
+		files, err = ioutil.ReadDir("./keyStore/")
+
 		if err != nil {
 			fmt.Println("ReadDir error:", err)
 			return
 		}
 
+		ch := make(chan informations, len(files))
+
 		for _, file := range files {
-			fileName := file.Name()
-			fmt.Println("ReadFile :", fileName)
-			keyjson, err := ioutil.ReadFile("./keyStore/" + fileName)
-			if err != nil {
-				fmt.Println("ReadFile error:", err)
+
+			go func(file os.FileInfo) {
+				var info informations
+				fileName := file.Name()
+				fmt.Println("ReadFile :", fileName)
+				info.keyjson, info.errRead = ioutil.ReadFile("./keyStore/" + fileName)
+
+				info.Key, info.errDecrypt = keystore.DecryptKey(info.keyjson, passphrase)
+
+				allAccountList = append(allAccountList, accountInfo{Address: info.Key.Address.Hex(),
+					PrivateKey: hex.EncodeToString(crypto.FromECDSA(info.Key.PrivateKey)),
+					Balance:    big.NewInt(0),
+				})
+				fmt.Println("Parse ReadFile :", fileName, "complete")
+				ch <- info
+			}(file)
+
+			it := <-ch
+
+			if it.errDecrypt != nil {
+				fmt.Println("DecryptKey error")
 				continue
 			}
 
-			Key, err := keystore.DecryptKey(keyjson, passphrase)
-			if err != nil {
-				fmt.Println("DecryptKey error", err)
+			if it.errRead != nil {
+				fmt.Println("Readfile error")
 				continue
 			}
-			allAccountList = append(allAccountList, accountInfo{Address: Key.Address.Hex(),
-				PublicKey:  hex.EncodeToString(crypto.FromECDSAPub(&Key.PrivateKey.PublicKey)),
-				PrivateKey: hex.EncodeToString(crypto.FromECDSA(Key.PrivateKey)),
-				Balance:    big.NewInt(0),
-			})
-			fmt.Println("Parse ReadFile :", fileName, "complete")
+
 		}
+
 		fmt.Println("Parse all  ReadFile complete")
 
 		allAccountList[0].Balance.SetBytes([]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -98,11 +125,10 @@ func main() {
 
 			jsonString := fmt.Sprintf(jsonStringFormat,
 				fromAccount.Address,
-				fromAccount.PublicKey,
 				fromAccount.PrivateKey,
 				toAccount.Address,
 				amount.String(),
-				"ether")
+			)
 
 			fmt.Println("send: ", jsonString)
 
