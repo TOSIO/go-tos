@@ -101,8 +101,7 @@ func main() {
 				fromAccount.PublicKey,
 				fromAccount.PrivateKey,
 				toAccount.Address,
-				amount.String(),
-				"ether")
+				amount.String())
 
 			fmt.Println("send: ", jsonString)
 
