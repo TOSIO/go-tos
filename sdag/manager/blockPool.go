@@ -1,4 +1,4 @@
-package sdag
+package manager
 
 import (
 	"container/list"
@@ -18,7 +18,7 @@ func init() {
 	UnverifiedTransactionList = list.New()
 }
 
-func addBlock(emptyInterfaceBlock interface{}) {
+func AddBlock(emptyInterfaceBlock interface{}) error {
 	var (
 		block types.Block
 		ok    bool
@@ -29,13 +29,13 @@ func addBlock(emptyInterfaceBlock interface{}) {
 		_, err := storage.GetBlock(block.GetHash())
 		if err != nil {
 			log.Error("The block has been added")
-			return
+			return fmt.Errorf("The block has been added")
 		} else {
 			log.Info("Non-repeating block")
 		}
 	} else {
 		log.Error("addBlock block.(types.Block) error")
-		return
+		return fmt.Errorf("addBlock block.(types.Block) error")
 	}
 
 	var linkHaveIsolated bool
@@ -46,7 +46,7 @@ func addBlock(emptyInterfaceBlock interface{}) {
 			if linkBlockI, ok := linkBlockHash.(types.Block); ok {
 				if linkBlockI.GetTime() > block.GetTime() {
 					log.Error("links time error")
-					return
+					return fmt.Errorf("links time error")
 				} else {
 					log.Info("links time legal")
 				}
@@ -81,6 +81,7 @@ func addBlock(emptyInterfaceBlock interface{}) {
 
 	storage.PutBlock(block.GetHash(), block.GetRlp())
 	addUnverifiedTransactionList(block.GetHash())
+	return nil
 }
 
 func PopUnverifiedTransactionList() (interface{}, error) {
