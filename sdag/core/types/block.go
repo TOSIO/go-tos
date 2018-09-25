@@ -1,9 +1,10 @@
 package types
+
 import (
-	"math/big"
-	"github.com/TOSIO/go-tos/devbase/common"
-	"errors"
 	"crypto/ecdsa"
+	"errors"
+	"github.com/TOSIO/go-tos/devbase/common"
+	"math/big"
 )
 
 var (
@@ -22,7 +23,6 @@ var (
 //7. 获取原始数据 整体RLP数据
 //8. status
 
-
 //set
 //1. 设置累积难度
 //2. status
@@ -35,7 +35,7 @@ var (
 //解析接口 -- RLP解码 - 从网络收到字节码，解码成block  DecodeRLP implements rlp.Decoder
 type BlockStatus uint
 
-const(
+const (
 	BLockNone BlockStatus = 1 << iota //0
 	BlockVerify
 	BlockConfirm
@@ -46,42 +46,49 @@ const(
 
 type BlockType uint
 
-const(
-	BlockTypeTx BlockType = 1
+const (
+	BlockTypeTx    BlockType = 1
 	BlockTypeMiner BlockType = 2
 )
 
 //挖矿不包括签名，hash
 //**************************
 type Block interface {
-	GetRlp() []byte 		   //获取区块原始数据
-	GetHash() common.Hash 		   //获取区块hash,包括签名,tx,miner block is the same
-	GetDiff() *big.Int	  		   //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
+	GetRlp() []byte       //获取区块原始数据
+	GetHash() common.Hash //获取区块hash,包括签名,tx,miner block is the same
+	GetDiff() *big.Int    //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
 
-	GetCumulativeDiff() *big.Int  //区块累积难度
+	GetCumulativeDiff() *big.Int               //区块累积难度
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
 
-	GetTime() uint64			   //获取区块时间
-	GetSender() (common.Address, error)    //获取区块发送者，即创建者,从签名获取
-	GetLinks() []common.Hash   //获取区块链接组
+	GetTime() uint64                    //获取区块时间
+	GetSender() (common.Address, error) //获取区块发送者，即创建者,从签名获取
+	GetLinks() []common.Hash            //获取区块链接组
 
 	GetStatus() BlockStatus       //获取状态
 	SetStatus(status BlockStatus) //设置状态
 
-	Sign(prv *ecdsa.PrivateKey)  error //签名
+	Sign(prv *ecdsa.PrivateKey) error //签名
 
-	Validation() error   // (check data,校验解签名)
+	Validation() error // (check data,校验解签名)
 }
 
 type BlockHeader struct {
-	Type BlockType  //1 tx, 2 miner
-	Time uint64 	//ms  timestamp
+	Type     BlockType //1 tx, 2 miner
+	Time     uint64    //ms  timestamp
 	GasPrice *big.Int  //tls
-	GasLimit uint64   //gas max value
+	GasLimit uint64    //gas max value
+}
+
+type MutableInfo struct {
+	status         BlockStatus //status
+	linkIt         []byte      //link it
+	difficulty     *big.Int    //self difficulty
+	cumulativeDiff *big.Int    //cumulative difficulty
 }
 
 //数据解析
-func BlockUpRlp(rlpData []byte) (Block, error){
+func BlockUpRlp(rlpData []byte) (Block, error) {
 	if len(rlpData) < 5 {
 		return nil, errors.New("rlpData is too short")
 	}
@@ -89,13 +96,25 @@ func BlockUpRlp(rlpData []byte) (Block, error){
 	ty := BlockType(rlpData[3])
 	if ty == BlockTypeTx {
 		return new(TxBlock).UnRlp(rlpData)
-	}else if ty == BlockTypeMiner {
+	} else if ty == BlockTypeMiner {
 		return new(MinerBlock).UnRlp(rlpData)
 	}
 
 	return nil, errors.New("block upRlp error")
 }
 
+//全数据解析
+func BlockUpAllRlp(rlpData []byte) (Block, error) {
+	if len(rlpData) < 5 {
+		return nil, errors.New("rlpData is too short")
+	}
 
+	ty := BlockType(rlpData[3])
+	if ty == BlockTypeTx {
+		return new(TxBlock).UnAllRlp(rlpData)
+	} else if ty == BlockTypeMiner {
+		return new(MinerBlock).UnRlp(rlpData)
+	}
 
-
+	return nil, errors.New("block upRlp error")
+}

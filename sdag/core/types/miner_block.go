@@ -26,9 +26,7 @@ type MinerBlock struct {
 
 	sender atomic.Value
 
-	difficulty     *big.Int
-	cumulativeDiff *big.Int
-	status         BlockStatus
+	MutableInfo
 
 	hash atomic.Value
 	size atomic.Value
@@ -50,6 +48,11 @@ func (mb *MinerBlock) data(withSig bool) (x interface{}) {
 }
 
 func (mb *MinerBlock) GetRlp() []byte {
+	enc, _ := rlp.EncodeToBytes(mb.data(true))
+	return enc
+}
+
+func (mb *MinerBlock) GeAllRlp() []byte {
 	enc, _ := rlp.EncodeToBytes(mb.data(true))
 	return enc
 }
@@ -122,6 +125,21 @@ func (mb *MinerBlock) GetTime() uint64 {
 }
 
 func (mb *MinerBlock) UnRlp(mbRLP []byte) (*MinerBlock, error) {
+
+	newMb := new(MinerBlock)
+
+	if err := rlp.DecodeBytes(mbRLP, newMb); err != nil {
+		return nil, err
+	}
+
+	if err := newMb.Validation(); err != nil {
+		return nil, err
+	}
+
+	return newMb, nil
+}
+
+func (mb *MinerBlock) UnAllRlp(mbRLP []byte) (interface{}, error) {
 
 	newMb := new(MinerBlock)
 
