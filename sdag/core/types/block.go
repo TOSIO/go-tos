@@ -71,6 +71,8 @@ type Block interface {
 	Sign(prv *ecdsa.PrivateKey) error //签名
 
 	Validation() error // (check data,校验解签名)
+
+	GetAllRlp() []byte //获取区块静态数据和易变数据字段的rlp编码
 }
 
 type BlockHeader struct {
@@ -113,7 +115,7 @@ func BlockUpAllRlp(rlpData []byte) (Block, error) {
 	if ty == BlockTypeTx {
 		return new(TxBlock).UnAllRlp(rlpData)
 	} else if ty == BlockTypeMiner {
-		return new(MinerBlock).UnRlp(rlpData)
+		return new(MinerBlock).UnAllRlp(rlpData)
 	}
 
 	return nil, errors.New("block upRlp error")

@@ -24,12 +24,15 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 		ok    bool
 	)
 	if block, ok = emptyInterfaceBlock.(types.Block); ok {
-		block.Validation()
-
-		_, err := storage.GetBlock(block.GetHash())
+		err := block.Validation()
 		if err != nil {
-			log.Error("The block has been added")
-			return fmt.Errorf("The block has been added")
+			log.Error("the block Validation fail")
+			return fmt.Errorf("the block Validation fail")
+		}
+		_, err = storage.GetBlock(block.GetHash())
+		if err != nil {
+			log.Error("the block has been added")
+			return fmt.Errorf("the block has been added")
 		} else {
 			log.Info("Non-repeating block")
 		}
@@ -39,17 +42,22 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 	}
 
 	var linkHaveIsolated bool
+	var linkBlockIs []types.Block
 
 	for _, hash := range block.GetLinks() {
-		linkBlockHash, err := storage.GetBlock(hash)
+		linkBlockEI, err := storage.GetBlock(hash) //the 'EI' is empty interface logogram
 		if err == nil {
-			if linkBlockI, ok := linkBlockHash.(types.Block); ok {
+			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
 				if linkBlockI.GetTime() > block.GetTime() {
 					log.Error("links time error")
 					return fmt.Errorf("links time error")
 				} else {
+					linkBlockIs = append(linkBlockIs, linkBlockI)
 					log.Info("links time legal")
 				}
+			} else {
+				log.Error("linkBlockEI assertion failure")
+				return fmt.Errorf("linkBlockEI assertion failure")
 			}
 		} else {
 			linkHaveIsolated = true
@@ -59,25 +67,17 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 	}
 
 	if linkHaveIsolated {
+		log.Warn("%s is a  Isolated block", block.GetHash())
 		//TODO
 		//add Isolated block
 	} else {
-		for _, hash := range block.GetLinks() {
-			linkBlockHash, err := storage.GetBlock(hash)
-			if err == nil {
-				if linkBlockI, ok := linkBlockHash.(types.Block); ok {
-					linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
-				}
-			} else {
-				linkHaveIsolated = true
-				//TODO
-				//add Isolated block
-			}
+		for _, linkBlockI := range linkBlockIs {
+			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
+			storage.PutBlock(linkBlockI.GetHash(), linkBlockI.GetAllRlp())
 		}
 	}
 
-	log.Warn("%s is a  Isolated block", block.GetHash())
-	log.Info("Verify before adding a block")
+	log.Info("Verification passed")
 
 	storage.PutBlock(block.GetHash(), block.GetRlp())
 	addUnverifiedTransactionList(block.GetHash())

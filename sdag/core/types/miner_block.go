@@ -52,7 +52,7 @@ func (mb *MinerBlock) GetRlp() []byte {
 	return enc
 }
 
-func (mb *MinerBlock) GeAllRlp() []byte {
+func (mb *MinerBlock) GetAllRlp() []byte {
 	enc, _ := rlp.EncodeToBytes(mb.data(true))
 	return enc
 }
@@ -139,7 +139,7 @@ func (mb *MinerBlock) UnRlp(mbRLP []byte) (*MinerBlock, error) {
 	return newMb, nil
 }
 
-func (mb *MinerBlock) UnAllRlp(mbRLP []byte) (interface{}, error) {
+func (mb *MinerBlock) UnAllRlp(mbRLP []byte) (*MinerBlock, error) {
 
 	newMb := new(MinerBlock)
 
