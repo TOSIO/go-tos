@@ -62,8 +62,6 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	//6. sign
 	txBlockI.Sign(txRequestInfo.PrivateKey)
 
-	txBlockI.GetCumulativeDiff()
-
 	return txBlock, nil
 }
 

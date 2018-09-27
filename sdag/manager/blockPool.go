@@ -7,6 +7,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
+	"time"
 )
 
 var (
@@ -16,6 +17,37 @@ var (
 
 func init() {
 	UnverifiedTransactionList = list.New()
+}
+
+type IsolatedBlock struct {
+	Links  []common.Hash //Links
+	linkIt []common.Hash //Link it
+	time   uint32
+}
+
+type lackBlock struct {
+	linkIt []common.Hash //Link it
+	time   uint32
+}
+
+var IsolatedBlockMap = make(map[common.Hash]IsolatedBlock)
+var lackBlockMap = make(map[common.Hash]lackBlock)
+
+func addIsolatedBlock(block types.Block) {
+	IsolatedBlockMap[block.GetHash()] = IsolatedBlock{block.GetLinks(), []common.Hash{}, uint32(time.Now().Unix())}
+	for _, link := range block.GetLinks() {
+		v, ok := IsolatedBlockMap[link]
+		if ok {
+			v.linkIt = append(v.linkIt, link)
+		} else {
+			v, ok := lackBlockMap[link]
+			if ok {
+				v.linkIt = append(v.linkIt, link)
+			} else {
+				lackBlockMap[link] = lackBlock{[]common.Hash{link}, uint32(time.Now().Unix())}
+			}
+		}
+	}
 }
 
 func AddBlock(emptyInterfaceBlock interface{}) error {
@@ -68,6 +100,7 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 
 	if linkHaveIsolated {
 		log.Warn("%s is a  Isolated block", block.GetHash())
+		block.SetStatus(block.GetStatus() | types.BlockVerify)
 		//TODO
 		//add Isolated block
 	} else {
@@ -80,7 +113,9 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 	log.Info("Verification passed")
 
 	storage.PutBlock(block.GetHash(), block.GetRlp())
-	addUnverifiedTransactionList(block.GetHash())
+	if !linkHaveIsolated {
+		addUnverifiedTransactionList(block.GetHash())
+	}
 	return nil
 }
 
