@@ -247,7 +247,7 @@ func (pm *ProtocolManager) processGetLastMainTimeSlice(p *peer, msg p2p.Msg) err
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) processGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
 	log.Trace("func ProtocolManager.processGetBlockHashBySlice | Process block hash query.")
-	lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
+	//lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
 	var targetSlice int64 = 0
 	err := msg.Decode(&targetSlice)
 	if err != nil {

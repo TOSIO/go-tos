@@ -21,33 +21,73 @@ func init() {
 
 type IsolatedBlock struct {
 	Links  []common.Hash //Links
-	linkIt []common.Hash //Link it
-	time   uint32
+	LinkIt []common.Hash //Link it
+	Time   uint32
 }
 
 type lackBlock struct {
-	linkIt []common.Hash //Link it
-	time   uint32
+	LinkIt []common.Hash //Link it
+	Time   uint32
 }
 
 var IsolatedBlockMap = make(map[common.Hash]IsolatedBlock)
 var lackBlockMap = make(map[common.Hash]lackBlock)
 
-func addIsolatedBlock(block types.Block) {
-	IsolatedBlockMap[block.GetHash()] = IsolatedBlock{block.GetLinks(), []common.Hash{}, uint32(time.Now().Unix())}
-	for _, link := range block.GetLinks() {
+func addIsolatedBlock(block types.Block, links []common.Hash) {
+	if _, ok := IsolatedBlockMap[block.GetHash()]; ok {
+		log.Warn("the block Validation fail")
+		return
+	}
+	IsolatedBlockMap[block.GetHash()] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix())}
+	for _, link := range links {
 		v, ok := IsolatedBlockMap[link]
 		if ok {
-			v.linkIt = append(v.linkIt, link)
+			v.LinkIt = append(v.LinkIt, link)
 		} else {
 			v, ok := lackBlockMap[link]
 			if ok {
-				v.linkIt = append(v.linkIt, link)
+				v.LinkIt = append(v.LinkIt, link)
 			} else {
 				lackBlockMap[link] = lackBlock{[]common.Hash{link}, uint32(time.Now().Unix())}
 			}
 		}
 	}
+
+	lackBlock, ok := lackBlockMap[block.GetHash()]
+	if ok {
+		v := IsolatedBlockMap[block.GetHash()]
+		v.LinkIt = append(v.LinkIt, lackBlock.LinkIt...)
+		IsolatedBlockMap[block.GetHash()] = v
+		delete(lackBlockMap, block.GetHash())
+	}
+}
+
+func deleteIsolatedBlock(block types.Block) {
+	v, ok := lackBlockMap[block.GetHash()]
+	if ok {
+		for _, hash := range v.LinkIt {
+			if deleteLink(hash) {
+				addUnverifiedTransactionList(hash)
+				storage.GetBlock(hash)
+			}
+		}
+	}
+}
+
+func deleteLink(v common.Hash) bool {
+	linkIt := IsolatedBlockMap[v].LinkIt
+	for index, hash := range linkIt {
+		if hash == v {
+			linkIt = append(linkIt[:index], linkIt[index+1:]...)
+			if len(linkIt) == 0 {
+				deleteLink(hash)
+				delete(IsolatedBlockMap, v)
+				addUnverifiedTransactionList(hash)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func AddBlock(emptyInterfaceBlock interface{}) error {
@@ -75,6 +115,7 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 
 	var linkHaveIsolated bool
 	var linkBlockIs []types.Block
+	var linkILackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
 		linkBlockEI, err := storage.GetBlock(hash) //the 'EI' is empty interface logogram
@@ -93,16 +134,14 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 			}
 		} else {
 			linkHaveIsolated = true
-			//TODO
-			//add Isolated block
+			linkILackBlock = append(linkILackBlock, hash)
 		}
 	}
 
 	if linkHaveIsolated {
 		log.Warn("%s is a  Isolated block", block.GetHash())
 		block.SetStatus(block.GetStatus() | types.BlockVerify)
-		//TODO
-		//add Isolated block
+		addIsolatedBlock(block, linkILackBlock)
 	} else {
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)

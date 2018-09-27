@@ -60,8 +60,8 @@ type TransactionInfo struct {
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
-	var transaction TransactionInfo
-	if err := json.Unmarshal([]byte(jsonString), &transaction); err != nil {
+	var transactionInfo TransactionInfo
+	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
 	}
 	var txRequestInfo transaction.TransInfo
