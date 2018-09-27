@@ -81,3 +81,4 @@ func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) error {
 	}
 	return bs.WithSignature(sig)
 }
+

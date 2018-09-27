@@ -1,92 +1,80 @@
 package transaction
 
 import (
-	"container/list"
+	"crypto/ecdsa"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/ethereum/go-ethereum"
-	"github.com/pkg/errors"
+	"github.com/TOSIO/go-tos/sdag/manager"
 	"math/big"
-	"time"
 )
 
-var (
-	UnverifiedTransactionList *list.List
+const (
+	TxBlockType     = 1
+	MinerBlockType  = 2
+	defaultGasPrice = 100
+	defaultGasLimit = 1 << 32
 )
 
-func init() {
-	UnverifiedTransactionList = list.New()
+type ReceiverInfo struct {
+	To     common.Address
+	Amount *big.Int
+}
+type TransInfo struct {
+	From       common.Address
+	Receiver   []ReceiverInfo
+	GasPrice   *big.Int //tls
+	GasLimit   uint64   //gas max value
+	PrivateKey *ecdsa.PrivateKey
 }
 
-type transInfo struct {
-	GasPrice *big.Int //tls
-	GasLimit uint64   //gas max value
-}
-
-func txBlockConstruction(TI *transInfo) (*types.TxBlock, error) {
+func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
+	if txRequestInfo.From != crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) {
+		return nil, fmt.Errorf("PrivateKey err")
+	}
 
 	//1. set header
-	var itx types.Block
-	tx := new(types.TxBlock)
-	itx = tx
-	tx.Header = types.BlockHeader{
-		1,
-		big.NewInt(time.Now().Unix()),
-		TI.GasPrice,
-		TI.GasLimit,
+	var txBlockI types.Block
+	txBlock := new(types.TxBlock)
+	txBlockI = txBlock
+	txBlock.Header = types.BlockHeader{
+		TxBlockType,
+		123, //utils.GetTimeStamp(),
+		txRequestInfo.GasPrice,
+		txRequestInfo.GasLimit,
 	}
 
 	//2. links
-	b := []byte{
-		0xb2, 0x6f, 0x2b, 0x34, 0x2a, 0xab, 0x24, 0xbc, 0xf6, 0x3e,
-		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
-		0xa2, 0x18, 0xc6, 0xa9, 0x27, 0x4d, 0x30, 0xab, 0x9a, 0x15,
-		0x10, 0x00,
-	}
-	var usedH common.Hash
-	usedH.SetBytes(b)
-	tx.Links = []common.Hash{
-		usedH,
-	}
+	manager.Confirm(txBlock.Links)
 
 	//3. accoutnonce
-	tx.AccountNonce = 100
+	txBlock.AccountNonce = 100
 
 	//4. txout
-	var addr common.Address
-	tx.Outs = []TxOut{
-		{addr, big.NewInt(1000)},
+	for _, v := range txRequestInfo.Receiver {
+		txBlock.Outs = append(txBlock.Outs, types.TxOut{Receiver: v.To, Amount: v.Amount})
 	}
 
 	//5. vm code
-	tx.Payload = []byte{0x0, 0x3b}
+	txBlock.Payload = []byte{0x0, 0x3b}
 
 	//6. sign
-	privateKey, err := crypto.GenerateKey()
+	txBlockI.Sign(txRequestInfo.PrivateKey)
+
+	txBlockI.GetCumulativeDiff()
+
+	return txBlock, nil
+}
+
+func Transaction(txRequestInfo *TransInfo) error {
+	TxBlock, err := txBlockConstruction(txRequestInfo)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	tx.Sign(privateKey)
-
-	addr1, _ := tx.GetSender()
-	if addr1 != crypto.PubkeyToAddress(privateKey.PublicKey) {
-		return nil, errors.New("sign err")
+	err = manager.AddBlock(TxBlock)
+	if err != nil {
+		return err
 	}
-
-	addUnverifiedTransactionList(tx)
-	return tx, nil
-}
-
-func addUnverifiedTransactionList(v interface{}) {
-	UnverifiedTransactionList.PushFront(v)
-}
-
-func PopUnverifiedTransactionList() (interface{}, error) {
-	if UnverifiedTransactionList.Len() > 0 {
-		return UnverifiedTransactionList.Remove(UnverifiedTransactionList.Front()), nil
-	} else {
-		return nil, fmt.Errorf("the list is empty")
-	}
+	return nil
 }
