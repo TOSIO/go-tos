@@ -20,12 +20,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"strings"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/sdag/transaction"
-	"math/big"
-	"strings"
 )
 
 // PublicEthereumAPI provides an API to access Ethereum full node-related
@@ -39,7 +40,8 @@ func NewPublicSdagAPI(s *Sdag) *PublicSdagAPI {
 	return &PublicSdagAPI{s}
 }
 
-func (api *PublicSdagAPI) DoRequest(data int) int {
+func (api *PublicSdagAPI) DoRequest(data string) string {
+	log.Trace("func PublicSdagAPI.DoRequest | receive request,", "param", data)
 	return data
 }
 
@@ -58,8 +60,8 @@ type TransactionInfo struct {
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
-	var transactionInfo TransactionInfo
-	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
+	var transaction TransactionInfo
+	if err := json.Unmarshal([]byte(jsonString), &transaction); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
 	}
 	var txRequestInfo transaction.TransInfo

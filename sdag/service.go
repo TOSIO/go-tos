@@ -65,6 +65,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 //实现service APIs()接口,返回sdag支持的rpc API接口
 func (s *Sdag) APIs() []rpc.API {
 	log.Debug("Sdag.APIs() called.")
+
 	apis := tosapi.GetAPIs(s.APIBackend)
 
 	// Append all the local APIs and return
@@ -92,7 +93,7 @@ func (s *Sdag) APIs() []rpc.API {
 //实现service Protocols()接口,返回sdag支持的rpc API接口
 func (s *Sdag) Protocols() []p2p.Protocol {
 	log.Debug("Sdag.Protocols() called.")
-	return nil
+	return s.protocolManager.SubProtocols
 }
 
 // Start implements node.Service, starting all internal goroutines needed by the

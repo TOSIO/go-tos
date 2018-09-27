@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/TOSIO/go-tos/sdag/mainchain"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/services/p2p"
@@ -24,6 +26,7 @@ type ProtocolManager struct {
 
 	SubProtocols []p2p.Protocol
 
+	mainChain mainchain.MainChainI
 	// channels for fetcher, syncer, txsyncLoop
 	newPeerCh   chan *peer
 	quitSync    chan struct{}
@@ -215,6 +218,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	defer msg.Discard()
 	p.Log().Info("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
 	//dispatch message here
+	switch msg.Code {
+	case GetLastMainTimeSlice: //获取最近一次临时主块的时间片
+		return pm.processGetLastMainTimeSlice(p, msg)
+	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
+		return pm.processGetBlockHashBySlice(p, msg)
+	case GetBlockDataMsg: //获取区块数据
+		return pm.processGetBlockDataByHash(p, msg)
+	}
 	return nil
 }
 
@@ -224,4 +235,30 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 		Network:    pm.networkID,
 		Difficulty: nil,
 	}
+}
+
+// 获取最近一次临时主块所在时间片消息处理
+func (pm *ProtocolManager) processGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.processGetLastMainTimeSlice | Process the last main timeslice query.")
+	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
+	return p.SendTimeSlice(lastMainSlice)
+}
+
+// 根据时间片获取对应所有区块hash消息处理
+func (pm *ProtocolManager) processGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.processGetBlockHashBySlice | Process block hash query.")
+	lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
+	var targetSlice int64 = 0
+	err := msg.Decode(&targetSlice)
+	if err != nil {
+		log.Trace("func ProtocolManager.processGetBlockHashBySlice | Failed to decode msg,", "err", err)
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+
+	return nil
+}
+
+// 根据区块hash返回对应区块（字节流）消息处理
+func (pm *ProtocolManager) processGetBlockDataByHash(p *peer, msg p2p.Msg) error {
+	return nil
 }
