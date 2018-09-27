@@ -98,3 +98,21 @@ func EncodeProxy(val interface{}) ([]byte, error) {
 	err := Encode(b, val)
 	return b.Bytes(), err
 }
+
+type Teststruct struct {
+	A int
+	B int
+	C int
+	S string
+}
+
+func TestEncodeduyu(test *testing.T) {
+
+	x := Teststruct{A: 456, B: 123, C: 789, S: "ssdfweterasdgasdjkhgjkasdhflrasdlkhfjhsdkhrfldsahfjjksadfhjkashfjkkjsaghdjkasdgfj"}
+	bytes, err := EncodeToBytes(x)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%v → %X\n", x, bytes)
+	//fmt.Println(bytes)
+}

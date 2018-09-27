@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"os"
 
-	configfile "github.com/TOSIO/go-tos/app/sendTx/configFile"
 	"github.com/TOSIO/go-tos/app/sendTx/httpSend"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
@@ -17,8 +16,7 @@ import (
 
 var (
 	//8545
-	urlStrings, _    = configfile.ReadConf("./configFile/config.toml")
-	urlString        = urlStrings.Urlstring
+	urlString        = "http://192.168.1.21:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
