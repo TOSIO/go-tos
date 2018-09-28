@@ -102,11 +102,6 @@ func (p *peer) Handshake(network uint64) error {
 	return nil
 }
 
-// 发送时间片点
-func (p *peer) SendTimeSlice(slice int64) error {
-	return p2p.Send(p.rw, LastMainTimeSlice, slice)
-}
-
 // newPeerSet creates a new peer set to track the active participants.
 func newPeerSet() *peerSet {
 	return &peerSet{
@@ -173,4 +168,9 @@ func (ps *peerSet) Close() {
 		p.Disconnect(p2p.DiscQuitting)
 	}
 	ps.closed = true
+}
+
+// 发送时间片点
+func (p *peer) SendTimeSlice(slice int64) error {
+	return p2p.Send(p.rw, LastMainTimeSlice, slice)
 }

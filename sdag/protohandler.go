@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/TOSIO/go-tos/sdag/mainchain"
+	"github.com/TOSIO/go-tos/sdag/synchronise"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
@@ -24,6 +25,7 @@ type ProtocolManager struct {
 
 	peers *peerSet
 
+	synchroniser synchronise.SynchroniserI
 	SubProtocols []p2p.Protocol
 
 	mainChain mainchain.MainChainI
@@ -189,7 +191,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	} */
 	// Register the peer locally
 	if err := pm.peers.Register(p); err != nil {
-		p.Log().Error("Ethereum peer registration failed", "err", err)
+		p.Log().Error("TOS peer registration failed", "err", err)
 		return err
 	}
 	defer pm.removePeer(p.id)
@@ -197,7 +199,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {
-			p.Log().Debug("Ethereum message handling failed", "err", err)
+			p.Log().Debug("TOS message handling failed", "err", err)
 			return err
 		}
 	}
@@ -220,11 +222,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	//dispatch message here
 	switch msg.Code {
 	case GetLastMainTimeSlice: //获取最近一次临时主块的时间片
-		return pm.processGetLastMainTimeSlice(p, msg)
+		return pm.handleGetLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
-		return pm.processGetBlockHashBySlice(p, msg)
+		return pm.handleGetBlockHashBySlice(p, msg)
 	case GetBlockDataMsg: //获取区块数据
-		return pm.processGetBlockDataByHash(p, msg)
+		return pm.handleGetBlockDataByHash(p, msg)
 	}
 	return nil
 }
@@ -238,20 +240,31 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 }
 
 // 获取最近一次临时主块所在时间片消息处理
-func (pm *ProtocolManager) processGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.processGetLastMainTimeSlice | Process the last main timeslice query.")
+func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleGetLastMainTimeSlice | Process the last main timeslice query.")
 	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
 	return p.SendTimeSlice(lastMainSlice)
 }
 
+// 获取最近一次临时主块所在时间片消息处理
+func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleLastMainTimeSlice | Process the last main timeslice response.")
+	var peerTimeSlice int64
+	err := msg.Decode(&peerTimeSlice)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+	// 将回复结果递送到同步器
+	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, peerTimeSlice)
+}
+
 // 根据时间片获取对应所有区块hash消息处理
-func (pm *ProtocolManager) processGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.processGetBlockHashBySlice | Process block hash query.")
+func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleGetBlockHashBySlice | Process block hash query.")
 	//lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
 	var targetSlice int64 = 0
 	err := msg.Decode(&targetSlice)
 	if err != nil {
-		log.Trace("func ProtocolManager.processGetBlockHashBySlice | Failed to decode msg,", "err", err)
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
 
@@ -259,6 +272,6 @@ func (pm *ProtocolManager) processGetBlockHashBySlice(p *peer, msg p2p.Msg) erro
 }
 
 // 根据区块hash返回对应区块（字节流）消息处理
-func (pm *ProtocolManager) processGetBlockDataByHash(p *peer, msg p2p.Msg) error {
+func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error {
 	return nil
 }
