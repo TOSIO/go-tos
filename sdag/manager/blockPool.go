@@ -23,6 +23,7 @@ type IsolatedBlock struct {
 	Links  []common.Hash //Links
 	LinkIt []common.Hash //Link it
 	Time   uint32
+	RLP    []byte
 }
 
 type lackBlock struct {
@@ -35,18 +36,21 @@ var lackBlockMap = make(map[common.Hash]lackBlock)
 
 func addIsolatedBlock(block types.Block, links []common.Hash) {
 	if _, ok := IsolatedBlockMap[block.GetHash()]; ok {
-		log.Warn("the block Validation fail")
+		log.Warn("the Isolated block already exists")
 		return
 	}
-	IsolatedBlockMap[block.GetHash()] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix())}
+
+	IsolatedBlockMap[block.GetHash()] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
 	for _, link := range links {
 		v, ok := IsolatedBlockMap[link]
 		if ok {
 			v.LinkIt = append(v.LinkIt, link)
+			IsolatedBlockMap[link] = v
 		} else {
 			v, ok := lackBlockMap[link]
 			if ok {
 				v.LinkIt = append(v.LinkIt, link)
+				lackBlockMap[link] = v
 			} else {
 				lackBlockMap[link] = lackBlock{[]common.Hash{link}, uint32(time.Now().Unix())}
 			}
@@ -65,54 +69,64 @@ func addIsolatedBlock(block types.Block, links []common.Hash) {
 func deleteIsolatedBlock(block types.Block) {
 	v, ok := lackBlockMap[block.GetHash()]
 	if ok {
-		for _, hash := range v.LinkIt {
-			if deleteLink(hash) {
-				addUnverifiedTransactionList(hash)
-				storage.GetBlock(hash)
+		currentList := v.LinkIt
+		nextList := []common.Hash{}
+		for len(currentList) > 0 {
+			for _, hash := range currentList {
+				linkBlock := IsolatedBlockMap[hash]
+				if len(linkBlock.Links) == 1 {
+					if linkBlock.Links[0] != hash {
+						log.Error("data exception")
+					} else {
+						newBlock, err := types.BlockUpRlp(linkBlock.RLP)
+						if err != nil {
+							linkCheckAndSave(newBlock)
+						} else {
+							log.Error("BlockUpRlp fail")
+						}
+						nextList = append(nextList, linkBlock.LinkIt...)
+						delete(IsolatedBlockMap, hash)
+					}
+				} else {
+					linkBlock.Links = deleteLinkHash(linkBlock.Links, hash)
+				}
 			}
+			currentList = nextList
+			nextList = []common.Hash{}
 		}
 	}
 }
 
-func deleteLink(v common.Hash) bool {
-	linkIt := IsolatedBlockMap[v].LinkIt
-	for index, hash := range linkIt {
-		if hash == v {
-			linkIt = append(linkIt[:index], linkIt[index+1:]...)
-			if len(linkIt) == 0 {
-				deleteLink(hash)
-				delete(IsolatedBlockMap, v)
-				addUnverifiedTransactionList(hash)
-				return true
-			}
+func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
+	for i, v := range link {
+		if v == hash {
+			link = append(link[:i], link[i+1:]...)
+			return link
 		}
 	}
-	return false
+	log.Error("Hash not found")
+	return link
 }
 
-func AddBlock(emptyInterfaceBlock interface{}) error {
-	var (
-		block types.Block
-		ok    bool
-	)
-	if block, ok = emptyInterfaceBlock.(types.Block); ok {
-		err := block.Validation()
-		if err != nil {
-			log.Error("the block Validation fail")
-			return fmt.Errorf("the block Validation fail")
-		}
-		_, err = storage.GetBlock(block.GetHash())
-		if err != nil {
-			log.Error("the block has been added")
-			return fmt.Errorf("the block has been added")
-		} else {
-			log.Info("Non-repeating block")
-		}
+func AddBlock(block types.Block) error {
+	err := block.Validation()
+	if err != nil {
+		log.Error("the block Validation fail")
+		return fmt.Errorf("the block Validation fail")
+	}
+	_, err = storage.GetBlock(block.GetHash())
+	if err != nil {
+		log.Error("the block has been added")
+		return fmt.Errorf("the block has been added")
 	} else {
-		log.Error("addBlock block.(types.Block) error")
-		return fmt.Errorf("addBlock block.(types.Block) error")
+		log.Info("Non-repeating block")
 	}
+	err = linkCheckAndSave(block)
+	deleteIsolatedBlock(block)
+	return err
+}
 
+func linkCheckAndSave(block types.Block) error {
 	var linkHaveIsolated bool
 	var linkBlockIs []types.Block
 	var linkILackBlock []common.Hash
@@ -143,18 +157,16 @@ func AddBlock(emptyInterfaceBlock interface{}) error {
 		block.SetStatus(block.GetStatus() | types.BlockVerify)
 		addIsolatedBlock(block, linkILackBlock)
 	} else {
+		log.Info("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.PutBlock(linkBlockI.GetHash(), linkBlockI.GetAllRlp())
 		}
-	}
 
-	log.Info("Verification passed")
-
-	storage.PutBlock(block.GetHash(), block.GetRlp())
-	if !linkHaveIsolated {
+		storage.PutBlock(block.GetHash(), block.GetRlp())
 		addUnverifiedTransactionList(block.GetHash())
 	}
+
 	return nil
 }
 
