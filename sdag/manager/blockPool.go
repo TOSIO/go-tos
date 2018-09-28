@@ -69,6 +69,7 @@ func addIsolatedBlock(block types.Block, links []common.Hash) {
 func deleteIsolatedBlock(block types.Block) {
 	v, ok := lackBlockMap[block.GetHash()]
 	if ok {
+		delete(lackBlockMap, block.GetHash())
 		currentList := v.LinkIt
 		nextList := []common.Hash{}
 		for len(currentList) > 0 {
@@ -84,7 +85,7 @@ func deleteIsolatedBlock(block types.Block) {
 						} else {
 							log.Error("BlockUpRlp fail")
 						}
-						nextList = append(nextList, linkBlock.LinkIt...)
+						nextList = append(nextList, hash)
 						delete(IsolatedBlockMap, hash)
 					}
 				} else {
