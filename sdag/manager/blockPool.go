@@ -76,18 +76,14 @@ func deleteIsolatedBlock(block types.Block) {
 			for _, hash := range currentList {
 				linkBlock := IsolatedBlockMap[hash]
 				if len(linkBlock.Links) == 1 {
-					if linkBlock.Links[0] != hash {
-						log.Error("data exception")
+					newBlock, err := types.BlockUpRlp(linkBlock.RLP)
+					if err != nil {
+						linkCheckAndSave(newBlock)
 					} else {
-						newBlock, err := types.BlockUpRlp(linkBlock.RLP)
-						if err != nil {
-							linkCheckAndSave(newBlock)
-						} else {
-							log.Error("BlockUpRlp fail")
-						}
-						nextList = append(nextList, hash)
-						delete(IsolatedBlockMap, hash)
+						log.Error("BlockUpRlp fail")
 					}
+					nextList = append(nextList, linkBlock.LinkIt...)
+					delete(IsolatedBlockMap, hash)
 				} else {
 					linkBlock.Links = deleteLinkHash(linkBlock.Links, hash)
 				}
