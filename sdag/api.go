@@ -42,7 +42,7 @@ func NewPublicSdagAPI(s *Sdag) *PublicSdagAPI {
 
 func (api *PublicSdagAPI) DoRequest(data string) string {
 	log.Trace("func PublicSdagAPI.DoRequest | receive request,", "param", data)
-	return data
+	return ""
 }
 
 type accountInfo struct {

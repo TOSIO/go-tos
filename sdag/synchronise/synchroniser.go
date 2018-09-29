@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TOSIO/go-tos/devbase/metrics"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 )
 
@@ -17,9 +17,10 @@ type Synchroniser struct {
 	peers     PeerSetI
 	mainChain mainchain.MainChainI
 
-	peerSliceCh chan RespPacketI
-	cancelCh    chan struct{} // Channel to cancel mid-flight syncs
-	cancelLock  sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
+	peerSliceCh   chan RespPacketI
+	blockhashesCh chan RespPacketI
+	cancelCh      chan struct{} // Channel to cancel mid-flight syncs
+	cancelLock    sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
 
 }
 
@@ -38,10 +39,16 @@ loop:
 		select {
 		case resp := <-s.peerSliceCh:
 			if timeSliceResp, ok := resp.(*TimeSliceResp); ok {
-				if s.mainChain.GetLastTempMainBlkSlice() > timeSliceResp.timeSlice {
+				lastMainSlice := s.mainChain.GetLastTempMainBlkSlice()
+				if lastMainSlice > timeSliceResp.timeSlice {
 					return nil
 				}
+				syncEndPoint := utils.GetMainTime(timeSliceResp.timeSlice)
+				for i := lastMainSlice - 32; i < syncEndPoint; i++ {
+
+				}
 			}
+
 			/* if s.mainChain.GetLastTempMainBlkSlice() > peerTmSlice {
 				return nil
 			} */
@@ -54,19 +61,32 @@ loop:
 	return nil
 }
 
+func (s *Synchroniser) syncByTimeslice(p PeerI, ts uint64) error {
+	p.RequestBlockHashBySlice(ts)
+	return nil
+}
+
 func (s *Synchroniser) requestTTL() time.Duration {
 	return time.Duration(2000)
 }
 
+func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
+	return s.deliverResponse(id, s.peerSliceCh, &TimeSliceResp{peerId: id, timeSlice: timeslice})
+}
+
+func (s *Synchroniser) DeliverBlockHashesResp(id string, resp RespPacketI) error {
+	return s.deliverResponse(id, s.blockhashesCh, resp)
+}
+
 // deliver injects a new batch of data received from a remote node.
-func (s *Synchroniser) deliverResponse(id string, destCh chan RespPacketI, packet RespPacketI, inMeter, dropMeter metrics.Meter) (err error) {
+func (s *Synchroniser) deliverResponse(id string, destCh chan RespPacketI, packet RespPacketI) (err error) {
 	// Update the delivery metrics for both good and failed deliveries
-	inMeter.Mark(int64(packet.Items()))
+	/* inMeter.Mark(int64(packet.Items()))
 	defer func() {
 		if err != nil {
 			dropMeter.Mark(int64(packet.Items()))
 		}
-	}()
+	}() */
 	// Deliver or abort if the sync is canceled while queuing
 	s.cancelLock.RLock()
 	cancel := s.cancelCh

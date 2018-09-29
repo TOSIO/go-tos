@@ -12,7 +12,7 @@ const (
 )
 
 type PeerI interface {
-	RequestBlockHashBySlice(slice int64) error
+	RequestBlockHashBySlice(slice uint64) error
 	RequestBlockData(hashes []common.Hash) error
 	RequestLastMainSlice() error
 }
@@ -31,5 +31,10 @@ type SynchroniserI interface {
 	SyncLight() error
 	RequestBlock(blk interface{}) (interface{}, error)
 	SendBlock(blk interface{}) error
-	DeliverLastTimeSliceResp(id string, timeslice int64) error
+	DeliverLastTimeSliceResp(id string, timeslice uint64) error
+	//DeliverBlockHashesResp(id string, resp *SliceBlkHashesResp) error
+	//DeliverBlockHashesResp(id string, ts uint64, hash []common.Hash) error
+	DeliverBlockHashesResp(id string, resp RespPacketI) error
+
+	DeliverBlockDatasResp(id string, resp RespPacketI) error
 }

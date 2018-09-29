@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TOSIO/go-tos/sdag/synchronise"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
@@ -171,6 +173,18 @@ func (ps *peerSet) Close() {
 }
 
 // 发送时间片点
-func (p *peer) SendTimeSlice(slice int64) error {
+func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, LastMainTimeSlice, slice)
+}
+
+func (p *peer) SendBlockHashes(blkHashes *synchronise.SliceBlkHashesResp) error {
+	return p2p.Send(p.rw, BlockHashBySliceMsg, blkHashes)
+}
+
+func (p *peer) SendBlocks(blocks [][]byte) error {
+	return p2p.Send(p.rw, BlockDataMsg, blocks)
+}
+
+func (p *peer) RequestBlockData(hashes []common.Hash) error {
+	return p2p.Send(p.rw, GetBlockDataMsg, hashes)
 }
