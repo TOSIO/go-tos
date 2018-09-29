@@ -16,7 +16,7 @@ import (
 
 var (
 	//8545
-	urlString        = "http://192.168.1.21:8545"
+	urlString        = "http://localhost:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",

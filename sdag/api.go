@@ -63,10 +63,11 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	var transactionInfo TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
 	}
 	var txRequestInfo transaction.TransInfo
 
-	txRequestInfo.GasPrice.SetUint64(0)
+	txRequestInfo.GasPrice = big.NewInt(0)
 	txRequestInfo.GasLimit = 0
 
 	err := hexString2Address(transactionInfo.Form.Address, &txRequestInfo.From)
@@ -79,7 +80,7 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	if err != nil {
 		return err.Error()
 	}
-	var Amount *big.Int
+	Amount := new(big.Int)
 	_, ok := Amount.SetString(transactionInfo.Amount, 10)
 	if !ok {
 		log.Error("Amount is invalid: %s", transactionInfo.Amount)
@@ -102,6 +103,9 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 }
 
 func hexString2Address(in string, out *common.Address) error {
+	if len(in) >= 2 && in[0] == '0' && (in[1] == 'x' || in[1] == 'X') {
+		in = in[2:]
+	}
 	bytes, err := hex.DecodeString(in)
 	if err != nil {
 		log.Error("hexString2Address failed: %s", err)

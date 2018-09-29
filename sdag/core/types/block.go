@@ -71,8 +71,6 @@ type Block interface {
 	Sign(prv *ecdsa.PrivateKey) error //签名
 
 	Validation() error // (check data,校验解签名)
-
-	GetAllRlp() []byte //获取区块静态数据和易变数据字段的rlp编码
 }
 
 type BlockHeader struct {
@@ -83,14 +81,14 @@ type BlockHeader struct {
 }
 
 type MutableInfo struct {
-	status         BlockStatus //status
-	linkIt         []byte      //link it
-	difficulty     *big.Int    //self difficulty
-	cumulativeDiff *big.Int    //cumulative difficulty
+	Status         BlockStatus //status
+	LinkIt         []byte      //link it
+	Difficulty     *big.Int    //self difficulty
+	CumulativeDiff *big.Int    //cumulative difficulty
 }
 
 //数据解析
-func BlockUpRlp(rlpData []byte) (Block, error) {
+func BlockUnRlp(rlpData []byte) (Block, error) {
 	if len(rlpData) < 5 {
 		return nil, errors.New("rlpData is too short")
 	}
@@ -100,22 +98,6 @@ func BlockUpRlp(rlpData []byte) (Block, error) {
 		return new(TxBlock).UnRlp(rlpData)
 	} else if ty == BlockTypeMiner {
 		return new(MinerBlock).UnRlp(rlpData)
-	}
-
-	return nil, errors.New("block upRlp error")
-}
-
-//全数据解析
-func BlockUpAllRlp(rlpData []byte) (Block, error) {
-	if len(rlpData) < 5 {
-		return nil, errors.New("rlpData is too short")
-	}
-
-	ty := BlockType(rlpData[3])
-	if ty == BlockTypeTx {
-		return new(TxBlock).UnAllRlp(rlpData)
-	} else if ty == BlockTypeMiner {
-		return new(MinerBlock).UnAllRlp(rlpData)
 	}
 
 	return nil, errors.New("block upRlp error")

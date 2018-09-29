@@ -59,14 +59,6 @@ func (tx *TxBlock) GetRlp() []byte {
 	return enc
 }
 
-func (tx *TxBlock) GetAllRlp() []byte {
-	enc, err := rlp.EncodeToBytes(tx.data(true))
-	if err != nil {
-		fmt.Println("err: ", err)
-	}
-	return enc
-}
-
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (tx *TxBlock) GetHash() common.Hash {
@@ -79,28 +71,28 @@ func (tx *TxBlock) GetHash() common.Hash {
 }
 
 func (tx *TxBlock) GetDiff() *big.Int {
-	if tx.difficulty != nil {
-		return tx.difficulty
+	if tx.Difficulty != nil {
+		return tx.Difficulty
 	}
 
-	tx.difficulty = utils.CalculateWork(tx.GetHash())
-	return tx.difficulty
+	tx.Difficulty = utils.CalculateWork(tx.GetHash())
+	return tx.Difficulty
 }
 
 func (tx *TxBlock) GetCumulativeDiff() *big.Int {
-	return tx.cumulativeDiff
+	return tx.CumulativeDiff
 }
 
 func (tx *TxBlock) SetCumulativeDiff(cumulativeDiff *big.Int) {
-	tx.cumulativeDiff = cumulativeDiff
+	tx.CumulativeDiff = cumulativeDiff
 }
 
 func (tx *TxBlock) GetStatus() BlockStatus {
-	return tx.status
+	return tx.Status
 }
 
 func (tx *TxBlock) SetStatus(status BlockStatus) {
-	tx.status = status
+	tx.Status = status
 }
 
 //relate sign
@@ -131,21 +123,6 @@ func (tx *TxBlock) GetTime() uint64 {
 }
 
 func (tx *TxBlock) UnRlp(txRLP []byte) (*TxBlock, error) {
-
-	newTx := new(TxBlock)
-
-	if err := rlp.DecodeBytes(txRLP, newTx); err != nil {
-		return nil, err
-	}
-
-	if err := newTx.Validation(); err != nil {
-		return nil, err
-	}
-
-	return newTx, nil
-}
-
-func (tx *TxBlock) UnAllRlp(txRLP []byte) (*TxBlock, error) {
 
 	newTx := new(TxBlock)
 

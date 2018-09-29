@@ -52,11 +52,6 @@ func (mb *MinerBlock) GetRlp() []byte {
 	return enc
 }
 
-func (mb *MinerBlock) GetAllRlp() []byte {
-	enc, _ := rlp.EncodeToBytes(mb.data(true))
-	return enc
-}
-
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (mb *MinerBlock) GetHash() common.Hash {
@@ -69,28 +64,28 @@ func (mb *MinerBlock) GetHash() common.Hash {
 }
 
 func (mb *MinerBlock) GetDiff() *big.Int {
-	if mb.difficulty != nil {
-		return mb.difficulty
+	if mb.Difficulty != nil {
+		return mb.Difficulty
 	}
 
-	mb.difficulty = utils.CalculateWork(rlpHash(mb.data(false)))
-	return mb.difficulty
+	mb.Difficulty = utils.CalculateWork(rlpHash(mb.data(false)))
+	return mb.Difficulty
 }
 
 func (mb *MinerBlock) GetCumulativeDiff() *big.Int {
-	return mb.cumulativeDiff
+	return mb.CumulativeDiff
 }
 
 func (mb *MinerBlock) SetCumulativeDiff(cumulativeDiff *big.Int) {
-	mb.cumulativeDiff = cumulativeDiff
+	mb.CumulativeDiff = cumulativeDiff
 }
 
 func (mb *MinerBlock) GetStatus() BlockStatus {
-	return mb.status
+	return mb.Status
 }
 
 func (mb *MinerBlock) SetStatus(status BlockStatus) {
-	mb.status = status
+	mb.Status = status
 }
 
 //relate sign
@@ -125,21 +120,6 @@ func (mb *MinerBlock) GetTime() uint64 {
 }
 
 func (mb *MinerBlock) UnRlp(mbRLP []byte) (*MinerBlock, error) {
-
-	newMb := new(MinerBlock)
-
-	if err := rlp.DecodeBytes(mbRLP, newMb); err != nil {
-		return nil, err
-	}
-
-	if err := newMb.Validation(); err != nil {
-		return nil, err
-	}
-
-	return newMb, nil
-}
-
-func (mb *MinerBlock) UnAllRlp(mbRLP []byte) (*MinerBlock, error) {
 
 	newMb := new(MinerBlock)
 

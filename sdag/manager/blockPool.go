@@ -12,7 +12,7 @@ import (
 
 var (
 	UnverifiedTransactionList *list.List
-	MaxConfirm                = 11
+	MaxConfirm                = 4
 )
 
 func init() {
@@ -76,11 +76,11 @@ func deleteIsolatedBlock(block types.Block) {
 			for _, hash := range currentList {
 				linkBlock := IsolatedBlockMap[hash]
 				if len(linkBlock.Links) == 1 {
-					newBlock, err := types.BlockUpRlp(linkBlock.RLP)
+					newBlock, err := types.BlockUnRlp(linkBlock.RLP)
 					if err != nil {
 						linkCheckAndSave(newBlock)
 					} else {
-						log.Error("BlockUpRlp fail")
+						log.Error("BlockUnRlp fail")
 					}
 					nextList = append(nextList, linkBlock.LinkIt...)
 					delete(IsolatedBlockMap, hash)
@@ -126,7 +126,7 @@ func AddBlock(block types.Block) error {
 func linkCheckAndSave(block types.Block) error {
 	var linkHaveIsolated bool
 	var linkBlockIs []types.Block
-	var linkILackBlock []common.Hash
+	var linksLackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
 		linkBlockEI, err := storage.GetBlock(hash) //the 'EI' is empty interface logogram
@@ -145,19 +145,18 @@ func linkCheckAndSave(block types.Block) error {
 			}
 		} else {
 			linkHaveIsolated = true
-			linkILackBlock = append(linkILackBlock, hash)
+			linksLackBlock = append(linksLackBlock, hash)
 		}
 	}
 
 	if linkHaveIsolated {
 		log.Warn("%s is a  Isolated block", block.GetHash())
-		block.SetStatus(block.GetStatus() | types.BlockVerify)
-		addIsolatedBlock(block, linkILackBlock)
+		addIsolatedBlock(block, linksLackBlock)
 	} else {
 		log.Info("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
-			storage.PutBlock(linkBlockI.GetHash(), linkBlockI.GetAllRlp())
+			storage.PutBlock(linkBlockI.GetHash(), linkBlockI.GetRlp())
 		}
 
 		storage.PutBlock(block.GetHash(), block.GetRlp())
@@ -184,7 +183,7 @@ func Confirm(links []common.Hash) {
 		}
 		hash, ok := hashI.(common.Hash)
 		if !ok {
-			log.Error("hash.(common.Hash)")
+			log.Error("error hash.(common.Hash)")
 		}
 		links = append(links, hash)
 	}
