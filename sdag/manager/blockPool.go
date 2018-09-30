@@ -16,8 +16,19 @@ var (
 	MaxConfirm                = 4
 )
 
+type protocolManagerI interface {
+	RelayBlock(blockRLP []byte) error
+}
+
+var (
+	pm protocolManagerI
+)
+
 func init() {
 	UnverifiedTransactionList = list.New()
+}
+func SetProtocolManager(protocolManager protocolManagerI) {
+	pm = protocolManager
 }
 
 type IsolatedBlock struct {
@@ -121,6 +132,7 @@ func AddBlock(block types.Block) error {
 	}
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
+	pm.RelayBlock(block.GetRlp())
 	return err
 }
 

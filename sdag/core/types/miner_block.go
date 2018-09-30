@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -145,7 +146,9 @@ func (mb *MinerBlock) Validation() error {
 	*/
 
 	//2
-	//if tx.Header.Time >
+	if mb.Header.Time < GenesisTime {
+		return fmt.Errorf("block time no greater than Genesis time")
+	}
 
 	//3
 

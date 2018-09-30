@@ -148,9 +148,19 @@ func (tx *TxBlock) Validation() error {
 	*/
 
 	//2
-	//if tx.Header.Time >
+	if tx.Header.Time < GenesisTime {
+		return fmt.Errorf("block time no greater than Genesis time")
+	}
 
 	//3
+	amount := big.NewInt(0)
+	for _, out := range tx.Outs {
+		amount.Add(amount, out.Amount)
+	}
+
+	if !(amount.Cmp(GlobalTosTotal) < 0) {
+		return fmt.Errorf("The amount is not less than the GlobalTosTotal")
+	}
 
 	//4
 	if _, err := tx.GetSender(); err != nil {
