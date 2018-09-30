@@ -24,6 +24,16 @@ func PutBlock(hash common.Hash, blockRLP []byte) error {
 	return nil
 }
 
+func GetBlockMutableInfo(hash common.Hash) (interface{}, error) {
+	var data interface{}
+	data = hash
+	return data, nil
+}
+
+func PutBlockMutableInfo(hash common.Hash, blockMutableInfoRLP []byte) error {
+	return nil
+}
+
 func Update(hash common.Hash, data interface{}, update func(block types.Block, data interface{})) error {
 	linkBlockEI, err := GetBlock(hash) //the 'EI' is empty interface logogram
 	if err == nil {

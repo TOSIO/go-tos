@@ -3,7 +3,9 @@ package types
 import (
 	"crypto/ecdsa"
 	"errors"
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/rlp"
 	"math/big"
 )
 
@@ -68,6 +70,8 @@ type Block interface {
 	GetStatus() BlockStatus       //获取状态
 	SetStatus(status BlockStatus) //设置状态
 
+	GetMutableInfo() *MutableInfo //易变信息
+
 	Sign(prv *ecdsa.PrivateKey) error //签名
 
 	Validation() error // (check data,校验解签名)
@@ -82,7 +86,7 @@ type BlockHeader struct {
 
 type MutableInfo struct {
 	Status         BlockStatus //status
-	LinkIt         []byte      //link it
+	confirmIt      []byte      //confirm it
 	Difficulty     *big.Int    //self difficulty
 	CumulativeDiff *big.Int    //cumulative difficulty
 }
@@ -101,4 +105,23 @@ func BlockUnRlp(rlpData []byte) (Block, error) {
 	}
 
 	return nil, errors.New("block upRlp error")
+}
+
+func GetMutableRlp(mutableInfo *MutableInfo) []byte {
+	enc, err := rlp.EncodeToBytes(mutableInfo)
+	if err != nil {
+		fmt.Println("err: ", err)
+	}
+	return enc
+}
+
+func UnMutableRlp(mutableRLP []byte) (*MutableInfo, error) {
+
+	newMutableInfo := new(MutableInfo)
+
+	if err := rlp.DecodeBytes(mutableRLP, newMutableInfo); err != nil {
+		return nil, err
+	}
+
+	return newMutableInfo, nil
 }

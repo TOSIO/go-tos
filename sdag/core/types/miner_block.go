@@ -26,7 +26,7 @@ type MinerBlock struct {
 
 	sender atomic.Value
 
-	MutableInfo
+	mutableInfo MutableInfo
 
 	hash atomic.Value
 	size atomic.Value
@@ -64,28 +64,28 @@ func (mb *MinerBlock) GetHash() common.Hash {
 }
 
 func (mb *MinerBlock) GetDiff() *big.Int {
-	if mb.Difficulty != nil {
-		return mb.Difficulty
+	if mb.mutableInfo.Difficulty != nil {
+		return mb.mutableInfo.Difficulty
 	}
 
-	mb.Difficulty = utils.CalculateWork(rlpHash(mb.data(false)))
-	return mb.Difficulty
+	mb.mutableInfo.Difficulty = utils.CalculateWork(rlpHash(mb.data(false)))
+	return mb.mutableInfo.Difficulty
 }
 
 func (mb *MinerBlock) GetCumulativeDiff() *big.Int {
-	return mb.CumulativeDiff
+	return mb.mutableInfo.CumulativeDiff
 }
 
 func (mb *MinerBlock) SetCumulativeDiff(cumulativeDiff *big.Int) {
-	mb.CumulativeDiff = cumulativeDiff
+	mb.mutableInfo.CumulativeDiff = cumulativeDiff
 }
 
 func (mb *MinerBlock) GetStatus() BlockStatus {
-	return mb.Status
+	return mb.mutableInfo.Status
 }
 
 func (mb *MinerBlock) SetStatus(status BlockStatus) {
-	mb.Status = status
+	mb.mutableInfo.Status = status
 }
 
 //relate sign
@@ -155,6 +155,10 @@ func (mb *MinerBlock) Validation() error {
 	}
 
 	return nil
+}
+
+func (mb *MinerBlock) GetMutableInfo() *MutableInfo {
+	return &mb.mutableInfo
 }
 
 // block interface

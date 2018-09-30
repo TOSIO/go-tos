@@ -156,7 +156,7 @@ func linkCheckAndSave(block types.Block) error {
 		log.Info("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
-			storage.PutBlock(linkBlockI.GetHash(), linkBlockI.GetRlp())
+			storage.PutBlockMutableInfo(linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
 		}
 
 		storage.PutBlock(block.GetHash(), block.GetRlp())

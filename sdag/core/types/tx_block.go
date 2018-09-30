@@ -29,7 +29,7 @@ type TxBlock struct {
 	BlockSign
 	sender atomic.Value
 
-	MutableInfo
+	mutableInfo MutableInfo
 
 	hash atomic.Value
 	size atomic.Value
@@ -71,28 +71,28 @@ func (tx *TxBlock) GetHash() common.Hash {
 }
 
 func (tx *TxBlock) GetDiff() *big.Int {
-	if tx.Difficulty != nil {
-		return tx.Difficulty
+	if tx.mutableInfo.Difficulty != nil {
+		return tx.mutableInfo.Difficulty
 	}
 
-	tx.Difficulty = utils.CalculateWork(tx.GetHash())
-	return tx.Difficulty
+	tx.mutableInfo.Difficulty = utils.CalculateWork(tx.GetHash())
+	return tx.mutableInfo.Difficulty
 }
 
 func (tx *TxBlock) GetCumulativeDiff() *big.Int {
-	return tx.CumulativeDiff
+	return tx.mutableInfo.CumulativeDiff
 }
 
 func (tx *TxBlock) SetCumulativeDiff(cumulativeDiff *big.Int) {
-	tx.CumulativeDiff = cumulativeDiff
+	tx.mutableInfo.CumulativeDiff = cumulativeDiff
 }
 
 func (tx *TxBlock) GetStatus() BlockStatus {
-	return tx.Status
+	return tx.mutableInfo.Status
 }
 
 func (tx *TxBlock) SetStatus(status BlockStatus) {
-	tx.Status = status
+	tx.mutableInfo.Status = status
 }
 
 //relate sign
@@ -158,4 +158,8 @@ func (tx *TxBlock) Validation() error {
 	}
 
 	return nil
+}
+
+func (tx *TxBlock) GetMutableInfo() *MutableInfo {
+	return &tx.mutableInfo
 }
