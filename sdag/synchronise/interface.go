@@ -12,13 +12,15 @@ const (
 )
 
 type PeerI interface {
+	NodeID() string
+	SetIdle(idle bool)
 	RequestBlockHashBySlice(slice uint64) error
 	RequestBlockData(timeslice uint64, hashes []common.Hash) error
 	RequestLastMainSlice() error
 }
 
 type PeerSetI interface {
-	SelectRandomPeer() (PeerI, error)
+	RandomSelectIdlePeer() (PeerI, error)
 }
 
 type RespPacketI interface {

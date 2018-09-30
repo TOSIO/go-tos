@@ -4,9 +4,9 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 )
 
-type TimeSlicePacket struct {
+type TimeslicePacket struct {
 	peerId    string
-	timeSlice uint64
+	timeslice uint64
 }
 
 type SliceBlkHashesPacket struct {
@@ -21,11 +21,11 @@ type SliceBlkDatasPacket struct {
 	blocks    [][]byte
 }
 
-func (ts *TimeSlicePacket) NodeId() string {
+func (ts *TimeslicePacket) NodeId() string {
 	return ts.peerId
 }
 
-func (ts *TimeSlicePacket) Items() int {
+func (ts *TimeslicePacket) Items() int {
 	return 1
 }
 

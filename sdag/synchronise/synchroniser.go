@@ -11,13 +11,17 @@ import (
 )
 
 var (
-	errNoSyncActive = errors.New("no sync active")
+	errNoSyncActive   = errors.New("no sync active")
+	errInternal       = errors.New("internal error")
+	errSendMsgTimeout = errors.New("send message timeout")
 )
 
 type Synchroniser struct {
 	peers      PeerSetI
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
+
+	oneSliceSyncDone chan uint64
 
 	peerSliceCh   chan RespPacketI
 	blockhashesCh chan RespPacketI
@@ -28,35 +32,53 @@ type Synchroniser struct {
 }
 
 func (s *Synchroniser) SyncHeavy() error {
-	// 随机挑选一个节点
-	peer, err := s.peers.SelectRandomPeer()
-	if err != nil {
-		return err
-	}
-	// 查询其当前最近一次临时主块的时间片
-	go peer.RequestLastMainSlice()
 
+	var timesliceEnd uint64
 	timeout := time.After(s.requestTTL())
+	hisNodes := make(map[string]string)
+	errCh := make(chan error)
+
+	lastSyncSlice := s.mainChain.GetLastTempMainBlkSlice() - 32
+	if lastSyncSlice < 0 {
+		lastSyncSlice = 0
+	}
+
 loop:
 	for {
+		// 随机挑选一个节点
+		peer, err := s.peers.RandomSelectIdlePeer()
+		if err != nil {
+			return err
+		}
+		if _, existed := hisNodes[peer.NodeID()]; existed {
+			continue
+		} else {
+			hisNodes[peer.NodeID()] = peer.NodeID()
+		}
+
+		// 查询其当前最近一次临时主块的时间片
+		go peer.RequestLastMainSlice()
+
 		select {
 		case resp := <-s.peerSliceCh:
-			if timeSliceResp, ok := resp.(*TimeSlicePacket); ok {
-				lastMainSlice := s.mainChain.GetLastTempMainBlkSlice()
-				if lastMainSlice > timeSliceResp.timeSlice {
-					return nil
+			if timesliceResp, ok := resp.(*TimeslicePacket); ok {
+				if lastSyncSlice > timesliceResp.timeslice {
+					continue
 				}
-				syncEndPoint := utils.GetMainTime(timeSliceResp.timeSlice)
-				for i := lastMainSlice - 32; i < syncEndPoint; i++ {
-
-				}
+				timesliceEnd = utils.GetMainTime(timesliceResp.timeslice)
+				go s.syncTimeslice(peer, lastSyncSlice, errCh)
 			}
-
-			/* if s.mainChain.GetLastTempMainBlkSlice() > peerTmSlice {
-				return nil
-			} */
-			break loop
+		case _ = <-errCh:
+			continue
+		case ts := <-s.oneSliceSyncDone:
+			if ts >= timesliceEnd {
+				break loop
+			}
+			lastSyncSlice = ts + 1
+			go s.syncTimeslice(peer, lastSyncSlice, errCh)
 		case <-timeout:
+			return nil
+		case <-s.cancelCh:
 			return nil
 		}
 	}
@@ -64,29 +86,38 @@ loop:
 	return nil
 }
 
-func (s *Synchroniser) syncByTimeslice(p PeerI, ts uint64) error {
+func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 	err := p.RequestBlockHashBySlice(ts)
 	if err != nil {
-		return nil
+		errCh <- err
+		return
 	}
-	for {
-		select {
-		case response := <-s.blockhashesCh:
-			if all, ok := response.(*SliceBlkHashesPacket); ok {
-				var diff []common.Hash
-				diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
-				p.RequestBlockData(all.timeslice, diff)
+	timeout := time.After(s.requestTTL())
+
+	select {
+	case response := <-s.blockhashesCh:
+		if all, ok := response.(*SliceBlkHashesPacket); ok {
+			var diff []common.Hash
+			diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
+			if err = p.RequestBlockData(all.timeslice, diff); err != nil {
+				errCh <- err
+				return
 			}
-		case response := <-s.blocksCh:
-			if blks, ok := response.(*SliceBlkDatasPacket); ok {
-				for _, blk := range blks.blocks {
-					s.blkstorage.AddBlock(blk)
-				}
+		} else {
+			errCh <- errInternal
+			return
+		}
+	case response := <-s.blocksCh:
+		if blks, ok := response.(*SliceBlkDatasPacket); ok {
+			for _, blk := range blks.blocks {
+				s.blkstorage.AddBlock(blk)
 			}
 		}
-
+	case <-timeout:
+		errCh <- errSendMsgTimeout
+		return
 	}
-	return nil
+	s.oneSliceSyncDone <- ts
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
@@ -94,7 +125,7 @@ func (s *Synchroniser) requestTTL() time.Duration {
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
-	return s.deliverResponse(id, s.peerSliceCh, &TimeSlicePacket{peerId: id, timeSlice: timeslice})
+	return s.deliverResponse(id, s.peerSliceCh, &TimeslicePacket{peerId: id, timeslice: timeslice})
 }
 
 func (s *Synchroniser) DeliverBlockHashesResp(id string, ts uint64, hash []common.Hash) error {

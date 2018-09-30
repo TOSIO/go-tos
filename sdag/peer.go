@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/synchronise"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
 
@@ -176,7 +177,7 @@ func (p *peer) SendTimeSlice(slice uint64) error {
 }
 
 func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {
-	return p2p.Send(p.rw, GetBlockHashBySliceMsg, &GetBlockHashBySliceResp{Timeslice: timeslice, Hashes: hashes})
+	return p2p.Send(p.rw, BlockHashBySliceMsg, &GetBlockHashBySliceResp{Timeslice: timeslice, Hashes: hashes})
 }
 
 func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
@@ -185,4 +186,24 @@ func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
 
 func (p *peer) RequestBlockData(timeslice uint64, hashes []common.Hash) error {
 	return p2p.Send(p.rw, GetBlockDataBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+}
+
+func (p *peer) NodeID() string {
+	return p.id
+}
+
+func (p *peer) SetIdle(idle bool) {
+
+}
+
+func (p *peer) RequestBlockHashBySlice(slice uint64) error {
+	return p2p.Send(p.rw, GetBlockHashBySliceMsg, slice)
+}
+
+func (p *peer) RequestLastMainSlice() error {
+	return nil
+}
+
+func (p *peerSet) RandomSelectIdlePeer() (synchronise.PeerI, error) {
+	return nil, nil
 }
