@@ -52,6 +52,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		networkID:    config.NetworkId,
 	}
 
+
+
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	var err error
@@ -114,3 +116,15 @@ func (s *Sdag) Stop() error {
 
 func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *Sdag) NetVersion() uint64 { return s.networkID }
+
+// CreateDB creates the chain database.
+func CreateDB(ctx *node.ServiceContext, config *Config, name string) (tosdb.Database, error) {
+	db, err := ctx.OpenDatabase(name, config.DatabaseCache,  config.DatabaseHandles)
+	if err != nil {
+		return nil, err
+	}
+	if db, ok := db.(*tosdb.LDBDatabase); ok {
+		db.Meter("eth/db/chaindata/")
+	}
+	return db, nil
+}
