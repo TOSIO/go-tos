@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/manager"
 	"math/big"
@@ -40,7 +41,7 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	txBlockI = txBlock
 	txBlock.Header = types.BlockHeader{
 		TxBlockType,
-		123, //utils.GetTimeStamp(),
+		utils.GetTimeStamp(),
 		txRequestInfo.GasPrice,
 		txRequestInfo.GasLimit,
 	}

@@ -149,6 +149,9 @@ func (mb *MinerBlock) Validation() error {
 	if mb.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
 	}
+	if mb.Header.Time > utils.GetTimeStamp() {
+		return fmt.Errorf("block time no less than current time")
+	}
 
 	//3
 
