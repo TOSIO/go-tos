@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TOSIO/go-tos/sdag/synchronise"
-
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
@@ -177,14 +175,14 @@ func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, LastMainTimeSlice, slice)
 }
 
-func (p *peer) SendBlockHashes(blkHashes *synchronise.SliceBlkHashesResp) error {
-	return p2p.Send(p.rw, BlockHashBySliceMsg, blkHashes)
+func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {
+	return p2p.Send(p.rw, GetBlockHashBySliceMsg, &GetBlockHashBySliceResp{Timeslice: timeslice, Hashes: hashes})
 }
 
-func (p *peer) SendBlocks(blocks [][]byte) error {
-	return p2p.Send(p.rw, BlockDataMsg, blocks)
+func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
+	return p2p.Send(p.rw, GetBlockDataBySliceMsg, &GetBlockDataBySliceResp{Timeslice: timeslice, Blocks: blocks})
 }
 
-func (p *peer) RequestBlockData(hashes []common.Hash) error {
-	return p2p.Send(p.rw, GetBlockDataMsg, hashes)
+func (p *peer) RequestBlockData(timeslice uint64, hashes []common.Hash) error {
+	return p2p.Send(p.rw, GetBlockDataBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
 }

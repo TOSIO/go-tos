@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 )
@@ -14,11 +15,13 @@ var (
 )
 
 type Synchroniser struct {
-	peers     PeerSetI
-	mainChain mainchain.MainChainI
+	peers      PeerSetI
+	mainChain  mainchain.MainChainI
+	blkstorage BlockStorageI
 
 	peerSliceCh   chan RespPacketI
 	blockhashesCh chan RespPacketI
+	blocksCh      chan RespPacketI
 	cancelCh      chan struct{} // Channel to cancel mid-flight syncs
 	cancelLock    sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
 
@@ -38,7 +41,7 @@ loop:
 	for {
 		select {
 		case resp := <-s.peerSliceCh:
-			if timeSliceResp, ok := resp.(*TimeSliceResp); ok {
+			if timeSliceResp, ok := resp.(*TimeSlicePacket); ok {
 				lastMainSlice := s.mainChain.GetLastTempMainBlkSlice()
 				if lastMainSlice > timeSliceResp.timeSlice {
 					return nil
@@ -62,7 +65,27 @@ loop:
 }
 
 func (s *Synchroniser) syncByTimeslice(p PeerI, ts uint64) error {
-	p.RequestBlockHashBySlice(ts)
+	err := p.RequestBlockHashBySlice(ts)
+	if err != nil {
+		return nil
+	}
+	for {
+		select {
+		case response := <-s.blockhashesCh:
+			if all, ok := response.(*SliceBlkHashesPacket); ok {
+				var diff []common.Hash
+				diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
+				p.RequestBlockData(all.timeslice, diff)
+			}
+		case response := <-s.blocksCh:
+			if blks, ok := response.(*SliceBlkDatasPacket); ok {
+				for _, blk := range blks.blocks {
+					s.blkstorage.AddBlock(blk)
+				}
+			}
+		}
+
+	}
 	return nil
 }
 
@@ -71,11 +94,15 @@ func (s *Synchroniser) requestTTL() time.Duration {
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
-	return s.deliverResponse(id, s.peerSliceCh, &TimeSliceResp{peerId: id, timeSlice: timeslice})
+	return s.deliverResponse(id, s.peerSliceCh, &TimeSlicePacket{peerId: id, timeSlice: timeslice})
 }
 
-func (s *Synchroniser) DeliverBlockHashesResp(id string, resp RespPacketI) error {
-	return s.deliverResponse(id, s.blockhashesCh, resp)
+func (s *Synchroniser) DeliverBlockHashesResp(id string, ts uint64, hash []common.Hash) error {
+	return s.deliverResponse(id, s.blockhashesCh, &SliceBlkHashesPacket{peerId: id, timeslice: ts, hashes: hash})
+}
+
+func (s *Synchroniser) DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error {
+	return s.deliverResponse(id, s.blockhashesCh, &SliceBlkDatasPacket{peerId: id, timeslice: ts, blocks: blocks})
 }
 
 // deliver injects a new batch of data received from a remote node.

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 
@@ -27,7 +26,7 @@ type ProtocolManager struct {
 	peers *peerSet
 
 	synchroniser synchronise.SynchroniserI
-	blkstorage   storage.BlockStorageI
+	blkstorage   synchronise.BlockStorageI
 	SubProtocols []p2p.Protocol
 
 	mainChain mainchain.MainChainI
@@ -227,9 +226,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleGetLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
 		return pm.handleGetBlockHashBySlice(p, msg)
-	case GetBlockDataMsg: //获取区块数据
+	case GetBlockDataBySliceMsg: //获取区块数据
 		return pm.handleGetBlockDataByHash(p, msg)
-	case BlockDataMsg:
+	case BlockDataBySliceMsg:
 		return pm.handleBlockDatasByHash(p, msg)
 	}
 	return nil
@@ -271,42 +270,41 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	var blkHashes synchronise.SliceBlkHashesResp
-	blkHashes.Hashes, err = pm.blkstorage.GetBlockHashByTmSlice(targetSlice)
-	blkHashes.Timeslice = targetSlice
+	var hashes []common.Hash
+	hashes, err = pm.blkstorage.GetBlockHashByTmSlice(targetSlice)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	return p.SendBlockHashes(&blkHashes)
+	return p.SendBlockHashes(targetSlice, hashes)
 }
 
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 	log.Trace("func ProtocolManager.handleBlockHashBySlice | Process block hashes response.")
-	var blkHashes synchronise.SliceBlkHashesResp
-	err := msg.Decode(&blkHashes)
+	var response GetBlockHashBySliceResp
+	err := msg.Decode(&response)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
 	// 将回复结果递送到同步器
-	return pm.synchroniser.DeliverBlockHashesResp(p.id, &blkHashes)
+	return pm.synchroniser.DeliverBlockHashesResp(p.id, response.Timeslice, response.Hashes)
 }
 
 // 根据区块hash返回对应区块（字节流）消息处理
 func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error {
 	log.Trace("func ProtocolManager.handleGetBlockDataByHash | Process block data query.")
-	var hashes []common.Hash
-	err := msg.Decode(&hashes)
+	var req GetBlockDataBySliceReq
+	err := msg.Decode(&req)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
 
-	if len(hashes) <= 0 {
+	if len(req.Hashes) <= 0 {
 		log.Trace("func ProtocolManager.handleGetBlockDataByHash | Param 'Hashes' is empty.")
 		return nil
 	}
 	var blocks [][]byte
-	blocks, err = pm.blkstorage.GetBlocks(hashes)
+	blocks, err = pm.blkstorage.GetBlocks(req.Hashes)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
@@ -314,16 +312,21 @@ func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error 
 		return nil
 	}
 	// 将结果回复给对方
-	return p.SendBlocks(blocks)
+	return p.SendSliceBlocks(req.Timeslice, blocks)
 }
 
 func (pm *ProtocolManager) handleBlockDatasByHash(p *peer, msg p2p.Msg) error {
 	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
-	var blkDatas synchronise.BlockDatasResp
-	err := msg.Decode(&blkDatas)
+	var response GetBlockDataBySliceResp
+	err := msg.Decode(&response)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
 	// 将回复结果递送到同步器
-	return pm.synchroniser.DeliverBlockDatasResp(p.id, &blkDatas)
+	return pm.synchroniser.DeliverBlockDatasResp(p.id, response.Timeslice, response.Blocks)
+}
+
+func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
+	fmt.Printf("called.")
+	return nil
 }

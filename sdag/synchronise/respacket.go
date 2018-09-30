@@ -4,42 +4,43 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 )
 
-type TimeSliceResp struct {
+type TimeSlicePacket struct {
 	peerId    string
 	timeSlice uint64
 }
 
-type SliceBlkHashesResp struct {
+type SliceBlkHashesPacket struct {
 	peerId    string
-	Timeslice uint64
-	Hashes    []common.Hash
+	timeslice uint64
+	hashes    []common.Hash
 }
 
-type BlockDatasResp struct {
-	peerId string
-	blocks [][]byte
+type SliceBlkDatasPacket struct {
+	peerId    string
+	timeslice uint64
+	blocks    [][]byte
 }
 
-func (ts *TimeSliceResp) NodeId() string {
+func (ts *TimeSlicePacket) NodeId() string {
 	return ts.peerId
 }
 
-func (ts *TimeSliceResp) Items() int {
+func (ts *TimeSlicePacket) Items() int {
 	return 1
 }
 
-func (bhs *SliceBlkHashesResp) NodeId() string {
+func (bhs *SliceBlkHashesPacket) NodeId() string {
 	return bhs.peerId
 }
 
-func (bhs *SliceBlkHashesResp) Items() int {
-	return len(bhs.Hashes)
+func (bhs *SliceBlkHashesPacket) Items() int {
+	return len(bhs.hashes)
 }
 
-func (bds *BlockDatasResp) NodeId() string {
+func (bds *SliceBlkDatasPacket) NodeId() string {
 	return bds.peerId
 }
 
-func (bds *BlockDatasResp) Items() int {
+func (bds *SliceBlkDatasPacket) Items() int {
 	return len(bds.blocks)
 }

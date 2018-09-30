@@ -1,5 +1,9 @@
 package sdag
 
+import (
+	"github.com/TOSIO/go-tos/devbase/common"
+)
+
 // Constants to match up protocol versions and messages
 const (
 	tos62 = 62
@@ -27,8 +31,8 @@ const (
 	LastMainTimeSlice      = 0x04
 	GetBlockHashBySliceMsg = 0x05
 	BlockHashBySliceMsg    = 0x06
-	GetBlockDataMsg        = 0x07
-	BlockDataMsg           = 0x08
+	GetBlockDataBySliceMsg = 0x07
+	BlockDataBySliceMsg    = 0x08
 
 	// Protocol messages belonging to tos/63
 	GetNodeDataMsg = 0x0d
@@ -36,6 +40,21 @@ const (
 	GetReceiptsMsg = 0x0f
 	ReceiptsMsg    = 0x10
 )
+
+type GetBlockHashBySliceResp struct {
+	Timeslice uint64
+	Hashes    []common.Hash
+}
+
+type GetBlockDataBySliceReq struct {
+	Timeslice uint64
+	Hashes    []common.Hash
+}
+
+type GetBlockDataBySliceResp struct {
+	Timeslice uint64
+	Blocks    [][]byte
+}
 
 type errCode int
 
