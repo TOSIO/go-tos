@@ -95,6 +95,7 @@ type MutableInfo struct {
 	confirmIt      []byte      //confirm it
 	Difficulty     *big.Int    //self difficulty
 	CumulativeDiff *big.Int    //cumulative difficulty
+	MaxLink 		uint64
 }
 
 //数据解析
