@@ -1,8 +1,13 @@
 package sdag
 
 import (
-	"github.com/TOSIO/go-tos/sdag/manager"
 	"sync"
+
+	"github.com/TOSIO/go-tos/sdag/manager"
+
+	"github.com/TOSIO/go-tos/sdag/mainchain"
+
+	"github.com/TOSIO/go-tos/sdag/synchronise"
 
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -24,8 +29,10 @@ type Sdag struct {
 	shutdownChan chan bool // Channel for shutting down the Ethereum
 
 	// Handlers(tx mempool)
-	blockchain      *interface{}
+	blockchain      mainchain.MainChainI
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
+
+	synchroniser *synchronise.Synchroniser
 
 	APIBackend    *SdagAPIBackend
 	netRPCService *tosapi.PublicNetAPI
@@ -59,17 +66,38 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		networkID:    config.NetworkId,
 		chainDb: chainDb,
 	}
+	manager.SetDB(sdag.chainDb)
+	manager.SetProtocolManager(sdag.protocolManager)
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	if sdag.protocolManager, err = NewProtocolManager(nil, config.NetworkId); err != nil {
+		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
 	sdag.APIBackend = &SdagAPIBackend{sdag}
 
-	manager.SetDB(sdag.chainDb)
-	manager.SetProtocolManager(sdag.protocolManager)
+	if sdag.blockchain, err = mainchain.New(); err != nil {
+		log.Error("Initialising Sdag blockchain failed.")
+		return nil, err
+	}
 
+	var storageProxy *synchronise.StorageProxy
+	var mempoolProxy *synchronise.MemPoolProxy
+	if storageProxy, err = synchronise.NewStorage(sdag.chainDb); err != nil {
+		log.Error("Initialising Sdag storageproxy failed.")
+		return nil, err
+	}
+	if mempoolProxy, err = synchronise.NewMempol(); err != nil {
+		log.Error("Initialising Sdag mempool failed.")
+		return nil, err
+	}
+
+	if sdag.synchroniser, err = synchronise.NewSynchroinser(sdag.protocolManager.Peers(),
+		sdag.blockchain, storageProxy, mempoolProxy); err != nil {
+		log.Error("Initialising Sdag synchroniser failed.")
+		return nil, err
+	}
 	return sdag, nil
 }
 
@@ -115,6 +143,8 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	// Start the RPC service
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 
+	// start sync procedure
+	go s.synchroniser.SyncHeavy()
 	return nil
 }
 

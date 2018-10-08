@@ -173,6 +173,10 @@ func (pm *ProtocolManager) newPeer(pv int, p *p2p.Peer, rw p2p.MsgReadWriter) *p
 	return newPeer(pv, p, rw)
 }
 
+func (pm *ProtocolManager) Peers() *peerSet {
+	return pm.peers
+}
+
 func (pm *ProtocolManager) handle(p *peer) error {
 	p.Log().Info("ProtocolManager.handle called.")
 	// Ignore maxPeers if this is a trusted peer
@@ -327,6 +331,8 @@ func (pm *ProtocolManager) handleBlockDatasByHash(p *peer, msg p2p.Msg) error {
 }
 
 func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
-	fmt.Printf("called.")
+	for _, p := range pm.peers.Peers() {
+		p.AsyncSendBlock(blockRLP)
+	}
 	return nil
 }

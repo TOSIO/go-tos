@@ -20,6 +20,7 @@ type Synchroniser struct {
 	peers      PeerSetI
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
+	mempool    MemPoolI
 
 	oneSliceSyncDone chan uint64
 
@@ -31,11 +32,18 @@ type Synchroniser struct {
 
 }
 
+func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp MemPoolI) (*Synchroniser, error) {
+	return &Synchroniser{peers: ps,
+		mainChain:  mc,
+		blkstorage: bs,
+		mempool:    mp}, nil
+}
+
 func (s *Synchroniser) SyncHeavy() error {
 
 	var timesliceEnd uint64
 	timeout := time.After(s.requestTTL())
-	hisNodes := make(map[string]string)
+	triedNodes := make(map[string]string)
 	errCh := make(chan error)
 
 	lastSyncSlice := s.mainChain.GetLastTempMainBlkSlice() - 32
@@ -50,10 +58,10 @@ loop:
 		if err != nil {
 			return err
 		}
-		if _, existed := hisNodes[peer.NodeID()]; existed {
+		if _, existed := triedNodes[peer.NodeID()]; existed {
 			continue
 		} else {
-			hisNodes[peer.NodeID()] = peer.NodeID()
+			triedNodes[peer.NodeID()] = peer.NodeID()
 		}
 
 		// 查询其当前最近一次临时主块的时间片
@@ -77,7 +85,7 @@ loop:
 			lastSyncSlice = ts + 1
 			go s.syncTimeslice(peer, lastSyncSlice, errCh)
 		case <-timeout:
-			return nil
+			continue
 		case <-s.cancelCh:
 			return nil
 		}
@@ -110,7 +118,7 @@ func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 	case response := <-s.blocksCh:
 		if blks, ok := response.(*SliceBlkDatasPacket); ok {
 			for _, blk := range blks.blocks {
-				s.blkstorage.AddBlock(blk)
+				s.mempool.AddBlock(blk)
 			}
 		}
 	case <-timeout:

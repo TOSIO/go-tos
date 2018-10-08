@@ -33,10 +33,12 @@ type BlockStorageI interface {
 	GetBlockHashByTmSlice(slice uint64) ([]common.Hash, error)
 
 	// 根据指定的hash集合返回对应的区块（RLP流）
-	GetBlocks([]common.Hash) ([][]byte, error)
+	GetBlocks(hashes []common.Hash) ([][]byte, error)
 
 	GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error)
+}
 
+type MemPoolI interface {
 	AddBlock(block []byte) error
 }
 

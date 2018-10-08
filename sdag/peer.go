@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"sync"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
@@ -16,6 +18,7 @@ var (
 	errClosed            = errors.New("peer set is closed")
 	errAlreadyRegistered = errors.New("peer is already registered")
 	errNotRegistered     = errors.New("peer is not registered")
+	errNoIdleNode        = errors.New("no idle node")
 )
 
 var (
@@ -31,6 +34,8 @@ type peer struct {
 
 	version  int         // Protocol version negotiated
 	forkDrop *time.Timer // Timed connection dropper if forks aren't validated in time
+
+	blocksQueue chan []byte
 
 	head common.Hash
 	td   *big.Int
@@ -171,6 +176,29 @@ func (ps *peerSet) Close() {
 	ps.closed = true
 }
 
+func (ps *peerSet) RandomSelectIdlePeer() (synchronise.PeerI, error) {
+	//var ret synchronise.PeerI = ps.Peer("")
+	var peers []*peer
+	for _, peer := range ps.peers {
+		peers = append(peers, peer)
+	}
+
+	if len(peers) <= 0 {
+		return nil, errNoIdleNode
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	index := rand.Intn(len(peers))
+
+	return peers[index], nil
+}
+
+func (ps *peerSet) Peers() map[string]*peer {
+	ps.lock.Lock()
+	defer ps.lock.Unlock()
+	return ps.peers
+}
+
 // 发送时间片点
 func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, LastMainTimeSlice, slice)
@@ -201,9 +229,13 @@ func (p *peer) RequestBlockHashBySlice(slice uint64) error {
 }
 
 func (p *peer) RequestLastMainSlice() error {
-	return nil
+	return p2p.Send(p.rw, GetLastMainTimeSlice, nil)
 }
 
-func (p *peerSet) RandomSelectIdlePeer() (synchronise.PeerI, error) {
-	return nil, nil
+func (p *peer) AsyncSendBlock(block []byte) {
+	select {
+	case p.blocksQueue <- block:
+	default:
+		log.Debug("peer [%s]'s queue is full, so give up.", p.id)
+	}
 }
