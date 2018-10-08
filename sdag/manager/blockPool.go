@@ -3,6 +3,8 @@ package manager
 import (
 	"container/list"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
+	"github.com/TOSIO/go-tos/sdag/core"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -22,11 +24,24 @@ type protocolManagerI interface {
 
 var (
 	pm protocolManagerI
+	db tosdb.Database
 )
 
 func init() {
 	UnverifiedTransactionList = list.New()
+	UnverifiedTransactionList.PushFront(GetMainBlockTail())
 }
+
+func SetDB(chainDb tosdb.Database) {
+	db = chainDb
+}
+
+func GetMainBlockTail() common.Hash {
+	var hash common.Hash
+	hash = core.GenesisHash
+	return hash
+}
+
 func SetProtocolManager(protocolManager protocolManagerI) {
 	pm = protocolManager
 }
@@ -119,20 +134,23 @@ func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
 
 func AddBlock(block types.Block) error {
 	err := block.Validation()
+
 	if err != nil {
 		log.Error("the block Validation fail")
 		return fmt.Errorf("the block Validation fail")
 	}
-	_, err = storage.GetBlock(block.GetHash())
-	if err != nil {
+
+	ok := storage.HasBlock(db, block.GetHash())
+	if ok {
 		log.Error("the block has been added")
 		return fmt.Errorf("the block has been added")
 	} else {
 		log.Info("Non-repeating block")
 	}
+
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
-	pm.RelayBlock(block.GetRlp())
+	//pm.RelayBlock(block.GetRlp())
 	return err
 }
 
@@ -142,28 +160,32 @@ func linkCheckAndSave(block types.Block) error {
 	var linksLackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
-		linkBlockEI, err := storage.GetBlock(hash) //the 'EI' is empty interface logogram
-		if err == nil {
-			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
-				if linkBlockI.GetTime() > block.GetTime() {
-					log.Error("links time error")
-					return fmt.Errorf("links time error")
+		if hash == core.GenesisHash {
+
+		} else {
+			linkBlockEI := storage.ReadBlock(db, hash) //the 'EI' is empty interface logogram
+			if linkBlockEI != nil {
+				if linkBlockI, ok := linkBlockEI.(types.Block); ok {
+					if linkBlockI.GetTime() > block.GetTime() {
+						log.Error("links time error")
+						return fmt.Errorf("links time error")
+					} else {
+						linkBlockIs = append(linkBlockIs, linkBlockI)
+						log.Info("links time legal")
+					}
 				} else {
-					linkBlockIs = append(linkBlockIs, linkBlockI)
-					log.Info("links time legal")
+					log.Error("linkBlockEI assertion failure")
+					return fmt.Errorf("linkBlockEI assertion failure")
 				}
 			} else {
-				log.Error("linkBlockEI assertion failure")
-				return fmt.Errorf("linkBlockEI assertion failure")
+				linkHaveIsolated = true
+				linksLackBlock = append(linksLackBlock, hash)
 			}
-		} else {
-			linkHaveIsolated = true
-			linksLackBlock = append(linksLackBlock, hash)
 		}
 	}
 
 	if linkHaveIsolated {
-		log.Warn("%s is a  Isolated block", block.GetHash())
+		log.Warn(block.GetHash().String(), "is a  Isolated block")
 		addIsolatedBlock(block, linksLackBlock)
 	} else {
 		log.Info("Verification passed")
@@ -172,7 +194,7 @@ func linkCheckAndSave(block types.Block) error {
 			storage.PutBlockMutableInfo(linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
 		}
 
-		storage.PutBlock(block.GetHash(), block.GetRlp())
+		storage.WriteBlock(db, block)
 		addUnverifiedTransactionList(block.GetHash())
 	}
 
@@ -187,7 +209,7 @@ func PopUnverifiedTransactionList() (interface{}, error) {
 	}
 }
 
-func Confirm(links []common.Hash) {
+func Confirm(links []common.Hash) []common.Hash {
 	listLen := UnverifiedTransactionList.Len()
 	for i := 0; i < listLen && i < MaxConfirm; i++ {
 		hashI, err := PopUnverifiedTransactionList()
@@ -200,6 +222,7 @@ func Confirm(links []common.Hash) {
 		}
 		links = append(links, hash)
 	}
+	return links
 }
 
 func addUnverifiedTransactionList(v interface{}) {

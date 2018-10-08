@@ -54,7 +54,7 @@ const (
 )
 
 const (
-	GenesisTime uint64 = 1546272000000
+	GenesisTime uint64 = 1538309988 //1546272000000
 )
 
 var GlobalTosTotal, _ = big.NewInt(0).SetString("1000000000000000000000000000", 10)

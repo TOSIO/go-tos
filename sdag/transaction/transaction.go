@@ -47,7 +47,7 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	}
 
 	//2. links
-	manager.Confirm(txBlock.Links)
+	txBlock.Links = manager.Confirm(txBlock.Links)
 
 	//3. accoutnonce
 	txBlock.AccountNonce = 100
@@ -61,7 +61,10 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	txBlock.Payload = []byte{0x0, 0x3b}
 
 	//6. sign
-	txBlockI.Sign(txRequestInfo.PrivateKey)
+	err := txBlockI.Sign(txRequestInfo.PrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("Sign error")
+	}
 
 	return txBlock, nil
 }

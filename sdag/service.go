@@ -1,6 +1,7 @@
 package sdag
 
 import (
+	"github.com/TOSIO/go-tos/sdag/manager"
 	"sync"
 
 	"github.com/TOSIO/go-tos/devbase/log"
@@ -52,15 +53,22 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		networkID:    config.NetworkId,
 	}
 
-
+	var err error
+	sdag.chainDb, err = CreateDB(ctx, config, "tos/db/sdagData/test")
+	if err != nil {
+		log.Error("CreateDB fail")
+	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
-	var err error
 	if sdag.protocolManager, err = NewProtocolManager(nil, config.NetworkId); err != nil {
 		return nil, err
 	}
 	sdag.APIBackend = &SdagAPIBackend{sdag}
+
+	manager.SetDB(sdag.chainDb)
+	manager.SetProtocolManager(sdag.protocolManager)
+
 	return sdag, nil
 }
 
@@ -119,12 +127,12 @@ func (s *Sdag) NetVersion() uint64 { return s.networkID }
 
 // CreateDB creates the chain database.
 func CreateDB(ctx *node.ServiceContext, config *Config, name string) (tosdb.Database, error) {
-	db, err := ctx.OpenDatabase(name, config.DatabaseCache,  config.DatabaseHandles)
+	db, err := ctx.OpenDatabase(name, config.DatabaseCache, config.DatabaseHandles)
 	if err != nil {
 		return nil, err
 	}
 	if db, ok := db.(*tosdb.LDBDatabase); ok {
-		db.Meter("eth/db/chaindata/")
+		db.Meter("tos/db/sdagData/")
 	}
 	return db, nil
 }

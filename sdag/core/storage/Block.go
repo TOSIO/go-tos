@@ -1,14 +1,21 @@
 package storage
 
 import (
+	"fmt"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
-	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/devbase/utils"
-	"fmt"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
-func ReadBlockRlp(db Reader, hash common.Hash) []byte{
+func GetBlock(hash common.Hash) (interface{}, error) {
+	var data interface{}
+	data = hash
+	return data, fmt.Errorf("err")
+}
+
+func ReadBlockRlp(db Reader, hash common.Hash) []byte {
 	data, _ := db.Get(hash.Bytes())
 	return data
 }
@@ -19,7 +26,7 @@ func ReadBlock(db Reader, hash common.Hash) types.Block {
 		return nil
 	}
 
-	block , err := types.BlockUnRlp(data)
+	block, err := types.BlockUnRlp(data)
 	if err != nil {
 		log.Error("Invalid block RLP", "hash", hash, "err", err)
 	}
@@ -27,7 +34,7 @@ func ReadBlock(db Reader, hash common.Hash) types.Block {
 	return block
 }
 
-func HasBlock(db Reader,hash common.Hash) bool {
+func HasBlock(db Reader, hash common.Hash) bool {
 	if has, err := db.Has(hash.Bytes()); !has || err != nil {
 		return false
 	}
@@ -69,7 +76,7 @@ func ReaderBlockHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, er
 }
 
 //根据指定的hash集合返回对应的区块（RLP流）
-func ReadBlocks(db Reader,hashes []common.Hash) ([][]byte, error) {
+func ReadBlocks(db Reader, hashes []common.Hash) ([][]byte, error) {
 
 	var blockRlps [][]byte
 	for _, hash := range hashes {
