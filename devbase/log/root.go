@@ -14,6 +14,15 @@ func init() {
 	root.SetHandler(DiscardHandler())
 }
 
+//NewLogModule
+
+func LogConfig(l Lvl, s string) {
+	glogger := NewGlogHandler(StreamHandler(os.Stderr, TerminalFormat(true))) //输出终端格式是否是彩色
+	glogger.Verbosity(l)                                                      //输出过滤级别LvlTrace
+	glogger.Vmodule(s)                                                        //输出模块名
+	Root().SetHandler(glogger)                                                //写入新的记录
+}
+
 // New returns a new logger with the given context.
 // New is a convenient alias for Root().New
 func New(ctx ...interface{}) Logger {
