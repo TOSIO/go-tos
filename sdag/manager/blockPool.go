@@ -134,7 +134,6 @@ func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
 
 func AddBlock(block types.Block) error {
 	err := block.Validation()
-
 	if err != nil {
 		log.Error("the block Validation fail")
 		return fmt.Errorf("the block Validation fail")
@@ -150,7 +149,7 @@ func AddBlock(block types.Block) error {
 
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
-	//pm.RelayBlock(block.GetRlp())
+	pm.RelayBlock(block.GetRlp())
 	return err
 }
 
@@ -185,13 +184,13 @@ func linkCheckAndSave(block types.Block) error {
 	}
 
 	if linkHaveIsolated {
-		log.Warn(block.GetHash().String(), "is a  Isolated block")
+		log.Warn(block.GetHash().String() + "is a Isolated block")
 		addIsolatedBlock(block, linksLackBlock)
 	} else {
 		log.Info("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
-			storage.PutBlockMutableInfo(linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
+			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
 		}
 
 		storage.WriteBlock(db, block)
