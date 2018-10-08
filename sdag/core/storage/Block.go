@@ -55,11 +55,15 @@ func WriteBlock(db Writer, block types.Block) error {
 }
 
 // 根据指定的时间片获取对应的所有区块hash
-func ReaderBlockHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, error) {
+func ReadBlocksHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, error) {
 	//mTime := utils.GetMainTime(slice)
 	var hashes []common.Hash
 	key := blockLookUpKey(slice)
 	iterator := db.NewIteratorWithPrefix(key)
+	if iterator == nil {
+		return nil, fmt.Errorf("Failed to get iterator")
+	}
+
 	for iterator.Next() {
 		fmt.Printf("key:%s, value:%s\n", iterator.Key(), iterator.Value())
 		hash := common.BytesToHash(iterator.Value())

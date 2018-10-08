@@ -16,6 +16,8 @@
 
 package tosdb
 
+import "github.com/syndtr/goleveldb/leveldb/iterator"
+
 // Code using batches should try to add this much data to the batch.
 // The value was determined empirically.
 const IdealBatchSize = 100 * 1024
@@ -38,6 +40,7 @@ type Database interface {
 	Has(key []byte) (bool, error)
 	Close()
 	NewBatch() Batch
+	NewIteratorWithPrefix(prefix []byte) iterator.Iterator
 }
 
 // Batch is a write-only database that commits changes to its host database

@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/syndtr/goleveldb/leveldb/iterator"
 )
 
 /*
@@ -85,6 +86,10 @@ func (db *MemDatabase) Delete(key []byte) error {
 	defer db.lock.Unlock()
 
 	delete(db.db, string(key))
+	return nil
+}
+
+func (db *MemDatabase) NewIteratorWithPrefix(prefix []byte) iterator.Iterator {
 	return nil
 }
 
