@@ -9,12 +9,6 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
-func GetBlock(hash common.Hash) (interface{}, error) {
-	var data interface{}
-	data = hash
-	return data, fmt.Errorf("err")
-}
-
 func ReadBlockRlp(db Reader, hash common.Hash) []byte {
 	data, _ := db.Get(hash.Bytes())
 	return data
@@ -105,12 +99,16 @@ func Update(db ReaderWrite, hash common.Hash, data interface{}, update func(bloc
 	return nil
 }
 
-func GetBlockMutableInfo(hash common.Hash) (interface{}, error) {
-	var data interface{}
-	data = hash
-	return data, nil
+func ReadBlockMutableInfoRlp(db Reader, hash common.Hash) ([]byte, error) {
+	data, err := db.Get(blockInfoKey(hash))
+	return data, err
 }
 
-func PutBlockMutableInfo(hash common.Hash, blockMutableInfoRLP []byte) error {
+func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP []byte) error {
+	if err := db.Put(blockInfoKey(hash), blockMutableInfoRLP); err != nil {
+		log.Error("Failed to store block info", "err", err)
+		return err
+	}
+
 	return nil
 }

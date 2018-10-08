@@ -3,6 +3,7 @@ package storage
 import (
 	"strconv"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/devbase/common"
 )
 
 var (
@@ -30,4 +31,8 @@ func nextId() []byte {
 	}
 
 	return strconv.AppendUint(nil, countTime + count, 16)
+}
+
+func blockInfoKey(hash common.Hash) []byte {
+	return append([]byte("i"), hash[:]...)
 }

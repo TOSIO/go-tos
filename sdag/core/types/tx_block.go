@@ -150,8 +150,7 @@ func (tx *TxBlock) Validation() error {
 	//2
 	if tx.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
-	}
-	if tx.Header.Time > utils.GetTimeStamp() {
+	} else if tx.Header.Time > utils.GetTimeStamp() {
 		return fmt.Errorf("block time no less than current time")
 	}
 
