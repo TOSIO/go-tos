@@ -52,6 +52,7 @@ type SynchroniserI interface {
 	DeliverBlockHashesResp(id string, ts uint64, hashes []common.Hash) error
 	DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error
 
+	DeliverNewBlockResp(id string, data []byte) error
 	//DeliverBlockHashesResp(id string, resp *SliceBlkHashesResp) error
 	//DeliverBlockHashesResp(id string, resp RespPacketI) error
 }

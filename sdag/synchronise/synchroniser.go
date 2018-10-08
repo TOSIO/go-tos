@@ -124,7 +124,7 @@ func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 			}
 		}
 	case newBlock := <-s.newBlockCh:
-		if blk, ok := response.(*NewBlockPacket); ok {
+		if blk, ok := newBlock.(*NewBlockPacket); ok {
 			s.mempool.AddBlock(blk.block)
 		}
 	case <-timeout:
@@ -150,7 +150,7 @@ func (s *Synchroniser) DeliverBlockDatasResp(id string, ts uint64, blocks [][]by
 	return s.deliverResponse(id, s.blocksCh, &SliceBlkDatasPacket{peerId: id, timeslice: ts, blocks: blocks})
 }
 
-func (s *Synchroniser) DeliverNewBlockResp(id string, ts uint64, data []byte) error {
+func (s *Synchroniser) DeliverNewBlockResp(id string, data []byte) error {
 	return s.deliverResponse(id, s.newBlockCh, &NewBlockPacket{peerId: id, block: data})
 }
 
