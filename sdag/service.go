@@ -46,17 +46,18 @@ type Sdag struct {
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
+
+	chainDb, err := CreateDB(ctx, config, "tos/db/sdagData/test")
+	if err != nil {
+		return nil, err
+	}
+
 	sdag := &Sdag{
 		//初始化
 		config:       config,
 		shutdownChan: make(chan bool),
 		networkID:    config.NetworkId,
-	}
-
-	var err error
-	sdag.chainDb, err = CreateDB(ctx, config, "tos/db/sdagData/test")
-	if err != nil {
-		log.Error("CreateDB fail")
+		chainDb: chainDb,
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
