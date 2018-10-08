@@ -21,6 +21,11 @@ type SliceBlkDatasPacket struct {
 	blocks    [][]byte
 }
 
+type NewBlockPacket struct {
+	peerId string
+	block  []byte
+}
+
 func (ts *TimeslicePacket) NodeId() string {
 	return ts.peerId
 }
@@ -43,4 +48,12 @@ func (bds *SliceBlkDatasPacket) NodeId() string {
 
 func (bds *SliceBlkDatasPacket) Items() int {
 	return len(bds.blocks)
+}
+
+func (bds *NewBlockPacket) NodeId() string {
+	return bds.peerId
+}
+
+func (bds *NewBlockPacket) Items() int {
+	return 1
 }

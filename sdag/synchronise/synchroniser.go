@@ -27,8 +27,10 @@ type Synchroniser struct {
 	peerSliceCh   chan RespPacketI
 	blockhashesCh chan RespPacketI
 	blocksCh      chan RespPacketI
-	cancelCh      chan struct{} // Channel to cancel mid-flight syncs
-	cancelLock    sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
+	newBlockCh    chan RespPacketI
+
+	cancelCh   chan struct{} // Channel to cancel mid-flight syncs
+	cancelLock sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
 
 }
 
@@ -121,6 +123,10 @@ func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 				s.mempool.AddBlock(blk)
 			}
 		}
+	case newBlock := <-s.newBlockCh:
+		if blk, ok := response.(*NewBlockPacket); ok {
+			s.mempool.AddBlock(blk.block)
+		}
 	case <-timeout:
 		errCh <- errSendMsgTimeout
 		return
@@ -141,7 +147,11 @@ func (s *Synchroniser) DeliverBlockHashesResp(id string, ts uint64, hash []commo
 }
 
 func (s *Synchroniser) DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error {
-	return s.deliverResponse(id, s.blockhashesCh, &SliceBlkDatasPacket{peerId: id, timeslice: ts, blocks: blocks})
+	return s.deliverResponse(id, s.blocksCh, &SliceBlkDatasPacket{peerId: id, timeslice: ts, blocks: blocks})
+}
+
+func (s *Synchroniser) DeliverNewBlockResp(id string, ts uint64, data []byte) error {
+	return s.deliverResponse(id, s.newBlockCh, &NewBlockPacket{peerId: id, block: data})
 }
 
 // deliver injects a new batch of data received from a remote node.

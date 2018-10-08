@@ -29,7 +29,8 @@ func NewStorage(db tosdb.Database) (*StorageProxy, error) {
 
 // 根据指定的时间片获取对应的所有区块hash
 func (s *StorageProxy) GetBlockHashByTmSlice(slice uint64) ([]common.Hash, error) {
-	return storage.ReaderBlockHashByTmSlice(s.db, slice)
+
+	return storage.ReadBlocksHashByTmSlice(s.db, slice)
 }
 
 // 根据指定的hash集合返回对应的区块（RLP流）
@@ -38,6 +39,6 @@ func (s *StorageProxy) GetBlocks(hashes []common.Hash) ([][]byte, error) {
 }
 
 func (s *StorageProxy) GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error) {
-	local, err := storage.ReaderBlockHashByTmSlice(s.db, timeslice)
+	local, err := storage.ReadBlocksHashByTmSlice(s.db, timeslice)
 	return local, err
 }

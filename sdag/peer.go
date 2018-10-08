@@ -72,7 +72,8 @@ func (p *peer) broadcast() {
 	p.Log().Info("Peer.broadcast() called.")
 	for {
 		select {
-
+		case block := <-p.blocksQueue:
+			p.SendNewBlock(block)
 		case <-p.term:
 			p.Log().Info("Peer.broadcast() exit.")
 			return
@@ -202,6 +203,10 @@ func (ps *peerSet) Peers() map[string]*peer {
 // 发送时间片点
 func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, LastMainTimeSlice, slice)
+}
+
+func (p *peer) SendNewBlock(block []byte) error {
+	return p2p.Send(p.rw, NewTxBlockMsg, block)
 }
 
 func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {

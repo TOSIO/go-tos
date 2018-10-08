@@ -234,6 +234,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleGetBlockDataByHash(p, msg)
 	case BlockDataBySliceMsg:
 		return pm.handleBlockDatasByHash(p, msg)
+	case NewTxBlockMsg:
+		return pm.handleNewBlock(p, msg)
 	}
 	return nil
 }
@@ -335,4 +337,15 @@ func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
 		p.AsyncSendBlock(blockRLP)
 	}
 	return nil
+}
+
+func (pm *ProtocolManager) handleNewBlock(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
+	var response []byte
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+
+	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
 }
