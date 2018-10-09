@@ -12,7 +12,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"errors"
 	"fmt"
-	"time"
+	//"time"
 )
 
 //Hash:  [127 242 125 253 133 17 225 78 67 44 32 180 203 174 113 51 76 140 182 175 221 159 171 16 194 223 76 253 141 216 34 53]
@@ -47,17 +47,17 @@ func TestWriteBlock(t *testing.T) {
 func TestReaderBlockHashByTmSlice(t *testing.T) {
 	db, _ := newTestLDB()
 
-	for i := 0; i < 10 ; i++  {
+	for i := 0; i < 1000 ; i++  {
 		block, _:= txBlockExample()
 		WriteBlock(db, block)
 		fmt.Println("Hash: ", block.GetHash())
 		fmt.Println("rlp: ", block.GetRlp())
 		fmt.Println("Time: ", block.GetTime())
 
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 	}
 
-	hashes, _:= ReaderBlockHashByTmSlice(db, utils.GetMainTime(utils.GetTimeStamp()))
+	hashes, _:= ReadBlocksHashByTmSlice(db, utils.GetMainTime(utils.GetTimeStamp()))
 	fmt.Println(len(hashes))
 
 	blocks, _ := ReadBlocks(db, hashes)

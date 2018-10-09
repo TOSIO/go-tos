@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+//测试挖矿区块
 func TestMinerBlock(t *testing.T) {
 
 	//tx

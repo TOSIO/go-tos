@@ -10,6 +10,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
+//测试交易区块
 func TestTxBlock(t *testing.T) {
 
 	//tx

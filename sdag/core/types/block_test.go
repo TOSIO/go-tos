@@ -28,6 +28,7 @@ func blockInterfaceExample(b Block) error {
 	return err
 }
 
+//测试区块rlp解析
 func TestBlockUpRlp(t *testing.T) {
 	tx, _ := txBlockExample()
 
