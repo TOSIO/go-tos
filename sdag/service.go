@@ -64,7 +64,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		config:       config,
 		shutdownChan: make(chan bool),
 		networkID:    config.NetworkId,
-		chainDb: chainDb,
+		chainDb:      chainDb,
 	}
 	manager.SetDB(sdag.chainDb)
 	manager.SetProtocolManager(sdag.protocolManager)
@@ -144,7 +144,7 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 
 	// start sync procedure
-	go s.synchroniser.SyncHeavy()
+	s.synchroniser.Start()
 	return nil
 }
 
