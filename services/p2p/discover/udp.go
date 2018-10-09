@@ -316,8 +316,10 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
 	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
+		log.Trace("func udp.findnode | pending callback.")
 		reply := r.(*neighbors)
 		for _, rn := range reply.Nodes {
+			log.Trace("Receive neighbor node", "ip", rn.IP, "addr", toaddr)
 			nreceived++
 			n, err := t.nodeFromRPC(toaddr, rn)
 			if err != nil {
@@ -383,6 +385,7 @@ func (t *udp) loop() {
 		for el := plist.Front(); el != nil; el = el.Next() {
 			nextTimeout = el.Value.(*pending)
 			if dist := nextTimeout.deadline.Sub(now); dist < 2*respTimeout {
+				log.Trace("func udp.loop | Set timeout", "dist", dist)
 				timeout.Reset(dist)
 				return
 			}
@@ -437,6 +440,7 @@ func (t *udp) loop() {
 			for el := plist.Front(); el != nil; el = el.Next() {
 				p := el.Value.(*pending)
 				if now.After(p.deadline) || now.Equal(p.deadline) {
+					log.Trace("func udp.loop | receive packet timeout", "from", p.from, "type", p.ptype)
 					p.errc <- errTimeout
 					plist.Remove(el)
 					contTimeouts++

@@ -460,6 +460,7 @@ func (srv *Server) Start() (err error) {
 	)
 
 	if !srv.NoDiscovery || srv.DiscoveryV5 { //
+		log.Debug("func Server.Start | Start udp listening...")
 		addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
 		if err != nil {
 			return err
@@ -471,6 +472,7 @@ func (srv *Server) Start() (err error) {
 		realaddr = conn.LocalAddr().(*net.UDPAddr)
 		if srv.NAT != nil {
 			if !realaddr.IP.IsLoopback() {
+				log.Debug("func Server.Start | Start nat...")
 				go nat.Map(srv.NAT, srv.quit, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
 			}
 			// TODO: react to external IP changes over time.
@@ -481,6 +483,7 @@ func (srv *Server) Start() (err error) {
 	}
 
 	if !srv.NoDiscovery && srv.DiscoveryV5 {
+		log.Debug("func Server.Start | Share udp connection for discovery v5.")
 		unhandled = make(chan discover.ReadPacket, 100)
 		sconn = &sharedUDPConn{conn, unhandled}
 	}
@@ -495,6 +498,7 @@ func (srv *Server) Start() (err error) {
 			Bootnodes:    srv.BootstrapNodes,
 			Unhandled:    unhandled,
 		}
+		log.Debug("func Server.Start | Start table...")
 		ntab, err := discover.ListenUDP(conn, cfg)
 		if err != nil {
 			return err

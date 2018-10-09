@@ -23,7 +23,7 @@ type SliceBlkDatasPacket struct {
 
 type NewBlockPacket struct {
 	peerId string
-	block  []byte
+	blocks [][]byte
 }
 
 func (ts *TimeslicePacket) NodeId() string {

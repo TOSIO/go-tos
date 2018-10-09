@@ -230,12 +230,14 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleGetLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
 		return pm.handleGetBlockHashBySlice(p, msg)
-	case GetBlockDataBySliceMsg: //获取区块数据
-		return pm.handleGetBlockDataByHash(p, msg)
-	case BlockDataBySliceMsg:
-		return pm.handleBlockDatasByHash(p, msg)
-	case NewTxBlockMsg:
-		return pm.handleNewBlock(p, msg)
+	case GetBlocksBySliceMsg: //获取区块数据
+		return pm.handleGetBlocksBySlice(p, msg)
+	case BlocksBySliceMsg:
+		return pm.handleBlocksBySlice(p, msg)
+	case GetBlockByHashMsg:
+		return pm.handleGetBlockByHash(p, msg)
+	case NewBlockMsg:
+		return pm.handleNewBlocks(p, msg)
 	}
 	return nil
 }
@@ -297,8 +299,8 @@ func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 }
 
 // 根据区块hash返回对应区块（字节流）消息处理
-func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleGetBlockDataByHash | Process block data query.")
+func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleGetBlocksBySlice | Process block data query by slice.")
 	var req GetBlockDataBySliceReq
 	err := msg.Decode(&req)
 	if err != nil {
@@ -306,7 +308,7 @@ func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error 
 	}
 
 	if len(req.Hashes) <= 0 {
-		log.Trace("func ProtocolManager.handleGetBlockDataByHash | Param 'Hashes' is empty.")
+		log.Trace("func ProtocolManager.handleGetBlocksBySlice | Param 'Hashes' is empty.")
 		return nil
 	}
 	var blocks [][]byte
@@ -321,8 +323,8 @@ func (pm *ProtocolManager) handleGetBlockDataByHash(p *peer, msg p2p.Msg) error 
 	return p.SendSliceBlocks(req.Timeslice, blocks)
 }
 
-func (pm *ProtocolManager) handleBlockDatasByHash(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
+func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleBlocksBySlice | Process block hashes response.")
 	var response GetBlockDataBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
@@ -332,6 +334,42 @@ func (pm *ProtocolManager) handleBlockDatasByHash(p *peer, msg p2p.Msg) error {
 	return pm.synchroniser.DeliverBlockDatasResp(p.id, response.Timeslice, response.Blocks)
 }
 
+func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleGetBlockByHash | Process block query by hash.")
+	var req []common.Hash
+	err := msg.Decode(&req)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+
+	if len(req) <= 0 {
+		log.Trace("func ProtocolManager.handleGetBlockByHash | Param 'Hashes' is empty.")
+		return nil
+	}
+
+	var blocks [][]byte
+	blocks, err = pm.blkstorage.GetBlocks(req)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+	if len(blocks) <= 0 {
+		return nil
+	}
+	// 将结果回复给对方
+	return p.SendNewBlocks(blocks)
+}
+
+func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
+	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
+	var response [][]byte
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+
+	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
+}
+
 func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
 	for _, p := range pm.peers.Peers() {
 		p.AsyncSendBlock(blockRLP)
@@ -339,13 +377,6 @@ func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
 	return nil
 }
 
-func (pm *ProtocolManager) handleNewBlock(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
-	var response []byte
-	err := msg.Decode(&response)
-	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
-	}
-
-	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
+func (pm *ProtocolManager) GetBlock(hashBlock common.Hash) error {
+	return pm.synchroniser.AsyncRequestBlock(hashBlock)
 }

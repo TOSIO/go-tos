@@ -54,11 +54,12 @@ type peerSet struct {
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 	return &peer{
-		Peer:    p,
-		rw:      rw,
-		version: version,
-		id:      fmt.Sprintf("%x", p.ID().Bytes()[:8]),
-		term:    make(chan struct{}),
+		Peer:        p,
+		rw:          rw,
+		version:     version,
+		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
+		term:        make(chan struct{}),
+		blocksQueue: make(chan []byte),
 	}
 }
 
@@ -73,7 +74,9 @@ func (p *peer) broadcast() {
 	for {
 		select {
 		case block := <-p.blocksQueue:
-			p.SendNewBlock(block)
+			var blocks [][]byte
+			blocks = append(blocks, block)
+			p.SendNewBlocks(blocks)
 		case <-p.term:
 			p.Log().Info("Peer.broadcast() exit.")
 			return
@@ -197,7 +200,11 @@ func (ps *peerSet) RandomSelectIdlePeer() (synchronise.PeerI, error) {
 func (ps *peerSet) Peers() map[string]*peer {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-	return ps.peers
+	var ret map[string]*peer
+	for k, v := range ps.peers {
+		ret[k] = v
+	}
+	return ret
 }
 
 // 发送时间片点
@@ -205,8 +212,8 @@ func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, LastMainTimeSlice, slice)
 }
 
-func (p *peer) SendNewBlock(block []byte) error {
-	return p2p.Send(p.rw, NewTxBlockMsg, block)
+func (p *peer) SendNewBlocks(blocks [][]byte) error {
+	return p2p.Send(p.rw, NewBlockMsg, blocks)
 }
 
 func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {
@@ -214,11 +221,15 @@ func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {
 }
 
 func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
-	return p2p.Send(p.rw, GetBlockDataBySliceMsg, &GetBlockDataBySliceResp{Timeslice: timeslice, Blocks: blocks})
+	return p2p.Send(p.rw, GetBlocksBySliceMsg, &GetBlockDataBySliceResp{Timeslice: timeslice, Blocks: blocks})
 }
 
-func (p *peer) RequestBlockData(timeslice uint64, hashes []common.Hash) error {
-	return p2p.Send(p.rw, GetBlockDataBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+func (p *peer) RequestBlocksBySlice(timeslice uint64, hashes []common.Hash) error {
+	return p2p.Send(p.rw, GetBlocksBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+}
+
+func (p *peer) RequestBlocks(hashes []common.Hash) error {
+	return p2p.Send(p.rw, GetBlockByHashMsg, hashes)
 }
 
 func (p *peer) NodeID() string {

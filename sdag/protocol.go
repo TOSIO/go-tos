@@ -24,15 +24,17 @@ const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a prot
 // tos protocol message codes
 const (
 	// Protocol messages belonging to tos/62
-	StatusMsg              = 0x00
-	NewTxBlockMsg          = 0x01
-	NewMiningBlockMsg      = 0x02
-	GetLastMainTimeSlice   = 0x03
-	LastMainTimeSlice      = 0x04
-	GetBlockHashBySliceMsg = 0x05
-	BlockHashBySliceMsg    = 0x06
-	GetBlockDataBySliceMsg = 0x07
-	BlockDataBySliceMsg    = 0x08
+	StatusMsg         = 0x00
+	NewBlockMsg       = 0x01
+	NewBlockHashMsg   = 0x02
+	GetBlockByHashMsg = 0x03
+
+	GetLastMainTimeSlice   = 0x04
+	LastMainTimeSlice      = 0x05
+	GetBlockHashBySliceMsg = 0x06
+	BlockHashBySliceMsg    = 0x07
+	GetBlocksBySliceMsg    = 0x08
+	BlocksBySliceMsg       = 0x09
 
 	// Protocol messages belonging to tos/63
 	GetNodeDataMsg = 0x0d

@@ -15,7 +15,8 @@ type PeerI interface {
 	NodeID() string
 	SetIdle(idle bool)
 	RequestBlockHashBySlice(slice uint64) error
-	RequestBlockData(timeslice uint64, hashes []common.Hash) error
+	RequestBlocksBySlice(timeslice uint64, hashes []common.Hash) error
+	RequestBlocks(hashes []common.Hash) error
 	RequestLastMainSlice() error
 }
 
@@ -45,14 +46,15 @@ type MemPoolI interface {
 type SynchroniserI interface {
 	SyncHeavy() error
 	SyncLight() error
-	RequestBlock(blk interface{}) (interface{}, error)
 	SendBlock(blk interface{}) error
+
+	AsyncRequestBlock(hash common.Hash) error
 
 	DeliverLastTimeSliceResp(id string, timeslice uint64) error
 	DeliverBlockHashesResp(id string, ts uint64, hashes []common.Hash) error
 	DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error
 
-	DeliverNewBlockResp(id string, data []byte) error
+	DeliverNewBlockResp(id string, data [][]byte) error
 	//DeliverBlockHashesResp(id string, resp *SliceBlkHashesResp) error
 	//DeliverBlockHashesResp(id string, resp RespPacketI) error
 }
