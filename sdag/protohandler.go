@@ -73,9 +73,9 @@ func NewProtocolManager(config *interface{}, networkID uint64) (*ProtocolManager
 func (pm *ProtocolManager) consumeNewPeer() {
 	for {
 		select {
-		case <-pm.newPeerCh:
+		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
-			log.Trace("func ProtocolManager.consumeNewPeer | called.")
+			log.Trace("func ProtocolManager.consumeNewPeer | receive a new peer,", "peer.id", peer.NodeID)
 		case <-pm.noMorePeers:
 			return
 		}
@@ -140,6 +140,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
+	go pm.consumeNewPeer()
 	log.Info("ProtocolManager.Start called.")
 }
 
