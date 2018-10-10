@@ -60,9 +60,10 @@ func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp 
 	return syncer, nil
 }
 
-func (s *Synchroniser) Start() {
+func (s *Synchroniser) Start() error {
 	go s.loop()
 	go s.SyncHeavy()
+	return nil
 }
 
 func (s *Synchroniser) loop() {

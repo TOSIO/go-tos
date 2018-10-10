@@ -44,9 +44,10 @@ type MemPoolI interface {
 }
 
 type SynchroniserI interface {
+	Start() error
 	SyncHeavy() error
-	SyncLight() error
-	SendBlock(blk interface{}) error
+	//SyncLight() error
+	//SendBlock(blk interface{}) error
 
 	AsyncRequestBlock(hash common.Hash) error
 

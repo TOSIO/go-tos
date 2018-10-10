@@ -11,6 +11,7 @@ import (
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/p2p/discover"
 )
@@ -25,6 +26,9 @@ type ProtocolManager struct {
 
 	peers *peerSet
 
+	chainDb tosdb.Database // Block chain database
+
+	blockChain   mainchain.MainChainI
 	synchroniser synchronise.SynchroniserI
 	blkstorage   synchronise.BlockStorageI
 	SubProtocols []p2p.Protocol
@@ -52,7 +56,8 @@ type NodeInfo struct {
 
 // NewProtocolManager returns a new tos sub protocol manager. The tos sub protocol manages peers capable
 // with the tos network.
-func NewProtocolManager(config *interface{}, networkID uint64) (*ProtocolManager, error) {
+func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.MainChainI,
+	db tosdb.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkID:   networkID,
@@ -60,12 +65,31 @@ func NewProtocolManager(config *interface{}, networkID uint64) (*ProtocolManager
 		newPeerCh:   make(chan *peer),
 		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
+		blockChain:  chain,
 	}
 
 	// Initiate a sub-protocol for every implemented version we can handle
-	if err := manager.initProtocols(); err != nil {
+	var err error
+	if err = manager.initProtocols(); err != nil {
 		return nil, err
 	}
+	var storageProxy *synchronise.StorageProxy
+	var mempoolProxy *synchronise.MemPoolProxy
+	if storageProxy, err = synchronise.NewStorage(db); err != nil {
+		log.Error("Initialising Sdag storageproxy failed.")
+		return nil, err
+	}
+	if mempoolProxy, err = synchronise.NewMempol(); err != nil {
+		log.Error("Initialising Sdag mempool failed.")
+		return nil, err
+	}
+
+	if manager.synchroniser, err = synchronise.NewSynchroinser(manager.Peers(),
+		chain, storageProxy, mempoolProxy); err != nil {
+		log.Error("Initialising Sdag synchroniser failed.")
+		return nil, err
+	}
+
 	return manager, nil
 }
 
@@ -141,6 +165,8 @@ func (pm *ProtocolManager) removePeer(id string) {
 
 func (pm *ProtocolManager) Start(maxPeers int) {
 	log.Info("ProtocolManager.Start called.")
+	// start sync procedure
+	pm.synchroniser.Start()
 	go pm.consumeNewPeer()
 	pm.maxPeers = maxPeers
 	go func() {

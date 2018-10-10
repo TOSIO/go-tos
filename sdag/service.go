@@ -53,13 +53,17 @@ type Sdag struct {
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
-
 	chainDb, err := CreateDB(ctx, config, "tos/db/sdagData/test")
 	if err != nil {
 		return nil, err
 	}
 
-	protocolManager, err := NewProtocolManager(nil, config.NetworkId)
+	var chain mainchain.MainChainI
+	if chain, err = mainchain.New(); err != nil {
+		log.Error("Initialising Sdag blockchain failed.")
+		return nil, err
+	}
+	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDb)
 	if err != nil {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
@@ -73,7 +77,9 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		networkID:       config.NetworkId,
 		chainDb:         chainDb,
 		protocolManager: protocolManager,
+		blockchain:      chain,
 	}
+
 	manager.SetDB(sdag.chainDb)
 	manager.SetProtocolManager(sdag.protocolManager)
 
@@ -81,27 +87,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 	sdag.APIBackend = &SdagAPIBackend{sdag}
 
-	if sdag.blockchain, err = mainchain.New(); err != nil {
-		log.Error("Initialising Sdag blockchain failed.")
-		return nil, err
-	}
-
-	var storageProxy *synchronise.StorageProxy
-	var mempoolProxy *synchronise.MemPoolProxy
-	if storageProxy, err = synchronise.NewStorage(sdag.chainDb); err != nil {
-		log.Error("Initialising Sdag storageproxy failed.")
-		return nil, err
-	}
-	if mempoolProxy, err = synchronise.NewMempol(); err != nil {
-		log.Error("Initialising Sdag mempool failed.")
-		return nil, err
-	}
-
-	if sdag.synchroniser, err = synchronise.NewSynchroinser(sdag.protocolManager.Peers(),
-		sdag.blockchain, storageProxy, mempoolProxy); err != nil {
-		log.Error("Initialising Sdag synchroniser failed.")
-		return nil, err
-	}
 	return sdag, nil
 }
 
@@ -146,9 +131,6 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
 	// Start the RPC service
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
-
-	// start sync procedure
-	s.synchroniser.Start()
 	return nil
 }
 
