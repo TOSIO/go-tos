@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/statistics"
 	"math/big"
 	"strings"
 
@@ -27,6 +28,11 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/sdag/transaction"
+)
+
+var (
+	statisticsObj statistics.Statistics
+	emptyC        = make(chan struct{}, 1)
 )
 
 // PublicEthereumAPI provides an API to access Ethereum full node-related
@@ -59,6 +65,10 @@ type TransactionInfo struct {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
+	//emptyC <- struct{}{}
+	//statisticsObj.Statistics()
+	//<-emptyC
+	//return "OK"
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var transactionInfo TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {

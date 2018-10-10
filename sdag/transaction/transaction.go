@@ -18,6 +18,11 @@ const (
 	defaultGasLimit = 1 << 32
 )
 
+var (
+	currentAccountNonce uint64 = 0
+	emptyC                     = make(chan struct{}, 1)
+)
+
 type ReceiverInfo struct {
 	To     common.Address
 	Amount *big.Int
@@ -47,10 +52,13 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	}
 
 	//2. links
-	txBlock.Links = manager.Confirm(txBlock.Links)
+	txBlock.Links = manager.SelectUnverifiedBlock(txBlock.Links)
 
 	//3. accoutnonce
-	txBlock.AccountNonce = 100
+	emptyC <- struct{}{}
+	txBlock.AccountNonce = currentAccountNonce
+	currentAccountNonce++
+	<-emptyC
 
 	//4. txout
 	for _, v := range txRequestInfo.Receiver {
@@ -74,7 +82,7 @@ func Transaction(txRequestInfo *TransInfo) error {
 	if err != nil {
 		return err
 	}
-	err = manager.AddBlock(TxBlock)
+	err = manager.SyncAddBlock(TxBlock)
 	if err != nil {
 		return err
 	}

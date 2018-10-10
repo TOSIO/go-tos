@@ -3,9 +3,11 @@ package manager
 import (
 	"container/list"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/statistics"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
+	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag/core"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -15,22 +17,25 @@ import (
 )
 
 var (
-	UnverifiedTransactionList *list.List
-	MaxConfirm                = 4
+	UnverifiedBlockList *list.List
+	MaxConfirm          = 4
+	statisticsObj       statistics.Statistics
 )
 
 type protocolManagerI interface {
 	RelayBlock(blockRLP []byte) error
+	GetBlock(hashBlock common.Hash) error
 }
 
 var (
-	pm protocolManagerI
-	db tosdb.Database
+	pm     protocolManagerI
+	db     tosdb.Database
+	emptyC = make(chan struct{}, 1)
 )
 
 func init() {
-	UnverifiedTransactionList = list.New()
-	UnverifiedTransactionList.PushFront(GetMainBlockTail())
+	UnverifiedBlockList = list.New()
+	UnverifiedBlockList.PushFront(GetMainBlockTail())
 }
 
 func SetDB(chainDb tosdb.Database) {
@@ -133,6 +138,13 @@ func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
 	return link
 }
 
+func SyncAddBlock(block types.Block) error {
+	emptyC <- struct{}{}
+	err := AddBlock(block)
+	<-emptyC
+	return err
+}
+
 func AddBlock(block types.Block) error {
 	err := block.Validation()
 	if err != nil {
@@ -151,11 +163,14 @@ func AddBlock(block types.Block) error {
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
 	pm.RelayBlock(block.GetRlp())
+
+	statisticsObj.Statistics()
+
 	return err
 }
 
 func linkCheckAndSave(block types.Block) error {
-	var linkHaveIsolated bool
+	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
 
@@ -178,53 +193,67 @@ func linkCheckAndSave(block types.Block) error {
 					return fmt.Errorf("linkBlockEI assertion failure")
 				}
 			} else {
-				linkHaveIsolated = true
+				isIsolated = true
 				linksLackBlock = append(linksLackBlock, hash)
 			}
 		}
 	}
 
-	if linkHaveIsolated {
+	if isIsolated {
 		log.Warn(block.GetHash().String() + "is a Isolated block")
 		addIsolatedBlock(block, linksLackBlock)
+		for _, linkBlockI := range linkBlockIs {
+			pm.GetBlock(linkBlockI.GetHash())
+		}
 	} else {
 		log.Info("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
+			DeleteUnverifiedTransactionList(linkBlockI.GetHash())
 		}
 
 		storage.WriteBlock(db, block)
-		addUnverifiedTransactionList(block.GetHash())
+		addUnverifiedBlockList(block.GetHash())
 	}
-
 	return nil
 }
 
-func PopUnverifiedTransactionList() (interface{}, error) {
-	if UnverifiedTransactionList.Len() > 0 {
-		return UnverifiedTransactionList.Remove(UnverifiedTransactionList.Front()), nil
-	} else {
-		return nil, fmt.Errorf("the list is empty")
+func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
+	for e := UnverifiedBlockList.Front(); e != nil; e = e.Next() {
+		if e.Value == linkHash {
+			UnverifiedBlockList.Remove(e)
+			return nil
+		}
 	}
+	return fmt.Errorf("Not found the linkHash")
 }
 
-func Confirm(links []common.Hash) []common.Hash {
-	listLen := UnverifiedTransactionList.Len()
-	for i := 0; i < listLen && i < MaxConfirm; i++ {
-		hashI, err := PopUnverifiedTransactionList()
-		if err != nil {
-			log.Error(err.Error())
-		}
-		hash, ok := hashI.(common.Hash)
+func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
+	i := 0
+	for e := UnverifiedBlockList.Front(); e != nil && i < params.MaxLinksNum; e = e.Next() {
+		hash, ok := e.Value.(common.Hash)
 		if !ok {
-			log.Error("error hash.(common.Hash)")
+			log.Error("error hash.(common.Hash): ", hash)
 		}
 		links = append(links, hash)
+		i++
 	}
+
+	//for i := 0; i < listLen && i < params.MaxLinksNum; i++ {
+	//	hashI, err := PopUnverifiedTransactionList()
+	//	if err != nil {
+	//		log.Error(err.Error())
+	//	}
+	//	hash, ok := hashI.(common.Hash)
+	//	if !ok {
+	//		log.Error("error hash.(common.Hash): ", hash)
+	//	}
+	//	links = append(links, hash)
+	//}
 	return links
 }
 
-func addUnverifiedTransactionList(v interface{}) {
-	UnverifiedTransactionList.PushFront(v)
+func addUnverifiedBlockList(v interface{}) {
+	UnverifiedBlockList.PushBack(v)
 }

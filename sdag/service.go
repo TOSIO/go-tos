@@ -59,22 +59,25 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		return nil, err
 	}
 
+	protocolManager, err := NewProtocolManager(nil, config.NetworkId)
+	if err != nil {
+		log.Error("Initialising Sdag protocol failed.")
+		return nil, err
+	}
+
 	sdag := &Sdag{
 		//初始化
-		config:       config,
-		shutdownChan: make(chan bool),
-		networkID:    config.NetworkId,
-		chainDb:      chainDb,
+		config:          config,
+		shutdownChan:    make(chan bool),
+		networkID:       config.NetworkId,
+		chainDb:         chainDb,
+		protocolManager: protocolManager,
 	}
 	manager.SetDB(sdag.chainDb)
 	manager.SetProtocolManager(sdag.protocolManager)
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
-	if sdag.protocolManager, err = NewProtocolManager(nil, config.NetworkId); err != nil {
-		log.Error("Initialising Sdag protocol failed.")
-		return nil, err
-	}
 	sdag.APIBackend = &SdagAPIBackend{sdag}
 
 	if sdag.blockchain, err = mainchain.New(); err != nil {
