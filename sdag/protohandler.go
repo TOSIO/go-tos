@@ -140,6 +140,12 @@ func (pm *ProtocolManager) removePeer(id string) {
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
+	pm.maxPeers = maxPeers
+	go func() {
+		for range pm.newPeerCh {
+
+		}
+	}()
 	go pm.consumeNewPeer()
 	log.Info("ProtocolManager.Start called.")
 }
@@ -188,10 +194,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the TOS handshake
 
-	if err := p.Handshake(pm.networkID); err != nil {
-		p.Log().Debug("TOS handshake failed", "err", err)
-		return err
-	}
+	//if err := p.Handshake(pm.networkID); err != nil {
+	//	p.Log().Debug("TOS handshake failed", "err", err)
+	//	return err
+	//}
 	/* if rw, ok := p.rw.(*meteredMsgReadWriter); ok {
 		rw.Init(p.version)
 	} */

@@ -200,7 +200,7 @@ func (ps *peerSet) RandomSelectIdlePeer() (synchronise.PeerI, error) {
 func (ps *peerSet) Peers() map[string]*peer {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-	var ret map[string]*peer
+	ret := make(map[string]*peer)
 	for k, v := range ps.peers {
 		ret[k] = v
 	}

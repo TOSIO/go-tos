@@ -54,7 +54,7 @@ func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp 
 	syncer.blockReqCh = make(chan struct{})
 
 	syncer.blockReqQueue = make(map[common.Hash]string)
-
+	syncer.blockUnfinishQueue = make(map[common.Hash]string)
 	syncer.cancelCh = make(chan struct{})
 
 	return syncer, nil

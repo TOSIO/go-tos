@@ -64,6 +64,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
+	protocolManager.Start(100)
 
 	sdag := &Sdag{
 		//初始化
