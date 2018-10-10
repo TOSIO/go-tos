@@ -69,7 +69,7 @@ var lackBlockMap = make(map[common.Hash]lackBlock)
 
 func addIsolatedBlock(block types.Block, links []common.Hash) {
 	if _, ok := IsolatedBlockMap[block.GetHash()]; ok {
-		log.Warn("the Isolated block already exists")
+		//log.Warn("the Isolated block already exists")
 		return
 	}
 
@@ -157,7 +157,7 @@ func AddBlock(block types.Block) error {
 		log.Error("the block has been added")
 		return fmt.Errorf("the block has been added")
 	} else {
-		log.Trace("Non-repeating block")
+		//log.Trace("Non-repeating block")
 	}
 
 	err = linkCheckAndSave(block)
@@ -186,7 +186,7 @@ func linkCheckAndSave(block types.Block) error {
 						return fmt.Errorf("links time error")
 					} else {
 						linkBlockIs = append(linkBlockIs, linkBlockI)
-						log.Trace("links time legal")
+						//log.Trace("links time legal")
 					}
 				} else {
 					log.Error("linkBlockEI assertion failure")
@@ -206,7 +206,7 @@ func linkCheckAndSave(block types.Block) error {
 			pm.GetBlock(linkBlockI.GetHash())
 		}
 	} else {
-		log.Trace("Verification passed")
+		//log.Trace("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))

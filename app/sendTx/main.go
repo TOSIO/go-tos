@@ -181,7 +181,7 @@ func main() {
 			lastTime = nowTime
 			numberMinute++
 			if numberMinute == 10 {
-				return
+				//return
 			}
 		}
 		//fmt.Println("----------------------------------------------", totalCount.String(), "-----------------------------------------------------")
