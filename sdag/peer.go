@@ -254,6 +254,6 @@ func (p *peer) AsyncSendBlock(block []byte) {
 	case p.blocksQueue <- block:
 		log.Trace("func peer.AsyncSendBlock | send block to channel success", "nodeID", p.id)
 	default:
-		log.Debug("peer [%s]'s queue is full, so give up.", p.id)
+		//log.Debug("peer [%s]'s queue is full, so give up.", p.id)
 	}
 }

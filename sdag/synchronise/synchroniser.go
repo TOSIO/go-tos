@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
@@ -50,7 +51,7 @@ func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp 
 	syncer.peerSliceCh = make(chan RespPacketI)
 	syncer.blockhashesCh = make(chan RespPacketI)
 	syncer.blocksCh = make(chan RespPacketI)
-	syncer.newBlockCh = make(chan RespPacketI)
+	syncer.newBlockCh = make(chan RespPacketI, 100)
 	syncer.blockReqCh = make(chan struct{})
 
 	syncer.blockReqQueue = make(map[common.Hash]string)
@@ -72,21 +73,24 @@ func (s *Synchroniser) loop() {
 
 	//forloop:
 	for {
-		// 随机挑选一个节点
-		peer, err := s.peers.RandomSelectIdlePeer()
-		if err != nil {
-			return
-		}
-		if _, existed := triedNodes[peer.NodeID()]; existed {
-			continue
-		} else {
-			triedNodes[peer.NodeID()] = peer.NodeID()
-		}
 
 		select {
 		case _ = <-s.blockReqCh:
+			// 随机挑选一个节点
+			peer, err := s.peers.RandomSelectIdlePeer()
+			if err != nil {
+				log.Error("Synchroniser.loop | select idle node failed.", "error", err)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			if _, existed := triedNodes[peer.NodeID()]; existed {
+				continue
+			} else {
+				triedNodes[peer.NodeID()] = peer.NodeID()
+			}
 			go s.processRequestBlock(peer)
 		case packet := <-s.newBlockCh:
+			log.Trace("Synchroniser.loop | receive a packet.")
 			go s.processBlockResp(packet)
 		case <-s.cancelCh:
 			return
@@ -95,6 +99,7 @@ func (s *Synchroniser) loop() {
 }
 
 func (s *Synchroniser) processBlockResp(packet RespPacketI) {
+	log.Trace("Synchroniser.processBlockResp | called.")
 	s.blockQueueLock.Lock()
 	defer s.blockQueueLock.Unlock()
 
@@ -102,6 +107,7 @@ func (s *Synchroniser) processBlockResp(packet RespPacketI) {
 		for _, item := range response.blocks {
 			block, err := types.BlockUnRlp(item)
 			s.mempool.AddBlock(item)
+			log.Trace("Synchroniser.processBlockResp | add block to mempool.")
 			if err != nil {
 				delete(s.blockUnfinishQueue, block.GetHash()) //已经在未完成队列中
 			}
@@ -261,8 +267,10 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan RespPacketI, packe
 	}
 	select {
 	case destCh <- packet:
+		log.Trace("Synchroniser.deliverResponse | deliver was finished")
 		return nil
 	case <-cancel:
 		return errNoSyncActive
 	}
+
 }
