@@ -157,7 +157,7 @@ func AddBlock(block types.Block) error {
 		log.Error("the block has been added")
 		return fmt.Errorf("the block has been added")
 	} else {
-		log.Info("Non-repeating block")
+		log.Trace("Non-repeating block")
 	}
 
 	err = linkCheckAndSave(block)
@@ -186,7 +186,7 @@ func linkCheckAndSave(block types.Block) error {
 						return fmt.Errorf("links time error")
 					} else {
 						linkBlockIs = append(linkBlockIs, linkBlockI)
-						log.Info("links time legal")
+						log.Trace("links time legal")
 					}
 				} else {
 					log.Error("linkBlockEI assertion failure")
@@ -206,7 +206,7 @@ func linkCheckAndSave(block types.Block) error {
 			pm.GetBlock(linkBlockI.GetHash())
 		}
 	} else {
-		log.Info("Verification passed")
+		log.Trace("Verification passed")
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
