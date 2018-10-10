@@ -140,6 +140,8 @@ func (pm *ProtocolManager) removePeer(id string) {
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
+	log.Info("ProtocolManager.Start called.")
+	go pm.consumeNewPeer()
 	pm.maxPeers = maxPeers
 	go func() {
 		for range pm.newPeerCh {
@@ -147,7 +149,6 @@ func (pm *ProtocolManager) Start(maxPeers int) {
 		}
 	}()
 	go pm.consumeNewPeer()
-	log.Info("ProtocolManager.Start called.")
 }
 
 func (pm *ProtocolManager) Stop() {
@@ -194,10 +195,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the TOS handshake
 
-	//if err := p.Handshake(pm.networkID); err != nil {
-	//	p.Log().Debug("TOS handshake failed", "err", err)
-	//	return err
-	//}
+	/* if err := p.Handshake(pm.networkID); err != nil {
+		p.Log().Debug("TOS handshake failed", "err", err)
+		return err
+	} */
 	/* if rw, ok := p.rw.(*meteredMsgReadWriter); ok {
 		rw.Init(p.version)
 	} */
@@ -233,6 +234,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	p.Log().Info("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
 	//dispatch message here
 	switch msg.Code {
+	case StatusMsg:
+		// Status messages should never arrive after the handshake
+		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 	case GetLastMainTimeSlice: //获取最近一次临时主块的时间片
 		return pm.handleGetLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash

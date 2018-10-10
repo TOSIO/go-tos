@@ -59,7 +59,7 @@ func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *peer {
 		version:     version,
 		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
 		term:        make(chan struct{}),
-		blocksQueue: make(chan []byte),
+		blocksQueue: make(chan []byte, 100),
 	}
 }
 
@@ -70,13 +70,14 @@ func (p *peer) close() {
 
 // 节点传输的业务逻辑在此实现
 func (p *peer) broadcast() {
-	p.Log().Info("Peer.broadcast() called.")
+	p.Log().Info("Peer.broadcast() | called.")
 	for {
 		select {
 		case block := <-p.blocksQueue:
 			var blocks [][]byte
 			blocks = append(blocks, block)
-			p.SendNewBlocks(blocks)
+			err := p.SendNewBlocks(blocks)
+			p.Log().Trace("Peer.broadcast() | send new block", "nodeID", p.id, "err", err)
 		case <-p.term:
 			p.Log().Info("Peer.broadcast() exit.")
 			return
@@ -251,6 +252,7 @@ func (p *peer) RequestLastMainSlice() error {
 func (p *peer) AsyncSendBlock(block []byte) {
 	select {
 	case p.blocksQueue <- block:
+		log.Trace("func peer.AsyncSendBlock | send block to channel success", "nodeID", p.id)
 	default:
 		log.Debug("peer [%s]'s queue is full, so give up.", p.id)
 	}
