@@ -55,6 +55,18 @@ var (
 		Name:  "debug",
 		Usage: "Prepends log messages with call-site location (file and line number)",
 	}
+	logCallFileFlag = cli.BoolFlag{
+		Name:  "logcallfile",
+		Usage: "Enable logging file name of log point",
+	}
+	logCallFnFlag = cli.BoolFlag{
+		Name:  "logcallfunc",
+		Usage: "Enable logging function name of log point",
+	}
+	logStackFlag = cli.BoolFlag{
+		Name:  "logcallstack",
+		Usage: "Enable logging stack information of log point",
+	}
 	pprofFlag = cli.BoolFlag{
 		Name:  "pprof",
 		Usage: "Enable the pprof HTTP server",
@@ -91,6 +103,8 @@ var (
 // Flags holds all command-line flags required for debugging.
 var Flags = []cli.Flag{
 	verbosityFlag, vmoduleFlag, backtraceAtFlag, debugFlag,
+	/* logCallFileFlag, logCallFnFlag,  */
+	logStackFlag,
 	pprofFlag, pprofAddrFlag, pprofPortFlag,
 	memprofilerateFlag, blockprofilerateFlag, cpuprofileFlag, traceFlag,
 }
@@ -106,6 +120,7 @@ func init() {
 	if usecolor {
 		output = colorable.NewColorableStderr()
 	}
+
 	ostream = log.StreamHandler(output, log.TerminalFormat(usecolor))
 	glogger = log.NewGlogHandler(ostream)
 }
@@ -115,17 +130,41 @@ func init() {
 func Setup(ctx *cli.Context, logdir string) error {
 	// logging
 	log.PrintOrigins(ctx.GlobalBool(debugFlag.Name))
+
 	if logdir != "" {
 		rfh, err := log.RotatingFileHandler(
 			logdir,
 			262144,
 			log.JSONFormatOrderedEx(false, true),
 		)
+
 		if err != nil {
 			return err
 		}
-		glogger.SetHandler(log.MultiHandler(ostream, rfh))
+		//handlers = append(handlers, rfh)
+		callFileHandler := log.CallerFileHandler(log.DiscardHandler())
+		if ctx.GlobalBool(logStackFlag.Name) {
+
+			callFuncHandler := log.CallerFuncHandler(log.DiscardHandler())
+			callStackHandler := log.CallerStackHandler("%+v", ostream)
+			glogger.SetHandler(log.MultiHandler(ostream, rfh, callFileHandler, callFuncHandler, callStackHandler))
+		} else {
+			callFuncHandler := log.CallerFuncHandler(ostream)
+			glogger.SetHandler(log.MultiHandler(ostream, rfh, callFileHandler, callFuncHandler))
+		}
+	} else {
+		callFileHandler := log.CallerFileHandler(log.DiscardHandler())
+		if ctx.GlobalBool(logStackFlag.Name) {
+
+			callFuncHandler := log.CallerFuncHandler(log.DiscardHandler())
+			callStackHandler := log.CallerStackHandler("%+v", ostream)
+			glogger.SetHandler(log.MultiHandler(callFileHandler, callFuncHandler, callStackHandler))
+		} else {
+			callFuncHandler := log.CallerFuncHandler(ostream)
+			glogger.SetHandler(log.MultiHandler(callFileHandler, callFuncHandler))
+		}
 	}
+
 	glogger.Verbosity(log.Lvl(ctx.GlobalInt(verbosityFlag.Name)))
 	glogger.Vmodule(ctx.GlobalString(vmoduleFlag.Name))
 	glogger.BacktraceAt(ctx.GlobalString(backtraceAtFlag.Name))
