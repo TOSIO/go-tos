@@ -99,7 +99,7 @@ func (pm *ProtocolManager) consumeNewPeer() {
 		select {
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
-			log.Trace("func ProtocolManager.consumeNewPeer | receive a new peer,", "peer.id", peer.NodeID)
+			log.Trace("Receive a new peer,", "peer.id", peer.NodeID)
 		case <-pm.noMorePeers:
 			return
 		}
@@ -257,7 +257,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
 	defer msg.Discard()
-	p.Log().Info("ProtocolManager.handleMsg() | receive message,code : ", msg.Code)
+	p.Log().Info("Receive message", "msg.Code", msg.Code)
 	//dispatch message here
 	switch msg.Code {
 	case StatusMsg:
@@ -289,14 +289,14 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 
 // 获取最近一次临时主块所在时间片消息处理
 func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleGetLastMainTimeSlice | Process the last main timeslice query.")
+	log.Trace("Process the last main timeslice query.")
 	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
 	return p.SendTimeSlice(lastMainSlice)
 }
 
 // 获取最近一次临时主块所在时间片消息处理
 func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleLastMainTimeSlice | Process the last main timeslice response.")
+	log.Trace("Process the last main timeslice response.")
 	var peerTimeSlice uint64
 	err := msg.Decode(&peerTimeSlice)
 	if err != nil {
@@ -308,7 +308,7 @@ func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleGetBlockHashBySlice | Process block hash query.")
+	log.Trace("Process block hash query.")
 	//lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
 	var targetSlice uint64 = 0
 	err := msg.Decode(&targetSlice)
@@ -325,7 +325,7 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleBlockHashBySlice | Process block hashes response.")
+	log.Trace("Process block hashes response.")
 	var response GetBlockHashBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
@@ -337,7 +337,7 @@ func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 
 // 根据区块hash返回对应区块（字节流）消息处理
 func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleGetBlocksBySlice | Process block data query by slice.")
+	log.Trace("Process block data query by slice.")
 	var req GetBlockDataBySliceReq
 	err := msg.Decode(&req)
 	if err != nil {
@@ -345,7 +345,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	}
 
 	if len(req.Hashes) <= 0 {
-		log.Trace("func ProtocolManager.handleGetBlocksBySlice | Param 'Hashes' is empty.")
+		log.Trace("Param 'Hashes' is empty.")
 		return nil
 	}
 	var blocks [][]byte
@@ -361,7 +361,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 }
 
 func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleBlocksBySlice | Process block hashes response.")
+	log.Trace("Process block hashes response.")
 	var response GetBlockDataBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
@@ -372,7 +372,7 @@ func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
 }
 
 func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleGetBlockByHash | Process block query by hash.")
+	log.Trace("Process block query by hash.")
 	var req []common.Hash
 	err := msg.Decode(&req)
 	if err != nil {
@@ -380,7 +380,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 	}
 
 	if len(req) <= 0 {
-		log.Trace("func ProtocolManager.handleGetBlockByHash | Param 'Hashes' is empty.")
+		log.Trace("Param 'Hashes' is empty.")
 		return nil
 	}
 
@@ -397,7 +397,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 }
 
 func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
-	log.Trace("func ProtocolManager.handleBlockDatasByHash | Process block hashes response.")
+	log.Trace("Process block hashes response.")
 	var response [][]byte
 	err := msg.Decode(&response)
 	if err != nil {

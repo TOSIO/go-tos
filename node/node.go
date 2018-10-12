@@ -271,7 +271,7 @@ func (n *Node) openDataDir() error {
 // assumptions about the state of the node.
 func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	// Gather all the possible APIs to surface
-	log.Trace("func Node.startRPC | RPC server is starting...")
+	log.Trace("RPC server is starting...")
 	apis := n.apis()
 	for _, service := range services {
 		apis = append(apis, service.APIs()...)
@@ -297,7 +297,7 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	}
 	// All API endpoints started successfully
 	n.rpcAPIs = apis
-	log.Trace("func Node.startRPC | RPC server successfully")
+	log.Trace("RPC server was started OK")
 	return nil
 }
 
