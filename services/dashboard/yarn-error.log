@@ -1,0 +1,41 @@
+Arguments: 
+  F:\node.exe C:\Users\lx\AppData\Roaming\npm\node_modules\yarn\bin\yarn.js add [package]
+
+PATH: 
+  C:\Program Files (x86)\Common Files\Oracle\Java\javapath;%JMETER_HOME%\bin;C:\MinGW\bin;D:\Python27\Scripts;C:\Program Files (x86)\Intel\iCLS Client\;C:\Program Files\Intel\iCLS Client\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files\Intel\Intel(R) Management Engine Components\DAL;C:\Program Files (x86)\Intel\Intel(R) Management Engine Components\IPT;C:\Program Files\Intel\Intel(R) Management Engine Components\IPT;D:\Python27;C:\Program Files\Git\cmd;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Go\bin;F:\;C:\Users\lx\GoPath\bin;E:\Java\jdk8\bin;C:\Users\lx\AppData\Local\Microsoft\WindowsApps;D:\Python2.7;D:\Python2.7\Scripts;C:\Users\lx\AppData\Roaming\npm;C:\Program Files\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64\bin;E:\Java\jdk8\jre\bin;;C:\Users\lx\AppData\Local\Programs\Microsoft VS Code\bin
+
+Yarn version: 
+  1.10.1
+
+Node version: 
+  8.11.4
+
+Platform: 
+  win32 x64
+
+Trace: 
+  Error: https://registry.yarnpkg.com/[package]: Not found
+      at Request.params.callback [as _callback] (C:\Users\lx\AppData\Roaming\npm\node_modules\yarn\lib\cli.js:61073:18)
+      at Request.self.callback (C:\Users\lx\AppData\Roaming\npm\node_modules\yarn\lib\cli.js:120166:22)
+      at emitTwo (events.js:126:13)
+      at Request.emit (events.js:214:7)
+      at Request.<anonymous> (C:\Users\lx\AppData\Roaming\npm\node_modules\yarn\lib\cli.js:121138:10)
+      at emitOne (events.js:116:13)
+      at Request.emit (events.js:211:7)
+      at IncomingMessage.<anonymous> (C:\Users\lx\AppData\Roaming\npm\node_modules\yarn\lib\cli.js:121060:12)
+      at Object.onceWrapper (events.js:313:30)
+      at emitNone (events.js:111:20)
+
+npm manifest: 
+  {
+    "name": "dashboard",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT"
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

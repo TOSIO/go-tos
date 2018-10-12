@@ -47,6 +47,10 @@ var (
 		utils.KeyStoreDirFlag,
 		utils.NoUSBFlag,
 
+		utils.DashboardEnabledFlag,
+		utils.DashboardAddrFlag,
+		utils.DashboardPortFlag,
+		utils.DashboardRefreshFlag,
 		utils.GCModeFlag,
 
 		utils.CacheFlag,

@@ -30,6 +30,7 @@ import (
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag"
+	"github.com/TOSIO/go-tos/services/dashboard"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/p2p/discover"
 	"github.com/TOSIO/go-tos/services/p2p/discv5"
@@ -135,12 +136,12 @@ var (
 		Usage: "Document Root for HTTPClient file scheme",
 		Value: DirectoryString{homeDir()},
 	}
-	/* 	defaultSyncMode = eth.DefaultConfig.SyncMode
-	   	SyncModeFlag    = TextMarshalerFlag{
-	   		Name:  "syncmode",
-	   		Usage: `Blockchain sync mode ("fast", "full", or "light")`,
-	   		Value: &defaultSyncMode,
-	   	} */
+	/* defaultSyncMode = sdag.DefaultConfig.SyncMode
+	SyncModeFlag    = TextMarshalerFlag{
+		Name:  "syncmode",
+		Usage: `Blockchain sync mode ("fast", "full", or "light")`,
+		Value: &defaultSyncMode,
+	} */
 	GCModeFlag = cli.StringFlag{
 		Name:  "gcmode",
 		Usage: `Blockchain garbage collection mode ("full", "archive")`,
@@ -161,10 +162,30 @@ var (
 		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
 	} */
 
+	LightKDFFlag = cli.BoolFlag{
+		Name:  "lightkdf",
+		Usage: "Reduce key-derivation RAM & CPU usage at some expense of KDF strength",
+	}
+
 	// Dashboard settings
 	DashboardEnabledFlag = cli.BoolFlag{
 		Name:  metrics.DashboardEnabledFlag,
 		Usage: "Enable the dashboard",
+	}
+	DashboardAddrFlag = cli.StringFlag{
+		Name:  "dashboard.addr",
+		Usage: "Dashboard listening interface",
+		Value: dashboard.DefaultConfig.Host,
+	}
+	DashboardPortFlag = cli.IntFlag{
+		Name:  "dashboard.host",
+		Usage: "Dashboard listening port",
+		Value: dashboard.DefaultConfig.Port,
+	}
+	DashboardRefreshFlag = cli.DurationFlag{
+		Name:  "dashboard.refresh",
+		Usage: "Dashboard metrics collection refresh rate",
+		Value: dashboard.DefaultConfig.Refresh,
 	}
 
 	// Performance tuning settings
@@ -705,4 +726,18 @@ func checkExclusive(ctx *cli.Context, args ...interface{}) {
 	if len(set) > 1 {
 		Fatalf("Flags %v can't be used at the same time", strings.Join(set, ", "))
 	}
+}
+
+// RegisterDashboardService adds a dashboard to the stack.
+func RegisterDashboardService(stack *node.Node, cfg *dashboard.Config, commit string) {
+	stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return dashboard.New(cfg, commit, ctx.ResolvePath("logs")), nil
+	})
+}
+
+// SetDashboardConfig applies dashboard related command line flags to the config.
+func ApplyDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
+	cfg.Host = ctx.GlobalString(DashboardAddrFlag.Name)
+	cfg.Port = ctx.GlobalInt(DashboardPortFlag.Name)
+	cfg.Refresh = ctx.GlobalDuration(DashboardRefreshFlag.Name)
 }
