@@ -79,7 +79,7 @@ func (s *Synchroniser) loop() {
 			// 随机挑选一个节点
 			peer, err := s.peers.RandomSelectIdlePeer()
 			if err != nil {
-				log.Error("Synchroniser.loop | select idle node failed.", "error", err)
+				log.Error("Error select idle node", "error", err)
 				time.Sleep(1 * time.Second)
 				continue
 			}
@@ -90,7 +90,7 @@ func (s *Synchroniser) loop() {
 			}
 			go s.processRequestBlock(peer)
 		case packet := <-s.newBlockCh:
-			log.Trace("Synchroniser.loop | receive a packet.")
+			log.Trace("Receive a packet.")
 			go s.processBlockResp(packet)
 		case <-s.cancelCh:
 			return
@@ -99,7 +99,7 @@ func (s *Synchroniser) loop() {
 }
 
 func (s *Synchroniser) processBlockResp(packet RespPacketI) {
-	log.Trace("Synchroniser.processBlockResp | called.")
+	log.Trace("Process block response")
 	s.blockQueueLock.Lock()
 	defer s.blockQueueLock.Unlock()
 
@@ -108,9 +108,9 @@ func (s *Synchroniser) processBlockResp(packet RespPacketI) {
 			if block, err := types.BlockUnRlp(item); err == nil {
 				s.mempool.AddBlock(item)
 				delete(s.blockUnfinishQueue, block.GetHash()) //已经在未完成队列中
-				log.Trace("Synchroniser.processBlockResp | add block to mempool.")
+				log.Trace("Add block to mempool.")
 			} else {
-				log.Trace("Synchroniser.processBlockResp | add block to mempool failed", "err", err)
+				log.Trace("Error Add block to mempool", "err", err)
 			}
 
 		}
@@ -269,7 +269,7 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan RespPacketI, packe
 	}
 	select {
 	case destCh <- packet:
-		log.Trace("Synchroniser.deliverResponse | deliver was finished")
+		log.Trace("Deliver was finished")
 		return nil
 	case <-cancel:
 		return errNoSyncActive
