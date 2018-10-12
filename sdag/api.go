@@ -105,10 +105,12 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 		return "HexToECDSA failed"
 	}
 
+	//emptyC <- struct{}{}
 	err = transaction.Transaction(&txRequestInfo)
 	if err != nil {
 		return err.Error()
 	}
+	//<-emptyC
 	return "OK"
 }
 

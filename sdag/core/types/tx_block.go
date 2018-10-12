@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"github.com/TOSIO/go-tos/params"
 	"math/big"
 
 	"fmt"
@@ -150,7 +151,7 @@ func (tx *TxBlock) Validation() error {
 	//2
 	if tx.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
-	} else if tx.Header.Time > utils.GetTimeStamp() {
+	} else if tx.Header.Time > utils.GetTimeStamp()+params.TimePeriod {
 		return fmt.Errorf("block time no less than current time")
 	}
 
