@@ -26,6 +26,7 @@ import (
 	"unicode"
 
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/services/dashboard"
 
 	cli "gopkg.in/urfave/cli.v1"
 
@@ -77,10 +78,11 @@ type TOSstatsConfig struct {
 }
 
 type tosConfig struct {
-	Sdag     sdag.Config
-	Node     node.Config
-	TOSstats TOSstatsConfig
-	//Dashboard dashboard.Config
+	Sdag      sdag.Config
+	Node      node.Config
+	TOSstats  TOSstatsConfig
+	Dashboard dashboard.Config
+	//Shh       whisper.Config
 }
 
 func loadConfig(file string, cfg *tosConfig) error {
@@ -119,34 +121,7 @@ func defaultNodeConfig() node.Config {
 	}
 	return false
 }
-
-func makeFullNode(ctx *cli.Context) *node.Node {
-	stack, cfg := makeConfigNode(ctx)
-
-	utils.RegisterEthService(stack, &cfg.Eth)
-
-	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
-		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
-	}
-	// Whisper must be explicitly enabled by specifying at least 1 whisper flag or in dev mode
-	shhEnabled := enableWhisper(ctx)
-	shhAutoEnabled := !ctx.GlobalIsSet(utils.WhisperEnabledFlag.Name) && ctx.GlobalIsSet(utils.DeveloperFlag.Name)
-	if shhEnabled || shhAutoEnabled {
-		if ctx.GlobalIsSet(utils.WhisperMaxMessageSizeFlag.Name) {
-			cfg.Shh.MaxMessageSize = uint32(ctx.Int(utils.WhisperMaxMessageSizeFlag.Name))
-		}
-		if ctx.GlobalIsSet(utils.WhisperMinPOWFlag.Name) {
-			cfg.Shh.MinimumAcceptedPOW = ctx.Float64(utils.WhisperMinPOWFlag.Name)
-		}
-		utils.RegisterShhService(stack, &cfg.Shh)
-	}
-
-	// Add the Ethereum Stats daemon if requested.
-	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
-	}
-	return stack
-} */
+*/
 
 // dumpConfig is the dumpconfig command.
 func dumpConfig(ctx *cli.Context) error {

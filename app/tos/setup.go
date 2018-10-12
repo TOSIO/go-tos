@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/sdag"
+	"github.com/TOSIO/go-tos/services/dashboard"
 	"github.com/elastic/gosigar"
 
 	"github.com/TOSIO/go-tos/app/utils"
@@ -33,9 +34,9 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	// Load defaults.
 	cfg := tosConfig{
 		// 各模块config变量初始化
-		Sdag: sdag.DefaultConfig,
-		Node: defaultNodeConfig(),
-		//Dashboard: dashboard.DefaultConfig,
+		Sdag:      sdag.DefaultConfig,
+		Node:      defaultNodeConfig(),
+		Dashboard: dashboard.DefaultConfig,
 	}
 
 	// Load config file.
@@ -53,6 +54,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	}
 
 	utils.ApplySdagFlags(ctx, &cfg.Sdag)
+	utils.ApplyDashboardConfig(ctx, &cfg.Dashboard)
 
 	// 其他模块config设置
 	log.Info("Warning! Other moduler config is not yet been")
@@ -100,10 +102,9 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 	// 服务注册
 	utils.RegisterSdagService(stack, &cfg.Sdag)
-
-	//if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
-	//	utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
-	//}
+	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
+		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
+	}
 	return stack
 }
 
