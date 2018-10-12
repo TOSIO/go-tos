@@ -109,7 +109,7 @@ func main() {
 	realaddr := conn.LocalAddr().(*net.UDPAddr)
 	if natm != nil {
 		if !realaddr.IP.IsLoopback() {
-			log.Debug("func main | Start nat...")
+			log.Debug("Starting nat...")
 			go nat.Map(natm, nil, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
 		}
 		// TODO: react to external IP changes over time.
@@ -119,7 +119,7 @@ func main() {
 	}
 
 	if *runv5 {
-		log.Debug("func main | Start discovery v5...")
+		log.Debug("Starting discovery v5...")
 		if _, err := discv5.ListenUDP(nodeKey, conn, realaddr, "", restrictList); err != nil {
 			utils.Fatalf("%v", err)
 		}
@@ -129,7 +129,7 @@ func main() {
 			AnnounceAddr: realaddr,
 			NetRestrict:  restrictList,
 		}
-		log.Debug("func main | Start discovery v4...")
+		log.Debug("Starting discovery v4...")
 		if _, err := discover.ListenUDP(conn, cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
