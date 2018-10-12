@@ -18,7 +18,6 @@ import (
 
 var (
 	UnverifiedBlockList *list.List
-	MaxConfirm          = 4
 	statisticsObj       statistics.Statistics
 )
 
@@ -28,14 +27,20 @@ type protocolManagerI interface {
 }
 
 var (
-	pm     protocolManagerI
-	db     tosdb.Database
-	emptyC = make(chan struct{}, 1)
+	pm        protocolManagerI
+	db        tosdb.Database
+	emptyC    = make(chan struct{}, 1)
+	blockChan = make(chan types.Block)
 )
 
 func init() {
 	UnverifiedBlockList = list.New()
 	UnverifiedBlockList.PushFront(GetMainBlockTail())
+	go func() {
+		for block := range blockChan {
+			AddBlock(block)
+		}
+	}()
 }
 
 func SetDB(chainDb tosdb.Database) {
@@ -139,10 +144,12 @@ func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
 }
 
 func SyncAddBlock(block types.Block) error {
-	emptyC <- struct{}{}
-	err := AddBlock(block)
-	<-emptyC
-	return err
+	//emptyC <- struct{}{}
+	//err := AddBlock(block)
+	//<-emptyC
+	blockChan <- block
+	//time.Sleep(1)
+	return nil
 }
 
 func AddBlock(block types.Block) error {
