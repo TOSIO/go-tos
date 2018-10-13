@@ -36,9 +36,20 @@ var (
 func init() {
 	UnverifiedBlockList = list.New()
 	UnverifiedBlockList.PushFront(GetMainBlockTail())
+
 	go func() {
+		//var n int64 = 0
+		//currentTime := time.Now().UnixNano()
 		for block := range blockChan {
 			AddBlock(block)
+			//time.Sleep(1 * time.Millisecond)
+			//statisticsObj.Statistics()
+			//n++
+			//if n == 2000 {
+			//	log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n))
+			//	currentTime = time.Now().UnixNano()
+			//	n = 0
+			//}
 		}
 	}()
 }
@@ -166,10 +177,16 @@ func AddBlock(block types.Block) error {
 	} else {
 		//log.Trace("Non-repeating block")
 	}
+	linksNumber := len(block.GetLinks())
+
+	if linksNumber < 1 || linksNumber > params.MaxLinksNum {
+		log.Error("the block linksNumber Exception.", "linksNumber", linksNumber)
+		return fmt.Errorf("the block linksNumber =%d", linksNumber)
+	}
 
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
-	pm.RelayBlock(block.GetRlp())
+	go pm.RelayBlock(block.GetRlp())
 
 	statisticsObj.Statistics()
 
