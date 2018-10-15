@@ -93,15 +93,15 @@ func addIsolatedBlock(block types.Block, links []common.Hash) {
 	for _, link := range links {
 		v, ok := IsolatedBlockMap[link]
 		if ok {
-			v.LinkIt = append(v.LinkIt, link)
+			v.LinkIt = append(v.LinkIt, block.GetHash())
 			IsolatedBlockMap[link] = v
 		} else {
 			v, ok := lackBlockMap[link]
 			if ok {
-				v.LinkIt = append(v.LinkIt, link)
+				v.LinkIt = append(v.LinkIt, block.GetHash())
 				lackBlockMap[link] = v
 			} else {
-				lackBlockMap[link] = lackBlock{[]common.Hash{link}, uint32(time.Now().Unix())}
+				lackBlockMap[link] = lackBlock{[]common.Hash{block.GetHash()}, uint32(time.Now().Unix())}
 			}
 		}
 	}
@@ -226,8 +226,8 @@ func linkCheckAndSave(block types.Block) error {
 	if isIsolated {
 		log.Warn(block.GetHash().String() + "is a Isolated block")
 		addIsolatedBlock(block, linksLackBlock)
-		for _, linkBlockI := range linkBlockIs {
-			pm.GetBlock(linkBlockI.GetHash())
+		for _, linkBlock := range linksLackBlock {
+			pm.GetBlock(linkBlock)
 		}
 	} else {
 		//log.Trace("Verification passed")
