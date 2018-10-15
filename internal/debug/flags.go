@@ -146,10 +146,10 @@ func Setup(ctx *cli.Context, logdir string) error {
 		if ctx.GlobalBool(logStackFlag.Name) {
 
 			callFuncHandler := log.CallerFuncHandler(log.DiscardHandler())
-			callStackHandler := log.CallerStackHandler("%+v", ostream)
+			callStackHandler := log.CallerStackHandler("%+v", rfh)
 			glogger.SetHandler(log.MultiHandler(ostream, rfh, callFileHandler, callFuncHandler, callStackHandler))
 		} else {
-			callFuncHandler := log.CallerFuncHandler(ostream)
+			callFuncHandler := log.CallerFuncHandler(rfh)
 			glogger.SetHandler(log.MultiHandler(ostream, rfh, callFileHandler, callFuncHandler))
 		}
 	} else {
