@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -106,6 +105,14 @@ func Update(db ReaderWrite, hash common.Hash, data interface{}, update func(bloc
 func ReadBlockMutableInfoRlp(db Reader, hash common.Hash) ([]byte, error) {
 	data, err := db.Get(blockInfoKey(hash))
 	return data, err
+}
+
+func ReadBlockMutableInfo(db Reader, hash common.Hash) (*types.MutableInfo, error) {
+	data, err := db.Get(blockInfoKey(hash))
+	if err != nil {
+		return nil, err
+	}
+	return types.UnMutableRlp(data)
 }
 
 func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP []byte) error {

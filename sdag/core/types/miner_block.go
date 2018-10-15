@@ -168,3 +168,6 @@ func (mb *MinerBlock) GetMutableInfo() *MutableInfo {
 }
 
 // block interface
+func (tx *MinerBlock) SetMaxLinks(MaxLink uint8) {
+	tx.mutableInfo.MaxLink = MaxLink
+}

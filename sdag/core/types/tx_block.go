@@ -176,3 +176,7 @@ func (tx *TxBlock) Validation() error {
 func (tx *TxBlock) GetMutableInfo() *MutableInfo {
 	return &tx.mutableInfo
 }
+
+func (tx *TxBlock) SetMaxLinks(MaxLink uint8) {
+	tx.mutableInfo.MaxLink = MaxLink
+}

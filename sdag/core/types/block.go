@@ -40,6 +40,7 @@ type BlockStatus uint
 const (
 	BLockNone BlockStatus = 1 << iota //0
 	BlockVerify
+	BlockTmpMaxDiff
 	BlockConfirm
 	BlockApply
 	BlockTmpMain
@@ -81,6 +82,8 @@ type Block interface {
 	Sign(prv *ecdsa.PrivateKey) error //签名
 
 	Validation() error // (check data,校验解签名)
+
+	SetMaxLinks(MaxLink uint8) //设置最大连接
 }
 
 type BlockHeader struct {
@@ -95,7 +98,7 @@ type MutableInfo struct {
 	confirmIt      []byte      //confirm it
 	Difficulty     *big.Int    //self difficulty
 	CumulativeDiff *big.Int    //cumulative difficulty
-	MaxLink 		uint64
+	MaxLink        uint8
 }
 
 //数据解析
