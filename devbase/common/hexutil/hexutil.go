@@ -118,6 +118,10 @@ func EncodeUint64(i uint64) string {
 	return string(strconv.AppendUint(enc, i, 16))
 }
 
+func EncodeUnit64ToByte(i uint64) []byte {
+	return strconv.AppendUint(nil, num, 16)
+}
+
 var bigWordNibbles int
 
 func init() {

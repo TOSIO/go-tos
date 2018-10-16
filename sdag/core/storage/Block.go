@@ -132,3 +132,21 @@ func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP [
 
 	return nil
 }
+
+func ReadMainBlock(db Reader, slice uint64) (*types.MainBlock, error ){
+	data, err := db.Get(mainBlockKey(slice))
+	if err != nil {
+		return nil, err
+	}
+
+	return new(types.MainBlock).UnRlp(data)
+}
+
+func WriteMainBlock(db Writer, mb *types.MainBlock, slice uint64) error {
+	if err := db.Put(mainBlockKey(slice), mb.Rlp()); err != nil {
+		log.Error("Failed to store main block", "err", err)
+		return err
+	}
+
+	return nil
+}
