@@ -50,6 +50,7 @@ func TestNodeIteratorCoverage(t *testing.T) {
 		if _, ok := hashes[hash]; !ok {
 			t.Errorf("state entry not reported %x", hash)
 		}
+		t.Log("MPT树节点hash:",hash)
 	}
 	for _, key := range db.TrieDB().DiskDB().(*tosdb.MemDatabase).Keys() {
 		if bytes.HasPrefix(key, []byte("secure-key-")) {

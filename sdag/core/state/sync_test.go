@@ -25,6 +25,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/trie"
+	"fmt"
 )
 
 // testAccount is the data associated with an account used by the state tests.
@@ -46,8 +47,9 @@ func makeTestState() (Database, common.Hash, []*testAccount) {
 	for i := byte(0); i < 96; i++ {
 		obj := state.GetOrNewStateObject(common.BytesToAddress([]byte{i}))
 		acc := &testAccount{address: common.BytesToAddress([]byte{i})}
-
 		obj.AddBalance(big.NewInt(int64(11 * i)))
+		fmt.Println("余额",obj.Balance())
+		fmt.Println("账户地址:",acc.address)
 		acc.balance = big.NewInt(int64(11 * i))
 
 		obj.SetNonce(uint64(42 * i))
@@ -63,6 +65,7 @@ func makeTestState() (Database, common.Hash, []*testAccount) {
 	root, _ := state.Commit(false)
 
 	// Return the generated state
+	fmt.Println("root值:",root)
 	return db, root, accounts
 }
 

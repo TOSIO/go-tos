@@ -98,7 +98,7 @@ type Account struct {
 	Nonce    uint64
 	Balance  *big.Int
 	Root     common.Hash // merkle root of the storage trie
-	CodeHash []byte
+	CodeHash []byte  //合约代码的Hash值 注：[合约]表示该项仅对合约账户有效
 }
 
 // newObject creates a state object.

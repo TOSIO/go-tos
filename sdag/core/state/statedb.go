@@ -50,7 +50,7 @@ var (
 // * Contracts
 // * Accounts
 type StateDB struct {
-	db   Database
+	db   Database //数据库抽象类  真正的数据的增删改查底层都在这里
 	trie Trie
 
 	// This map holds 'live' objects, which will get modified while processing a state transition.
