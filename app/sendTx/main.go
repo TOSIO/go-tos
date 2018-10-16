@@ -168,15 +168,15 @@ func main() {
 		}
 		totalCount = totalCount.Add(totalCount, big.NewInt(1))
 		nowTime := time.Now().Unix()
-		if lastTime+60 < nowTime {
+		if lastTime+10 < nowTime {
 			temp := big.NewInt(0)
 			temp = temp.Sub(totalCount, lastTotalCount)
 			tempInt := temp.Int64()
 			fmt.Println("========================")
 			fmt.Println("totalCount=", totalCount)
 			fmt.Println("lastTotalCount=", lastTotalCount)
-			fmt.Println("60 s totalCount=", tempInt)
-			fmt.Println(tempInt/60, "/s")
+			fmt.Println("10 s totalCount=", tempInt)
+			fmt.Println(tempInt/10, "/s")
 			lastTotalCount.Set(totalCount)
 			lastTime = nowTime
 			numberMinute++

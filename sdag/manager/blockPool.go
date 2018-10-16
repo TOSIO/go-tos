@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/statistics"
+	"sync"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -31,6 +32,7 @@ var (
 	db        tosdb.Database
 	emptyC    = make(chan struct{}, 1)
 	blockChan = make(chan types.Block)
+	mu        sync.RWMutex
 )
 
 func init() {
@@ -38,18 +40,17 @@ func init() {
 	UnverifiedBlockList.PushFront(GetMainBlockTail())
 
 	go func() {
-		//var n int64 = 0
-		//currentTime := time.Now().UnixNano()
+		var n int64 = 0
+		currentTime := time.Now().UnixNano()
 		for block := range blockChan {
 			AddBlock(block)
-			//time.Sleep(1 * time.Millisecond)
 			//statisticsObj.Statistics()
-			//n++
-			//if n == 2000 {
-			//	log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n))
-			//	currentTime = time.Now().UnixNano()
-			//	n = 0
-			//}
+			n++
+			if n == 2000 {
+				log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
+				currentTime = time.Now().UnixNano()
+				n = 0
+			}
 		}
 	}()
 }
@@ -188,7 +189,9 @@ func AddBlock(block types.Block) error {
 	deleteIsolatedBlock(block)
 	go pm.RelayBlock(block.GetRlp())
 
-	statisticsObj.Statistics()
+	if statisticsObj.Statistics() {
+		fmt.Println(UnverifiedBlockList.Len())
+	}
 
 	return err
 }
@@ -197,10 +200,11 @@ func linkCheckAndSave(block types.Block) error {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
+	var haveLinkGenesis bool
 
 	for _, hash := range block.GetLinks() {
 		if hash == core.GenesisHash {
-
+			haveLinkGenesis = true
 		} else {
 			linkBlockEI := storage.ReadBlock(db, hash) //the 'EI' is empty interface logogram
 			if linkBlockEI != nil {
@@ -231,6 +235,9 @@ func linkCheckAndSave(block types.Block) error {
 		}
 	} else {
 		//log.Trace("Verification passed")
+		if haveLinkGenesis {
+			DeleteUnverifiedTransactionList(core.GenesisHash)
+		}
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
@@ -244,6 +251,8 @@ func linkCheckAndSave(block types.Block) error {
 }
 
 func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
+	mu.Lock()
+	defer mu.Unlock()
 	for e := UnverifiedBlockList.Front(); e != nil; e = e.Next() {
 		if e.Value == linkHash {
 			UnverifiedBlockList.Remove(e)
@@ -255,6 +264,8 @@ func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
 
 func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
 	i := 0
+	mu.RLock()
+	defer mu.RUnlock()
 	for e := UnverifiedBlockList.Front(); e != nil && i < params.MaxLinksNum; e = e.Next() {
 		hash, ok := e.Value.(common.Hash)
 		if !ok {
@@ -263,21 +274,11 @@ func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
 		links = append(links, hash)
 		i++
 	}
-
-	//for i := 0; i < listLen && i < params.MaxLinksNum; i++ {
-	//	hashI, err := PopUnverifiedTransactionList()
-	//	if err != nil {
-	//		log.Error(err.Error())
-	//	}
-	//	hash, ok := hashI.(common.Hash)
-	//	if !ok {
-	//		log.Error("error hash.(common.Hash): ", hash)
-	//	}
-	//	links = append(links, hash)
-	//}
 	return links
 }
 
 func addUnverifiedBlockList(v interface{}) {
+	mu.Lock()
+	defer mu.Unlock()
 	UnverifiedBlockList.PushBack(v)
 }

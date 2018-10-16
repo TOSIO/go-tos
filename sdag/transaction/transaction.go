@@ -52,7 +52,9 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	}
 
 	//2. links
-	txBlock.Links = manager.SelectUnverifiedBlock(txBlock.Links)
+	for len(txBlock.Links) == 0 {
+		txBlock.Links = manager.SelectUnverifiedBlock(txBlock.Links)
+	}
 
 	//3. accoutnonce
 	emptyC <- struct{}{}

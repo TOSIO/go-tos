@@ -115,6 +115,15 @@ func ReadBlockMutableInfo(db Reader, hash common.Hash) (*types.MutableInfo, erro
 	return types.UnMutableRlp(data)
 }
 
+func WriteBlockMutableInfo(db Writer, hash common.Hash, info *types.MutableInfo) error {
+	if err := db.Put(blockInfoKey(hash), types.GetMutableRlp(info)); err != nil {
+		log.Error("Failed to store block info", "err", err)
+		return err
+	}
+
+	return nil
+}
+
 func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP []byte) error {
 	if err := db.Put(blockInfoKey(hash), blockMutableInfoRLP); err != nil {
 		log.Error("Failed to store block info", "err", err)
