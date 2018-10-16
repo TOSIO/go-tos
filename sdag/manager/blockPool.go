@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/statistics"
+	"sync"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -18,7 +19,6 @@ import (
 
 var (
 	UnverifiedBlockList *list.List
-	MaxConfirm          = 4
 	statisticsObj       statistics.Statistics
 )
 
@@ -28,14 +28,31 @@ type protocolManagerI interface {
 }
 
 var (
-	pm     protocolManagerI
-	db     tosdb.Database
-	emptyC = make(chan struct{}, 1)
+	pm        protocolManagerI
+	db        tosdb.Database
+	emptyC    = make(chan struct{}, 1)
+	blockChan = make(chan types.Block)
+	mu        sync.RWMutex
 )
 
 func init() {
 	UnverifiedBlockList = list.New()
 	UnverifiedBlockList.PushFront(GetMainBlockTail())
+
+	go func() {
+		var n int64 = 0
+		currentTime := time.Now().UnixNano()
+		for block := range blockChan {
+			AddBlock(block)
+			//statisticsObj.Statistics()
+			n++
+			if n == 2000 {
+				log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
+				currentTime = time.Now().UnixNano()
+				n = 0
+			}
+		}
+	}()
 }
 
 func SetDB(chainDb tosdb.Database) {
@@ -77,15 +94,15 @@ func addIsolatedBlock(block types.Block, links []common.Hash) {
 	for _, link := range links {
 		v, ok := IsolatedBlockMap[link]
 		if ok {
-			v.LinkIt = append(v.LinkIt, link)
+			v.LinkIt = append(v.LinkIt, block.GetHash())
 			IsolatedBlockMap[link] = v
 		} else {
 			v, ok := lackBlockMap[link]
 			if ok {
-				v.LinkIt = append(v.LinkIt, link)
+				v.LinkIt = append(v.LinkIt, block.GetHash())
 				lackBlockMap[link] = v
 			} else {
-				lackBlockMap[link] = lackBlock{[]common.Hash{link}, uint32(time.Now().Unix())}
+				lackBlockMap[link] = lackBlock{[]common.Hash{block.GetHash()}, uint32(time.Now().Unix())}
 			}
 		}
 	}
@@ -139,10 +156,12 @@ func deleteLinkHash(link []common.Hash, hash common.Hash) []common.Hash {
 }
 
 func SyncAddBlock(block types.Block) error {
-	emptyC <- struct{}{}
-	err := AddBlock(block)
-	<-emptyC
-	return err
+	//emptyC <- struct{}{}
+	//err := AddBlock(block)
+	//<-emptyC
+	blockChan <- block
+	//time.Sleep(1)
+	return nil
 }
 
 func AddBlock(block types.Block) error {
@@ -159,12 +178,20 @@ func AddBlock(block types.Block) error {
 	} else {
 		//log.Trace("Non-repeating block")
 	}
+	linksNumber := len(block.GetLinks())
+
+	if linksNumber < 1 || linksNumber > params.MaxLinksNum {
+		log.Error("the block linksNumber Exception.", "linksNumber", linksNumber)
+		return fmt.Errorf("the block linksNumber =%d", linksNumber)
+	}
 
 	err = linkCheckAndSave(block)
 	deleteIsolatedBlock(block)
-	pm.RelayBlock(block.GetRlp())
+	go pm.RelayBlock(block.GetRlp())
 
-	statisticsObj.Statistics()
+	if statisticsObj.Statistics() {
+		fmt.Println(UnverifiedBlockList.Len())
+	}
 
 	return err
 }
@@ -173,10 +200,11 @@ func linkCheckAndSave(block types.Block) error {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
+	var haveLinkGenesis bool
 
 	for _, hash := range block.GetLinks() {
 		if hash == core.GenesisHash {
-
+			haveLinkGenesis = true
 		} else {
 			linkBlockEI := storage.ReadBlock(db, hash) //the 'EI' is empty interface logogram
 			if linkBlockEI != nil {
@@ -202,11 +230,14 @@ func linkCheckAndSave(block types.Block) error {
 	if isIsolated {
 		log.Warn(block.GetHash().String() + "is a Isolated block")
 		addIsolatedBlock(block, linksLackBlock)
-		for _, linkBlockI := range linkBlockIs {
-			pm.GetBlock(linkBlockI.GetHash())
+		for _, linkBlock := range linksLackBlock {
+			pm.GetBlock(linkBlock)
 		}
 	} else {
 		//log.Trace("Verification passed")
+		if haveLinkGenesis {
+			DeleteUnverifiedTransactionList(core.GenesisHash)
+		}
 		for _, linkBlockI := range linkBlockIs {
 			linkBlockI.SetStatus(linkBlockI.GetStatus() | types.BlockVerify)
 			storage.WriteBlockMutableInfoRlp(db, linkBlockI.GetHash(), types.GetMutableRlp(linkBlockI.GetMutableInfo()))
@@ -220,6 +251,8 @@ func linkCheckAndSave(block types.Block) error {
 }
 
 func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
+	mu.Lock()
+	defer mu.Unlock()
 	for e := UnverifiedBlockList.Front(); e != nil; e = e.Next() {
 		if e.Value == linkHash {
 			UnverifiedBlockList.Remove(e)
@@ -231,6 +264,8 @@ func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
 
 func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
 	i := 0
+	mu.RLock()
+	defer mu.RUnlock()
 	for e := UnverifiedBlockList.Front(); e != nil && i < params.MaxLinksNum; e = e.Next() {
 		hash, ok := e.Value.(common.Hash)
 		if !ok {
@@ -239,21 +274,11 @@ func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
 		links = append(links, hash)
 		i++
 	}
-
-	//for i := 0; i < listLen && i < params.MaxLinksNum; i++ {
-	//	hashI, err := PopUnverifiedTransactionList()
-	//	if err != nil {
-	//		log.Error(err.Error())
-	//	}
-	//	hash, ok := hashI.(common.Hash)
-	//	if !ok {
-	//		log.Error("error hash.(common.Hash): ", hash)
-	//	}
-	//	links = append(links, hash)
-	//}
 	return links
 }
 
 func addUnverifiedBlockList(v interface{}) {
+	mu.Lock()
+	defer mu.Unlock()
 	UnverifiedBlockList.PushBack(v)
 }

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/common/hexutil"
 )
 
 var (
@@ -12,7 +13,7 @@ var (
 )
 
 func blockLookUpKey(slice uint64) []byte {
-	return append([]byte("t"), strconv.AppendUint(nil, slice, 16)...)
+	return append([]byte("t"), hexutil.EncodeUnit64ToByte(slice)...)
 }
 
 func blockKey(slice uint64) []byte {
@@ -30,9 +31,13 @@ func nextId() []byte {
 		count += 1
 	}
 
-	return strconv.AppendUint(nil, countTime + count, 16)
+	return hexutil.EncodeUnit64ToByte(countTime + count)
 }
 
 func blockInfoKey(hash common.Hash) []byte {
 	return append([]byte("i"), hash[:]...)
+}
+
+func mainBlockKey(slice uint64) []byte {
+	return append([]byte("M"), hexutil.EncodeUnit64ToByte(slice)...)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/params"
 	"math/big"
 	"sync/atomic"
 )
@@ -148,7 +149,7 @@ func (mb *MinerBlock) Validation() error {
 	//2
 	if mb.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
-	} else if mb.Header.Time > utils.GetTimeStamp() {
+	} else if mb.Header.Time > utils.GetTimeStamp()+params.TimePeriod {
 		return fmt.Errorf("block time no less than current time")
 	}
 
@@ -167,3 +168,6 @@ func (mb *MinerBlock) GetMutableInfo() *MutableInfo {
 }
 
 // block interface
+func (tx *MinerBlock) SetMaxLinks(MaxLink uint8) {
+	tx.mutableInfo.MaxLink = MaxLink
+}

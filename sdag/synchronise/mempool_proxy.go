@@ -15,7 +15,8 @@ func NewMempol() (*MemPoolProxy, error) {
 func (m *MemPoolProxy) AddBlock(data []byte) error {
 	b, err := types.BlockUnRlp(data)
 	if err != nil {
-		return manager.SyncAddBlock(b)
+		return err
 	}
-	return err
+	return manager.SyncAddBlock(b)
+
 }

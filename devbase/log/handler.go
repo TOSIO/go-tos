@@ -77,8 +77,9 @@ func FileHandler(path string, fmtr Format) (Handler, error) {
 
 // countingWriter wraps a WriteCloser object in order to count the written bytes.
 type countingWriter struct {
-	w     io.WriteCloser // the wrapped object
-	count uint           // number of bytes written
+	w      io.WriteCloser // the wrapped object
+	count  uint           // number of bytes written
+	rwlock sync.RWMutex
 }
 
 // Write increments the byte counter by the number of bytes written.
@@ -99,6 +100,7 @@ func (w *countingWriter) Close() error {
 // Assumes that every line ended by '\n' contains a valid log record.
 func prepFile(path string) (*countingWriter, error) {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0600)
+	//f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0755)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +127,8 @@ func prepFile(path string) (*countingWriter, error) {
 		return nil, err
 	}
 	ns := fi.Size() - cut
-	if err = f.Truncate(ns); err != nil {
+	err = os.Truncate(path, ns)
+	if /* err = f.Truncate(ns);  */ err != nil {
 		return nil, err
 	}
 	return &countingWriter{w: f, count: uint(ns)}, nil
@@ -160,6 +163,16 @@ func RotatingFileHandler(path string, limit uint, formatter Format) (Handler, er
 	h := StreamHandler(counter, formatter)
 
 	return FuncHandler(func(r *Record) error {
+		var err error
+		counter.rwlock.RLock()
+		if counter.count <= limit && counter.w != nil {
+			err = h.Log(r)
+			counter.rwlock.RUnlock()
+			return err
+		}
+		counter.rwlock.RUnlock()
+
+		counter.rwlock.Lock()
 		if counter.count > limit {
 			counter.Close()
 			counter.w = nil
@@ -171,12 +184,15 @@ func RotatingFileHandler(path string, limit uint, formatter Format) (Handler, er
 				0600,
 			)
 			if err != nil {
+				counter.rwlock.Unlock()
 				return err
 			}
 			counter.w = f
 			counter.count = 0
 		}
-		return h.Log(r)
+		err = h.Log(r)
+		counter.rwlock.Unlock()
+		return err
 	}), nil
 }
 

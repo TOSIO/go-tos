@@ -57,7 +57,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	utils.ApplyDashboardConfig(ctx, &cfg.Dashboard)
 
 	// 其他模块config设置
-	log.Info("makeConfigNode | warning other moduler config is not yet been")
+	log.Info("Warning! Other moduler config is not yet been")
 	return stack, cfg
 }
 
@@ -110,17 +110,17 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 
 //启动账户相关服务
 func activeAccount(ctx *cli.Context, stack *node.Node) {
-	log.Info("activeAccount | called.")
+	log.Info("Starting account service")
 }
 
 //启动辅助服务
 func startAuxservice(ctx *cli.Context, stack *node.Node) {
-	log.Info("startAuxservice | called.")
+	log.Info("Starting aux service")
 }
 
 //钱包循环
 func walletloop(stack *node.Node) {
-	log.Info("walletloop | called.")
+	log.Info("Starting wallet-loop")
 }
 
 // startNode boots up the system node and all registered protocols, after which

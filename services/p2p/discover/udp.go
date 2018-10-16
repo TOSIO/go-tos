@@ -316,7 +316,7 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
 	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
-		log.Trace("func udp.findnode | pending callback.")
+		log.Trace("Pending callback called")
 		reply := r.(*neighbors)
 		for _, rn := range reply.Nodes {
 			log.Trace("Receive neighbor node", "ip", rn.IP, "addr", toaddr)
@@ -330,7 +330,7 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 		}
 		return nreceived >= bucketSize
 	})
-	log.Trace("func udp.findnode | send request,", "toid", toid, "toaddr", toaddr, "target", target)
+	log.Trace("Send request,", "toid", toid, "toaddr", toaddr, "target", target)
 	t.send(toaddr, findnodePacket, &findnode{
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
@@ -385,7 +385,7 @@ func (t *udp) loop() {
 		for el := plist.Front(); el != nil; el = el.Next() {
 			nextTimeout = el.Value.(*pending)
 			if dist := nextTimeout.deadline.Sub(now); dist < 2*respTimeout {
-				log.Trace("func udp.loop | Set timeout", "dist", dist)
+				log.Trace("Set timeout", "dist", dist)
 				timeout.Reset(dist)
 				return
 			}
@@ -440,7 +440,7 @@ func (t *udp) loop() {
 			for el := plist.Front(); el != nil; el = el.Next() {
 				p := el.Value.(*pending)
 				if now.After(p.deadline) || now.Equal(p.deadline) {
-					log.Trace("func udp.loop | receive packet timeout", "from", p.from, "type", p.ptype)
+					log.Trace("Receive packet timeout", "from", p.from, "type", p.ptype)
 					p.errc <- errTimeout
 					plist.Remove(el)
 					contTimeouts++
@@ -499,7 +499,7 @@ func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) 
 }
 
 func (t *udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
-	log.Trace("func udp.write | write message,", "toaddr", toaddr, "what", what, "packet", packet)
+	log.Trace("Write message", "toaddr", toaddr, "what", what, "packet", packet)
 	_, err := t.conn.WriteToUDP(packet, toaddr)
 	log.Trace(">> "+what, "addr", toaddr, "err", err)
 	return err
@@ -540,7 +540,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 	buf := make([]byte, 1280)
 	for {
 		nbytes, from, err := t.conn.ReadFromUDP(buf)
-		log.Trace("func udp.readLoop-discv4 | read message:", "from", from, "msg", buf[:nbytes])
+		log.Trace("Read message", "from", from, "msg", buf[:nbytes])
 		if netutil.IsTemporaryError(err) {
 			// Ignore temporary read errors.
 			log.Debug("Temporary UDP read error", "err", err)
@@ -560,7 +560,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
-	log.Debug("udp.handlePacket-discov4 | receive message,", "from", from, "packet", buf)
+	log.Debug("Receive message", "from", from, "packet", buf)
 
 	packet, fromID, hash, err := decodePacket(buf)
 	if err != nil {
@@ -579,7 +579,7 @@ func decodePacket(buf []byte) (packet, NodeID, []byte, error) {
 	hash, sig, sigdata := buf[:macSize], buf[macSize:headSize], buf[headSize:]
 	shouldhash := crypto.Keccak256(buf[macSize:])
 	if !bytes.Equal(hash, shouldhash) {
-		log.Debug("decodePacket | recevice ", "hash", hash, "shouldhash", shouldhash)
+		log.Debug("Recevice ", "hash", hash, "shouldhash", shouldhash)
 		return nil, NodeID{}, nil, errBadHash
 	}
 	fromID, err := recoverNodeID(crypto.Keccak256(buf[headSize:]), sig)
@@ -608,7 +608,7 @@ func (req *ping) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte) er
 	if expired(req.Expiration) {
 		return errExpired
 	}
-	log.Trace("func ping.handle | handle ping,", "to", t, "from", from, "mac", mac)
+	log.Trace("Handle ping,", "to", t, "from", from, "mac", mac)
 
 	t.send(from, pongPacket, &pong{
 		To:         makeEndpoint(from, req.From.TCP),
@@ -671,14 +671,14 @@ func (req *findnode) handle(t *udp, from *net.UDPAddr, fromID NodeID, mac []byte
 			p.Nodes = append(p.Nodes, nodeToRPC(n))
 		}
 		if len(p.Nodes) == maxNeighbors {
-			log.Trace("func findnode.handle | send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
+			log.Trace("Send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
 			t.send(from, neighborsPacket, &p)
 			p.Nodes = p.Nodes[:0]
 			sent = true
 		}
 	}
 	if len(p.Nodes) > 0 || !sent {
-		log.Trace("func findnode.handle | send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
+		log.Trace("Send message,", "to", t, "from", from, "closet num", len(closest), "mac", mac)
 		t.send(from, neighborsPacket, &p)
 	}
 	return nil

@@ -2,7 +2,6 @@ package storage
 
 import (
 	"fmt"
-
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -108,9 +107,44 @@ func ReadBlockMutableInfoRlp(db Reader, hash common.Hash) ([]byte, error) {
 	return data, err
 }
 
+func ReadBlockMutableInfo(db Reader, hash common.Hash) (*types.MutableInfo, error) {
+	data, err := db.Get(blockInfoKey(hash))
+	if err != nil {
+		return nil, err
+	}
+	return types.UnMutableRlp(data)
+}
+
+func WriteBlockMutableInfo(db Writer, hash common.Hash, info *types.MutableInfo) error {
+	if err := db.Put(blockInfoKey(hash), types.GetMutableRlp(info)); err != nil {
+		log.Error("Failed to store block info", "err", err)
+		return err
+	}
+
+	return nil
+}
+
 func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP []byte) error {
 	if err := db.Put(blockInfoKey(hash), blockMutableInfoRLP); err != nil {
 		log.Error("Failed to store block info", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+func ReadMainBlock(db Reader, slice uint64) (*types.MainBlock, error ){
+	data, err := db.Get(mainBlockKey(slice))
+	if err != nil {
+		return nil, err
+	}
+
+	return new(types.MainBlock).UnRlp(data)
+}
+
+func WriteMainBlock(db Writer, mb *types.MainBlock, slice uint64) error {
+	if err := db.Put(mainBlockKey(slice), mb.Rlp()); err != nil {
+		log.Error("Failed to store main block", "err", err)
 		return err
 	}
 

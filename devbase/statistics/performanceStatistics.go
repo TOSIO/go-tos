@@ -12,7 +12,7 @@ type Statistics struct {
 	lastTime       int64
 }
 
-func (s *Statistics) Statistics() {
+func (s *Statistics) Statistics() bool {
 	if s.totalCount == nil {
 		s.totalCount = big.NewInt(0)
 		s.lastTotalCount = big.NewInt(0)
@@ -31,5 +31,7 @@ func (s *Statistics) Statistics() {
 		fmt.Println(tempInt/10, "/s")
 		s.lastTotalCount.Set(s.totalCount)
 		s.lastTime = nowTime
+		return true
 	}
+	return false
 }

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
@@ -70,7 +69,7 @@ func (p *peer) close() {
 
 // 节点传输的业务逻辑在此实现
 func (p *peer) broadcast() {
-	p.Log().Info("Peer.broadcast() | called.")
+	p.Log().Info("Starting broadcast")
 	for {
 		select {
 		case block := <-p.blocksQueue:
@@ -79,7 +78,7 @@ func (p *peer) broadcast() {
 			err := p.SendNewBlocks(blocks)
 			p.Log().Trace("Peer.broadcast() | send new block", "nodeID", p.id, "err", err)
 		case <-p.term:
-			p.Log().Info("Peer.broadcast() exit.")
+			p.Log().Info("Broadcast stopped")
 			return
 		}
 	}
@@ -252,7 +251,7 @@ func (p *peer) RequestLastMainSlice() error {
 func (p *peer) AsyncSendBlock(block []byte) {
 	select {
 	case p.blocksQueue <- block:
-		log.Trace("func peer.AsyncSendBlock | send block to channel success", "nodeID", p.id)
+		p.Log().Trace("Send block to channel success")
 	default:
 		//log.Debug("peer [%s]'s queue is full, so give up.", p.id)
 	}
