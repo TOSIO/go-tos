@@ -15,6 +15,7 @@ import (
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
+	"github.com/TOSIO/go-tos/sdag/core/state"
 )
 
 /*
@@ -39,6 +40,9 @@ type Sdag struct {
 
 	// DB interfaces
 	chainDb tosdb.Database // Block chain database
+
+	//statedb
+	stateDb state.Database //mpt trie
 
 	eventMux       *interface{}
 	accountManager *interface{}
@@ -76,6 +80,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		shutdownChan:    make(chan bool),
 		networkID:       config.NetworkId,
 		chainDb:         chainDb,
+		stateDb:         state.NewDatabase(tosdb.NewMemDatabase()),
 		protocolManager: protocolManager,
 		blockchain:      chain,
 	}
