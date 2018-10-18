@@ -77,7 +77,8 @@ type Block interface {
 	GetStatus() BlockStatus       //获取状态
 	SetStatus(status BlockStatus) //设置状态
 
-	GetMutableInfo() *MutableInfo //易变信息
+	GetMutableInfo() *MutableInfo            //获取易变信息
+	SetMutableInfo(mutableInfo *MutableInfo) //设置易变信息
 
 	Sign(prv *ecdsa.PrivateKey) error //签名
 
@@ -94,11 +95,11 @@ type BlockHeader struct {
 }
 
 type MutableInfo struct {
-	Status         BlockStatus //status
-	confirmIt      []byte      //confirm it
-	Difficulty     *big.Int    //self difficulty
-	CumulativeDiff *big.Int    //cumulative difficulty
-	MaxLink        uint8
+	Status              BlockStatus //status
+	ConfirmItsTimeSlice uint64      //Confirm its time slice
+	Difficulty          *big.Int    //self difficulty
+	CumulativeDiff      *big.Int    //cumulative difficulty
+	MaxLink             uint8
 }
 
 //数据解析

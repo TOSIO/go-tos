@@ -1,14 +1,13 @@
 package storage
 
 import (
-	"strconv"
-	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/common/hexutil"
+	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 var (
-	count uint64
+	count     uint64
 	countTime uint64
 )
 

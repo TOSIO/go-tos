@@ -167,6 +167,10 @@ func (mb *MinerBlock) GetMutableInfo() *MutableInfo {
 	return &mb.mutableInfo
 }
 
+func (mb *MinerBlock) SetMutableInfo(mutableInfo *MutableInfo) {
+	mb.mutableInfo = *mutableInfo
+}
+
 // block interface
 func (tx *MinerBlock) SetMaxLinks(MaxLink uint8) {
 	tx.mutableInfo.MaxLink = MaxLink

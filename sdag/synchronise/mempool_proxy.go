@@ -18,5 +18,4 @@ func (m *MemPoolProxy) AddBlock(data []byte) error {
 		return err
 	}
 	return manager.SyncAddBlock(b)
-
 }

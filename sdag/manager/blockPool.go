@@ -186,7 +186,7 @@ func AddBlock(block types.Block) error {
 	}
 
 	err = linkCheckAndSave(block)
-	deleteIsolatedBlock(block)
+	//deleteIsolatedBlock(block)
 	go pm.RelayBlock(block.GetRlp())
 
 	if statisticsObj.Statistics() {
