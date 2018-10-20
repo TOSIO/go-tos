@@ -256,7 +256,6 @@ func newUDP(c conn, cfg Config) (*Table, *udp, error) {
 		return nil, nil, err
 	}
 	udp.Table = tab
-
 	go udp.loop()
 	go udp.readLoop(cfg.Unhandled)
 	return udp.Table, udp, nil
@@ -330,7 +329,7 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 		}
 		return nreceived >= bucketSize
 	})
-	log.Trace("Send request,", "toid", toid, "toaddr", toaddr, "target", target)
+	log.Trace("Send request", "toid", toid, "toaddr", toaddr, "target", target)
 	t.send(toaddr, findnodePacket, &findnode{
 		Target:     target,
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
@@ -501,7 +500,7 @@ func (t *udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error) 
 func (t *udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	log.Trace("Write message", "toaddr", toaddr, "what", what, "packet", packet)
 	_, err := t.conn.WriteToUDP(packet, toaddr)
-	log.Trace(">> "+what, "addr", toaddr, "err", err)
+	log.Debug(">> "+what, "addr", toaddr, "err", err)
 	return err
 }
 
@@ -560,7 +559,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
-	log.Debug("Receive message", "from", from, "packet", buf)
+	log.Trace("Receive message", "from", from, "packet", buf)
 
 	packet, fromID, hash, err := decodePacket(buf)
 	if err != nil {
@@ -568,7 +567,7 @@ func (t *udp) handlePacket(from *net.UDPAddr, buf []byte) error {
 		return err
 	}
 	err = packet.handle(t, from, fromID, hash)
-	log.Trace("<< "+packet.name(), "addr", from, "err", err)
+	log.Debug("<< "+packet.name(), "from", from, "ID", fromID.String(), "err", err)
 	return err
 }
 

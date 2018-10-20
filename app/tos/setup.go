@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	godebug "runtime/debug"
@@ -64,10 +65,11 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 func activePPROF(ctx *cli.Context) error {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	logdir := ""
+	logdir := (&node.Config{DataDir: utils.MakeDataDir(ctx)}).ResolvePath("logs")
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		logdir = (&node.Config{DataDir: utils.MakeDataDir(ctx)}).ResolvePath("logs")
 	}
+	fmt.Printf("Log dir is %s", logdir)
 	if err := debug.Setup(ctx, logdir); err != nil {
 		return err
 	}

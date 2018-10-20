@@ -248,7 +248,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 func (pm *ProtocolManager) handleMsg(p *peer) error {
-	p.Log().Info("Try to handle message")
+	p.Log().Info("Starting handle message")
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
@@ -257,7 +257,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
 	defer msg.Discard()
-	p.Log().Info("Receive message", "msg.Code", msg.Code)
+	p.Log().Debug("Receive message", "msg.Code", msg.Code)
 	//dispatch message here
 	switch msg.Code {
 	case StatusMsg:

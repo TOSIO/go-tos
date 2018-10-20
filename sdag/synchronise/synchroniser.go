@@ -73,7 +73,6 @@ func (s *Synchroniser) loop() {
 
 	//forloop:
 	for {
-
 		select {
 		case _ = <-s.blockReqCh:
 			// 随机挑选一个节点
@@ -118,8 +117,8 @@ func (s *Synchroniser) processBlockResp(packet RespPacketI) {
 }
 
 func (s *Synchroniser) processRequestBlock(peer PeerI) {
-	s.blockQueueLock.Lock()
 	defer s.blockQueueLock.Unlock()
+	s.blockQueueLock.Lock()
 	var req []common.Hash
 	for k, v := range s.blockReqQueue {
 		delete(s.blockReqQueue, k) //已经在未完成队列中
@@ -226,8 +225,10 @@ func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 
 func (s *Synchroniser) AsyncRequestBlock(hash common.Hash) error {
 	s.blockQueueLock.Lock()
-	defer s.blockQueueLock.Unlock()
 	s.blockReqQueue[hash] = ""
+	s.blockQueueLock.Unlock()
+
+	s.blockReqCh <- struct{}{}
 	return nil
 }
 
