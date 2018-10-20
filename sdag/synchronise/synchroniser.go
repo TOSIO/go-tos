@@ -37,12 +37,15 @@ type Synchroniser struct {
 	blockUnfinishQueue map[common.Hash]string
 	blockQueueLock     sync.RWMutex // Lock to protect the cancel channel and peer in delivers
 
-	cancelCh   chan struct{} // Channel to cancel mid-flight syncs
-	cancelLock sync.RWMutex  // Lock to protect the cancel channel and peer in delivers
+	cancelCh chan struct{} // Channel to cancel mid-flight syncs
+
+	syncResultCh chan error
+
+	cancelLock sync.RWMutex // Lock to protect the cancel channel and peer in delivers
 
 }
 
-func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp MemPoolI) (*Synchroniser, error) {
+func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp MemPoolI, resultCh chan error) (*Synchroniser, error) {
 	syncer := &Synchroniser{peers: ps,
 		mainChain:  mc,
 		blkstorage: bs,
@@ -57,7 +60,7 @@ func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp 
 	syncer.blockReqQueue = make(map[common.Hash]string)
 	syncer.blockUnfinishQueue = make(map[common.Hash]string)
 	syncer.cancelCh = make(chan struct{})
-
+	syncer.syncResultCh = resultCh
 	return syncer, nil
 }
 
@@ -151,6 +154,7 @@ loop:
 		// 随机挑选一个节点
 		peer, err := s.peers.RandomSelectIdlePeer()
 		if err != nil {
+			s.syncResultCh <- err
 			return err
 		}
 		if _, existed := triedNodes[peer.NodeID()]; existed {
@@ -185,7 +189,7 @@ loop:
 			return nil
 		}
 	}
-
+	s.syncResultCh <- nil
 	return nil
 }
 
