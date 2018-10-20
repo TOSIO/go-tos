@@ -10,6 +10,7 @@ import (
 	"github.com/TOSIO/go-tos/params"
 	"math/big"
 	"sync/atomic"
+	"encoding/binary"
 )
 
 type BlockNonce [8]byte
@@ -175,3 +176,12 @@ func (mb *MinerBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 func (tx *MinerBlock) SetMaxLinks(MaxLink uint8) {
 	tx.mutableInfo.MaxLink = MaxLink
 }
+
+
+// EncodeNonce converts the given integer to a block nonce.
+func EncodeNonce(i uint64) BlockNonce {
+	var n BlockNonce
+	binary.BigEndian.PutUint64(n[:], i)
+	return n
+}
+
