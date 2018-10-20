@@ -6,6 +6,10 @@ import (
 	"math/big"
 	"sync"
 
+	"github.com/TOSIO/go-tos/sdag/core"
+
+	"github.com/TOSIO/go-tos/devbase/event"
+
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 
@@ -18,6 +22,19 @@ import (
 
 var errIncompatibleConfig = errors.New("incompatible configuration")
 
+const (
+	STAT_NONE = iota
+	STAT_SYNCING
+	STAT_READY
+	STAT_WORKING
+	STAT_NET_UNVAILABLE
+)
+
+type status struct {
+	nodeNum  int `json:node_num`
+	progress int `json:progress` //0-none,1-syncing,2-ready,3-working,4-connecting
+}
+
 // tos sdag协议管理、实现
 type ProtocolManager struct {
 	networkID uint64
@@ -25,6 +42,9 @@ type ProtocolManager struct {
 	maxPeers int
 
 	peers *peerSet
+
+	networkFeed *event.Feed
+	feeded      bool
 
 	chainDb tosdb.Database // Block chain database
 
@@ -39,6 +59,8 @@ type ProtocolManager struct {
 	quitSync    chan struct{}
 	noMorePeers chan struct{}
 
+	stat       status
+	syncResult chan error
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
 	wg sync.WaitGroup
@@ -57,7 +79,7 @@ type NodeInfo struct {
 // NewProtocolManager returns a new tos sub protocol manager. The tos sub protocol manages peers capable
 // with the tos network.
 func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.MainChainI,
-	db tosdb.Database) (*ProtocolManager, error) {
+	db tosdb.Database, feed *event.Feed) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkID:   networkID,
@@ -66,6 +88,10 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
 		blockChain:  chain,
+		networkFeed: feed,
+		feeded:      false,
+		stat:        status{nodeNum: 0, progress: STAT_NONE},
+		syncResult:  make(chan error),
 	}
 
 	// Initiate a sub-protocol for every implemented version we can handle
@@ -85,7 +111,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	}
 
 	if manager.synchroniser, err = synchronise.NewSynchroinser(manager.Peers(),
-		chain, storageProxy, mempoolProxy); err != nil {
+		chain, storageProxy, mempoolProxy, manager.syncResult); err != nil {
 		log.Error("Initialising Sdag synchroniser failed.")
 		return nil, err
 	}
@@ -94,7 +120,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 }
 
 // this function will be removed in future
-func (pm *ProtocolManager) consumeNewPeer() {
+func (pm *ProtocolManager) loop() {
 	for {
 		select {
 		case peer := <-pm.newPeerCh:
@@ -102,6 +128,10 @@ func (pm *ProtocolManager) consumeNewPeer() {
 			log.Trace("Receive a new peer,", "peer.id", peer.NodeID)
 		case <-pm.noMorePeers:
 			return
+		case result := <-pm.syncResult:
+			if result == nil {
+				pm.stat.progress = STAT_WORKING
+			}
 		}
 	}
 }
@@ -161,20 +191,23 @@ func (pm *ProtocolManager) removePeer(id string) {
 	if peer != nil {
 		peer.Peer.Disconnect(p2p.DiscUselessPeer)
 	}
+
+	if pm.peers.Len() <= 0 {
+		pm.networkFeed.Send(core.NETWORK_CLOSED)
+		pm.feeded = false
+		pm.stat.progress = STAT_NET_UNVAILABLE
+	}
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
 	log.Info("ProtocolManager.Start called.")
 	// start sync procedure
-	pm.synchroniser.Start()
-	go pm.consumeNewPeer()
-	pm.maxPeers = maxPeers
-	go func() {
-		for range pm.newPeerCh {
+	pm.stat.progress = STAT_SYNCING
 
-		}
-	}()
-	go pm.consumeNewPeer()
+	pm.synchroniser.Start()
+	go pm.loop()
+	pm.maxPeers = maxPeers
+
 }
 
 func (pm *ProtocolManager) Stop() {
@@ -233,6 +266,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		p.Log().Error("TOS peer registration failed", "err", err)
 		return err
 	}
+	if !pm.feeded {
+		pm.networkFeed.Send(core.NETWORK_CONNECTED)
+		pm.feeded = true
+	}
 	defer pm.removePeer(p.id)
 
 	// main loop. handle incoming messages.
@@ -245,6 +282,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 }
 func errResp(code errCode, format string, v ...interface{}) error {
 	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
+}
+
+func (pm *ProtocolManager) GetStatus() status {
+	return pm.stat
 }
 
 func (pm *ProtocolManager) handleMsg(p *peer) error {

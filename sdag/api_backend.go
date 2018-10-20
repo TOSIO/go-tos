@@ -24,3 +24,7 @@ type SdagAPIBackend struct {
 func (b *SdagAPIBackend) ProtocolVersion() int {
 	return b.sdag.SdagVersion()
 }
+
+func (b *SdagAPIBackend) Status() string {
+	return b.sdag.Status()
+}

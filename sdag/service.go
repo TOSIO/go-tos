@@ -1,14 +1,17 @@
 package sdag
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/TOSIO/go-tos/sdag/manager"
+	"github.com/TOSIO/go-tos/sdag/miner"
 
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 
+	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/internal/tosapi"
@@ -33,6 +36,9 @@ type Sdag struct {
 	blockchain      mainchain.MainChainI
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
+	networkFeed *event.Feed
+
+	miner        *miner.Miner
 	synchroniser *synchronise.Synchroniser
 	//mempool       *manager.MemPool
 	APIBackend    *SdagAPIBackend
@@ -46,8 +52,6 @@ type Sdag struct {
 
 	eventMux       *interface{}
 	accountManager *interface{}
-
-	miner *interface{} //miner
 
 	networkID uint64
 
@@ -64,19 +68,19 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 	stateDB := state.NewDatabase(tosdb.NewMemDatabase())
 
+	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI
 	if chain, err = mainchain.New(chainDB, stateDB); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
-
-	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDB)
+	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDB, netFeed)
 	if err != nil {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
-	protocolManager.Start(100)
 
+	minerParam := miner.MinerInfo{}
 	sdag := &Sdag{
 		//初始化
 		config:          config,
@@ -86,6 +90,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		stateDb:         stateDB,
 		protocolManager: protocolManager,
 		blockchain:      chain,
+		networkFeed:     netFeed,
+		miner:           miner.New(&minerParam),
 	}
 	//sdag.mempool = manager.NewMemPool()
 
@@ -141,17 +147,31 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
 	// Start the RPC service
 	//s.mempool.Start()
+	s.protocolManager.Start(100)
+	s.miner.Start()
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 	return nil
 }
 
 func (s *Sdag) Stop() error {
 	log.Debug("Sdag.Stop() called.")
+	s.protocolManager.Stop()
+	s.miner.Stop()
 	return nil
 }
 
 func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *Sdag) NetVersion() uint64 { return s.networkID }
+
+func (s *Sdag) Status() string {
+	status := s.protocolManager.GetStatus()
+	data, err := json.Marshal(status)
+	if err != nil {
+		return ""
+	} else {
+		return string(data)
+	}
+}
 
 // CreateDB creates the chain database.
 func CreateDB(ctx *node.ServiceContext, config *Config, name string) (tosdb.Database, error) {
