@@ -103,7 +103,7 @@ type MutableInfo struct {
 }
 
 //数据解析
-func BlockUnRlp(rlpData []byte) (Block, error) {
+func BlockDecode(rlpData []byte) (Block, error) {
 	if len(rlpData) < 5 {
 		return nil, errors.New("rlpData is too short")
 	}

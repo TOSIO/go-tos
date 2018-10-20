@@ -29,17 +29,17 @@ func blockInterfaceExample(b Block) error {
 }
 
 //测试区块rlp解析
-func TestBlockUpRlp(t *testing.T) {
+func TestBlockDecode(t *testing.T) {
 	tx, _ := txBlockExample()
 
-	if uTx, err := BlockUpRlp(tx.GetRlp()); err != nil {
+	if uTx, err := BlockDecode(tx.GetRlp()); err != nil {
 		t.Errorf("tx prase error")
 	}else {
 		fmt.Println("uTx:  ", uTx)
 	}
 
 	mb, _ := minerBlockExample()
-	if uMb, err := BlockUpRlp(mb.GetRlp()); err != nil {
+	if uMb, err := BlockDecode(mb.GetRlp()); err != nil {
 		t.Errorf("mb prase error: %s" , err)
 	}else {
 		fmt.Println("uMb:  ", uMb)

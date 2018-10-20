@@ -105,7 +105,7 @@ func (s *Synchroniser) processBlockResp(packet RespPacketI) {
 
 	if response, ok := packet.(*NewBlockPacket); ok {
 		for _, item := range response.blocks {
-			if block, err := types.BlockUnRlp(item); err == nil {
+			if block, err := types.BlockDecode(item); err == nil {
 				s.mempool.AddBlock(item)
 				delete(s.blockUnfinishQueue, block.GetHash()) //已经在未完成队列中
 				log.Trace("Add block to mempool.")

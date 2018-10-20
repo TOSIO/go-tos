@@ -126,7 +126,7 @@ func deleteIsolatedBlock(block types.Block) {
 			for _, hash := range currentList {
 				linkBlock := IsolatedBlockMap[hash]
 				if len(linkBlock.Links) == 1 {
-					newBlock, err := types.BlockUnRlp(linkBlock.RLP)
+					newBlock, err := types.BlockDecode(linkBlock.RLP)
 					if err != nil {
 						linkCheckAndSave(newBlock)
 					} else {

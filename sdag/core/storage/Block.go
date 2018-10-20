@@ -19,7 +19,7 @@ func ReadBlock(db Reader, hash common.Hash) types.Block {
 		return nil
 	}
 
-	block, err := types.BlockUnRlp(data)
+	block, err := types.BlockDecode(data)
 	if err != nil {
 		log.Error("Invalid block RLP", "hash", hash, "err", err)
 	}

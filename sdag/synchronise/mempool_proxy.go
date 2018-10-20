@@ -13,7 +13,7 @@ func NewMempol() (*MemPoolProxy, error) {
 }
 
 func (m *MemPoolProxy) AddBlock(data []byte) error {
-	b, err := types.BlockUnRlp(data)
+	b, err := types.BlockDecode(data)
 	if err != nil {
 		return err
 	}
