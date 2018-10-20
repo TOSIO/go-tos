@@ -50,7 +50,12 @@ func WriteBlockRlp(db Writer, hash common.Hash, time uint64, blockRLP []byte) er
 }
 
 func WriteBlock(db Writer, block types.Block) error {
-	return WriteBlockRlp(db, block.GetHash(), block.GetTime(), block.GetRlp())
+	err := WriteBlockRlp(db, block.GetHash(), block.GetTime(), block.GetRlp())
+	if err != nil {
+		return err
+	}
+	err = WriteBlockMutableInfo(db, block.GetHash(), block.GetMutableInfo())
+	return err
 }
 
 // 根据指定的时间片获取对应的所有区块hash
@@ -133,7 +138,7 @@ func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP [
 	return nil
 }
 
-func ReadMainBlock(db Reader, slice uint64) (*types.MainBlock, error ){
+func ReadMainBlock(db Reader, slice uint64) (*types.MainBlock, error) {
 	data, err := db.Get(mainBlockKey(slice))
 	if err != nil {
 		return nil, err

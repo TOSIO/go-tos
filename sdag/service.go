@@ -57,17 +57,20 @@ type Sdag struct {
 // New creates a new Ethereum object (including the
 // initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
-	chainDb, err := CreateDB(ctx, config, "tos/db/sdagData/test")
+	chainDB, err := CreateDB(ctx, config, "tos/db/sdagData/test")
 	if err != nil {
 		return nil, err
 	}
 
+	stateDB := state.NewDatabase(tosdb.NewMemDatabase())
+
 	var chain mainchain.MainChainI
-	if chain, err = mainchain.New(); err != nil {
+	if chain, err = mainchain.New(chainDB, stateDB); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
-	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDb)
+
+	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDB)
 	if err != nil {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
@@ -79,8 +82,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		config:          config,
 		shutdownChan:    make(chan bool),
 		networkID:       config.NetworkId,
-		chainDb:         chainDb,
-		stateDb:         state.NewDatabase(tosdb.NewMemDatabase()),
+		chainDb:         chainDB,
+		stateDb:         stateDB,
 		protocolManager: protocolManager,
 		blockchain:      chain,
 	}
@@ -88,6 +91,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 	manager.SetDB(sdag.chainDb)
 	manager.SetProtocolManager(sdag.protocolManager)
+	manager.SetMainChain(chain)
 	//manager.SetMemPool(sdag.mempool)
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 

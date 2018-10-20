@@ -63,9 +63,12 @@ var GlobalTosTotal, _ = big.NewInt(0).SetString("1000000000000000000000000000", 
 //挖矿不包括签名，hash
 //**************************
 type Block interface {
-	GetRlp() []byte       //获取区块原始数据
-	GetHash() common.Hash //获取区块hash,包括签名,tx,miner block is the same
-	GetDiff() *big.Int    //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
+	GetType() BlockType    //获取区块类型
+	GetGasPrice() *big.Int //获取gas
+	GetGasLimit() uint64   //获取gas max value
+	GetRlp() []byte        //获取区块原始数据
+	GetHash() common.Hash  //获取区块hash,包括签名,tx,miner block is the same
+	GetDiff() *big.Int     //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
 
 	GetCumulativeDiff() *big.Int               //区块累积难度
 	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度

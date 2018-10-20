@@ -184,3 +184,19 @@ func (tx *TxBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 func (tx *TxBlock) SetMaxLinks(MaxLink uint8) {
 	tx.mutableInfo.MaxLink = MaxLink
 }
+
+func (tx *TxBlock) GetType() BlockType {
+	return tx.Header.Type
+}
+
+func (tx *TxBlock) GetGasPrice() *big.Int {
+	return tx.Header.GasPrice
+}
+
+func (tx *TxBlock) GetGasLimit() uint64 {
+	return tx.Header.GasLimit
+}
+
+func (tx *TxBlock) GetPayload() []byte {
+	return tx.Payload
+}

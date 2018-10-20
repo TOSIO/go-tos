@@ -173,8 +173,20 @@ func (mb *MinerBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 }
 
 // block interface
-func (tx *MinerBlock) SetMaxLinks(MaxLink uint8) {
-	tx.mutableInfo.MaxLink = MaxLink
+func (mb *MinerBlock) SetMaxLinks(MaxLink uint8) {
+	mb.mutableInfo.MaxLink = MaxLink
+}
+
+func (mb *MinerBlock) GetType() BlockType {
+	return mb.Header.Type
+}
+
+func (mb *MinerBlock) GetGasPrice() *big.Int {
+	return mb.Header.GasPrice
+}
+
+func (mb *MinerBlock) GetGasLimit() uint64 {
+	return mb.Header.GasLimit
 }
 
 

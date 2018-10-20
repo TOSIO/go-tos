@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"sync"
 	"time"
 
@@ -56,6 +57,8 @@ var (
 
 	//UnverifiedBlockList *list.List
 	statisticsObj statistics.Statistics
+
+	mainChainI mainchain.MainChainI
 )
 
 func init() {
@@ -112,6 +115,10 @@ func GetMainBlockTail() common.Hash {
 
 func SetProtocolManager(protocolManager protocolManagerI) {
 	pm = protocolManager
+}
+
+func SetMainChain(mainChain mainchain.MainChainI) {
+	mainChainI = mainChain
 }
 
 /*
@@ -291,6 +298,7 @@ func linkCheckAndSave(block types.Block) error {
 			deleteUnverifiedBlock(core.GenesisHash)
 		}
 		verifyAncestors(linkBlockIs)
+		mainChainI.ComputeCumulativeDiff(block)
 		saveBlock(block)
 		deleteIsolatedBlock(block)
 		pm.RelayBlock(block.GetRlp())
