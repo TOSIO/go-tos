@@ -2,9 +2,10 @@ package manager
 
 import (
 	"fmt"
-	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"sync"
 	"time"
+
+	"github.com/TOSIO/go-tos/sdag/mainchain"
 
 	"github.com/TOSIO/go-tos/devbase/common/container"
 	"github.com/TOSIO/go-tos/devbase/statistics"
