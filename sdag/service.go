@@ -13,9 +13,9 @@ import (
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/internal/tosapi"
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
-	"github.com/TOSIO/go-tos/sdag/core/state"
 )
 
 /*
@@ -34,7 +34,7 @@ type Sdag struct {
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
 	synchroniser *synchronise.Synchroniser
-
+	//mempool       *manager.MemPool
 	APIBackend    *SdagAPIBackend
 	netRPCService *tosapi.PublicNetAPI
 
@@ -84,10 +84,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 	}
+	//sdag.mempool = manager.NewMemPool()
 
 	manager.SetDB(sdag.chainDb)
 	manager.SetProtocolManager(sdag.protocolManager)
-
+	//manager.SetMemPool(sdag.mempool)
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	sdag.APIBackend = &SdagAPIBackend{sdag}
@@ -135,6 +136,7 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 func (s *Sdag) Start(srvr *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
 	// Start the RPC service
+	//s.mempool.Start()
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 	return nil
 }

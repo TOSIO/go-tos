@@ -134,7 +134,8 @@ func Setup(ctx *cli.Context, logdir string) error {
 	if logdir != "" {
 		rfh, err := log.RotatingFileHandler(
 			logdir,
-			262144,
+			//262144,
+			2097152,
 			log.JSONFormatOrderedEx(false, true),
 		)
 
