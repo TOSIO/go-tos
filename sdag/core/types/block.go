@@ -4,9 +4,10 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"math/big"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
-	"math/big"
 )
 
 var (
@@ -138,4 +139,16 @@ func UnMutableRlp(mutableRLP []byte) (*MutableInfo, error) {
 	}
 
 	return newMutableInfo, nil
+}
+
+func GetBlockStatus(blockStatusInfo BlockStatus) string {
+
+	if blockStatusInfo&BlockMain == BlockMain {
+		return "Main"
+	} else if blockStatusInfo&(BlockApply|BlockConfirm) == (BlockApply | BlockConfirm) {
+		return "Accepted"
+	} else if blockStatusInfo&BlockConfirm == BlockConfirm {
+		return "Rejected"
+	}
+	return "Pending"
 }

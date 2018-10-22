@@ -29,6 +29,8 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
+	"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -64,6 +66,49 @@ type TransactionInfo struct {
 	Form   accountInfo
 	To     string
 	Amount string
+}
+
+type BlockInfo struct {
+	BlockHash           common.Hash
+	Status              string
+	ConfirmItsTimeSlice string
+	Difficulty          string
+	CumulativeDiff      string
+	MaxLink             string
+}
+
+func (api *PublicSdagAPI) Apigetstatus(jsonString string) string {
+
+	jsonString = strings.Replace(jsonString, `\`, "", -1)
+	var tempblockInfo BlockInfo
+	if err := json.Unmarshal([]byte(jsonString), &tempblockInfo); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+
+	db := api.s.chainDb
+
+	reandBlockInfo, _ := storage.ReadBlockMutableInfo(db, tempblockInfo.BlockHash)
+	blockStatus := manager.GetUserBlockStatus(tempblockInfo.BlockHash)
+	jsonData, _ := json.Marshal(blockStatus)
+	tempblockInfo.Status = string(jsonData)
+	jsonData1, _ := json.Marshal(reandBlockInfo.ConfirmItsTimeSlice)
+	tempblockInfo.ConfirmItsTimeSlice = string(jsonData1)
+	jsonData2, _ := json.Marshal(reandBlockInfo.Difficulty)
+	tempblockInfo.Difficulty = string(jsonData2)
+	jsonData3, _ := json.Marshal(reandBlockInfo.CumulativeDiff)
+	tempblockInfo.CumulativeDiff = string(jsonData3)
+	jsonData4, _ := json.Marshal(reandBlockInfo.MaxLink)
+	tempblockInfo.MaxLink = string(jsonData4)
+
+	returnblockInfo := fmt.Sprintln("BlockStatus: ", tempblockInfo.Status,
+		"BlockConfirmItsTimeSlice: ", tempblockInfo.ConfirmItsTimeSlice,
+		"BlockDifficulty: ", tempblockInfo.Difficulty,
+		"BlockCumulativeDiff: ", tempblockInfo.CumulativeDiff,
+		"BlockMaxLink: ", tempblockInfo.MaxLink,
+	)
+
+	return returnblockInfo
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
