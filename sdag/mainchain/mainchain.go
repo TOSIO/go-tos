@@ -21,15 +21,8 @@ var (
 type MainChain struct {
 	db       tosdb.Database
 	stateDb  state.Database
-	Tail     TailBlock
-	pervTail TailBlock
-}
-
-type TailBlock struct {
-	Hash           common.Hash
-	CumulativeDiff *big.Int
-	Number         uint64
-	Time           uint64
+	Tail     types.TailMainBlockInfo
+	pervTail types.TailMainBlockInfo
 }
 
 func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
@@ -73,7 +66,7 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 	}
 }
 
-func (mainChain *MainChain) GetTail() *TailBlock {
+func (mainChain *MainChain) GetTail() *types.TailMainBlockInfo {
 	emptyChan <- struct{}{}
 	tail := mainChain.Tail
 	<-emptyChan
@@ -235,7 +228,7 @@ func (mainChain *MainChain) Confirm() error {
 		if err != nil {
 			return err
 		}
-		err = storage.WriteMainBlock(mainChain.db, &types.MainBlock{Hash: block.GetHash(), Root: root}, mainTimeSlice)
+		err = storage.WriteMainBlock(mainChain.db, &types.MainBlockInfo{Hash: block.GetHash(), Root: root}, mainTimeSlice)
 		if err != nil {
 			return err
 		}
