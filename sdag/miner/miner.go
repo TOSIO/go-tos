@@ -25,12 +25,12 @@ import (
 	"crypto/ecdsa"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"math/rand"
-	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/event"
 )
 
 const (
@@ -42,7 +42,7 @@ const (
 
 var (
 	ismining =  make(chan bool)
-	feed 			*event.Feed
+	feed 		*event.Feed
 	mineBlockI types.Block
 
 )
@@ -81,21 +81,20 @@ func New(minerinfo *MinerInfo,mc mainchain.MainChainI) *Miner {
 
 }
 
-//开始挖矿
+//start miner work
 func (m *Miner) Start() {
-		ismining <- true
-		work(m)
+	work(m)
+	ismining <- true
 }
 
-//挖矿
+//miner work
 func work(m *Miner) {
-	//外部事件监听
+	//listen subscribe event
 	sub  := feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
 	//get random nonce
 	nonce := m.getNonceSeed()
-	//循环计算nonce值
-	//累计循环次数
+	//Cumulative count of cycles
 	var count uint64
 	go func() {
 	loop:
@@ -134,7 +133,7 @@ func work(m *Miner) {
 			fh ,fDiff := m.mainchin.GetPervTail()
 			mineBlock.Links[0] = fh
 			mineBlock.Links = append(mineBlock.Links,manager.SelectUnverifiedBlock(3)...)
-
+			search:
 			for {
 				nonce++
 				count++
@@ -160,7 +159,7 @@ func work(m *Miner) {
 
 					//send block
 					m.sender(mineBlock)
-					break
+					break search
 				}
 			}
 
@@ -168,20 +167,20 @@ func work(m *Miner) {
 	}()
 }
 
-//停止挖矿
+//stop miner work
 func (m *Miner) Stop() {
-		ismining <- false
-		work(m)
+	work(m)
+	ismining <- false
 }
 
-//发送挖矿结果
+//send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
 	mineBlockI = mineblock
 	mineBlockI.Sign(m.mineinfo.PrivateKey)
 	manager.SyncAddBlock(mineblock)
 }
 
-//获取随机数种子
+//get random nonce
 func(m *Miner)getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
