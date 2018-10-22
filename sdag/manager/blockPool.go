@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TOSIO/go-tos/devbase/event"
+
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 
 	"github.com/TOSIO/go-tos/devbase/common/container"
@@ -37,56 +39,113 @@ type protocolManagerI interface {
 	GetBlock(hashBlock common.Hash) error
 }
 
-var (
+type BlockPool struct {
 	pm        protocolManagerI
 	db        tosdb.Database
-	emptyC    = make(chan struct{}, 1)
-	blockChan = make(chan types.Block, 8)
+	emptyC    chan struct{}
+	blockChan chan types.Block
 
-	IsolatedBlockMap = make(map[common.Hash]IsolatedBlock)
-	lackBlockMap     = make(map[common.Hash]lackBlock)
+	IsolatedBlockMap map[common.Hash]IsolatedBlock
+	lackBlockMap     map[common.Hash]lackBlock
 	rwlock           sync.RWMutex
 
-	maxQueueSize = 10000
+	maxQueueSize int
 
-	newBlockAddChan   = make(chan types.Block, 1000)
-	unverifiedAddChan = make(chan common.Hash, 1000)
-	unverifiedDelChan = make(chan common.Hash, 2000)
+	newblockFeed *event.Feed
+	blockEvent   *event.TypeMux
+
+	newBlocksSub     *event.TypeMuxSubscription
+	queryUnverifySub *event.TypeMuxSubscription
+
+	newBlockAddChan   chan types.Block
+	unverifiedAddChan chan common.Hash
+	unverifiedDelChan chan common.Hash
 	//unverifiedGetChan: make(chan unverifiedReq),
-	unverifiedBlocks = container.NewUniqueList(maxQueueSize * 3)
+	unverifiedBlocks *container.UniqueList
 	listLock         sync.RWMutex
 
 	//UnverifiedBlockList *list.List
 	statisticsObj statistics.Statistics
 
 	mainChainI mainchain.MainChainI
-)
+}
 
-func init() {
+func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.TypeMux) *BlockPool {
+	pool := &BlockPool{
+		mainChainI: mainChain,
+		db:         chainDb,
+
+		newblockFeed: &event.Feed{},
+		emptyC:       make(chan struct{}, 1),
+		blockChan:    make(chan types.Block, 8),
+
+		IsolatedBlockMap: make(map[common.Hash]IsolatedBlock),
+		lackBlockMap:     make(map[common.Hash]lackBlock),
+
+		maxQueueSize: 10000,
+
+		newBlockAddChan:   make(chan types.Block, 1000),
+		unverifiedAddChan: make(chan common.Hash, 1000),
+		unverifiedDelChan: make(chan common.Hash, 2000),
+
+		blockEvent: feed,
+		//newBlocksEvent: make(chan core.NewBlocksEvent, 8),
+		//unverifiedGetChan: make(chan unverifiedReq),
+	}
+	pool.newBlocksSub = pool.blockEvent.Subscribe(&core.NewBlocksEvent{})
+	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
+	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
+	go pool.loop()
+	return pool
+}
+
+func (p *BlockPool) SubscribeNewBlocksEvent(ev chan<- core.NewBlocksEvent) {
+	p.newblockFeed.Subscribe(ev)
+}
+
+func (p *BlockPool) loop() {
 	//UnverifiedBlockList = list.New()
 	//UnverifiedBlockList.PushFront(genesis)
-	unverifiedBlocks.Push(GetMainBlockTail())
+	p.unverifiedBlocks.Push(GetMainBlockTail())
 	go func() {
 		var n int64 = 0
 		currentTime := time.Now().UnixNano()
 		for {
 			select {
-			case block := <-blockChan:
-				go AddBlock(block)
+			case ch := <-p.newBlocksSub.Chan():
+				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
+					go func(event *core.NewBlocksEvent) {
+						for _, block := range event.Blocks {
+							p.AddBlock(block)
+							if n == 2000 {
+								log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
+								currentTime = time.Now().UnixNano()
+								n = 0
+							}
+						}
+					}(ev)
+				}
+			case ch := <-p.queryUnverifySub.Chan():
+				if ev, ok := ch.Data.(*core.GetUnverifyBlocksEvent); ok {
+					ev.Hashes = p.SelectUnverifiedBlock(4)
+					ev.Done <- struct{}{}
+				}
+			case block := <-p.blockChan:
+				go p.AddBlock(block)
 				if n == 2000 {
 					log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
 					currentTime = time.Now().UnixNano()
 					n = 0
 				}
-			case hash := <-unverifiedAddChan:
-				listLock.Lock()
-				unverifiedBlocks.Push(hash)
-				listLock.Unlock()
+			case hash := <-p.unverifiedAddChan:
+				p.listLock.Lock()
+				p.unverifiedBlocks.Push(hash)
+				p.listLock.Unlock()
 
-			case hash := <-unverifiedDelChan:
-				listLock.Lock()
-				unverifiedBlocks.Remove(hash)
-				listLock.Unlock()
+			case hash := <-p.unverifiedDelChan:
+				p.listLock.Lock()
+				p.unverifiedBlocks.Remove(hash)
+				p.listLock.Unlock()
 				/* 	case req := <-p.unverifiedGetChan:
 				i := 0
 				for itr, _ := p.unverifiedBlocks.Front(); itr != nil && i < params.MaxLinksNum; itr = itr.Next() {
@@ -104,15 +163,17 @@ func init() {
 	}()
 }
 
-func SetDB(chainDb tosdb.Database) {
-	db = chainDb
-}
-
 func GetMainBlockTail() common.Hash {
 	var hash common.Hash
 	hash = core.GenesisHash
 	return hash
 }
+
+/* func SetDB(chainDb tosdb.Database) {
+	db = chainDb
+}
+
+
 
 func SetProtocolManager(protocolManager protocolManagerI) {
 	pm = protocolManager
@@ -121,45 +182,45 @@ func SetProtocolManager(protocolManager protocolManagerI) {
 func SetMainChain(mainChain mainchain.MainChainI) {
 	mainChainI = mainChain
 }
-
+*/
 /*
 func SetMemPool(mp *MemPool) {
 	//mempool = mp
 } */
 
-func addIsolatedBlock(block types.Block, links []common.Hash) {
-	defer rwlock.Unlock()
-	rwlock.Lock()
+func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
+	defer p.rwlock.Unlock()
+	p.rwlock.Lock()
 
 	isolated := block.GetHash()
-	if _, ok := IsolatedBlockMap[isolated]; ok {
+	if _, ok := p.IsolatedBlockMap[isolated]; ok {
 		//log.Warn("the Isolated block already exists")
 		return
 	}
 
-	IsolatedBlockMap[isolated] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
+	p.IsolatedBlockMap[isolated] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
 	for _, link := range links {
-		v, ok := IsolatedBlockMap[link] //if the ancestor of the block has already existed in orphan graph
+		v, ok := p.IsolatedBlockMap[link] //if the ancestor of the block has already existed in orphan graph
 		if ok {
 			v.LinkIt = append(v.LinkIt, isolated) //update the ancestor's desendant list who is directly reference it
-			IsolatedBlockMap[link] = v
+			p.IsolatedBlockMap[link] = v
 		} else { //marker the parent
-			v, ok := lackBlockMap[link]
+			v, ok := p.lackBlockMap[link]
 			if ok {
 				v.LinkIt = append(v.LinkIt, isolated)
-				lackBlockMap[link] = v
+				p.lackBlockMap[link] = v
 			} else {
-				lackBlockMap[link] = lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
+				p.lackBlockMap[link] = lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
 			}
 		}
 	}
 
-	lackBlock, ok := lackBlockMap[isolated]
+	lackBlock, ok := p.lackBlockMap[isolated]
 	if ok {
-		v := IsolatedBlockMap[isolated]
+		v := p.IsolatedBlockMap[isolated]
 		v.LinkIt = append(v.LinkIt, lackBlock.LinkIt...)
-		IsolatedBlockMap[isolated] = v
-		delete(lackBlockMap, isolated)
+		p.IsolatedBlockMap[isolated] = v
+		delete(p.lackBlockMap, isolated)
 	}
 }
 
@@ -168,16 +229,16 @@ type verifyMarker struct {
 	verified bool
 }
 
-func deleteIsolatedBlock(block types.Block) {
-	defer rwlock.Unlock()
-	rwlock.Lock()
+func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
+	defer p.rwlock.Unlock()
+	p.rwlock.Lock()
 
 	blockHash := block.GetHash()
-	v, ok := lackBlockMap[blockHash]
+	v, ok := p.lackBlockMap[blockHash]
 	if ok {
 		log.Trace("Delete block from orphan graph", "block", blockHash.String())
 
-		delete(lackBlockMap, blockHash)
+		delete(p.lackBlockMap, blockHash)
 		//save blcok
 		currentList := v.LinkIt // descendants
 		nextLayerList := []common.Hash{}
@@ -186,12 +247,12 @@ func deleteIsolatedBlock(block types.Block) {
 
 		for len(currentList) > 0 {
 			for _, hash := range currentList { // process descendants by layer
-				isolated := IsolatedBlockMap[hash]
+				isolated := p.IsolatedBlockMap[hash]
 				// verify ancestors
 				for i, ancestor := range isolated.Links {
 					if marker, ok := ancestorCache[ancestor]; ok && marker != nil {
 						if !marker.verified {
-							verifyAncestor(marker.block)
+							p.verifyAncestor(marker.block)
 							marker.verified = true
 						}
 						isolated.Links = append(isolated.Links[:i], isolated.Links[i+1:]...)
@@ -202,8 +263,8 @@ func deleteIsolatedBlock(block types.Block) {
 					// save block
 					if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
 						ancestorCache[hash] = &verifyMarker{fullBlock, false}
-						delete(IsolatedBlockMap, hash)
-						saveBlock(fullBlock)
+						delete(p.IsolatedBlockMap, hash)
+						p.saveBlock(fullBlock)
 					} else {
 						log.Error("Unserialize(UnRLP) failed", "block", hash.String(), "err", err)
 					}
@@ -216,23 +277,31 @@ func deleteIsolatedBlock(block types.Block) {
 	}
 }
 
-func SyncAddBlock(block types.Block) error {
+func (p *BlockPool) EnQueue(block types.Block) error {
+	event := core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+	event.Blocks = append(event.Blocks, block)
+
+	p.blockEvent.Post(&event)
+	return nil
+}
+
+func (p *BlockPool) SyncAddBlock(block types.Block) error {
 	//emptyC <- struct{}{}
 	//err := AddBlock(block)
 	//<-emptyC
-	blockChan <- block
+	p.blockChan <- block
 	//time.Sleep(1)
 	return nil
 }
 
-func AddBlock(block types.Block) error {
+func (p *BlockPool) AddBlock(block types.Block) error {
 	err := block.Validation()
 	if err != nil {
 		log.Error("the block Validation fail")
 		return fmt.Errorf("the block Validation fail")
 	}
 
-	ok := storage.HasBlock(db, block.GetHash())
+	ok := storage.HasBlock(p.db, block.GetHash())
 	if ok {
 		log.Error("the block has been added")
 		return fmt.Errorf("the block has been added")
@@ -247,16 +316,16 @@ func AddBlock(block types.Block) error {
 		return fmt.Errorf("the block linksNumber =%d", linksNumber)
 	}
 
-	err = linkCheckAndSave(block)
+	err = p.linkCheckAndSave(block)
 
 	//deleteIsolatedBlock(block)
 	//go pm.RelayBlock(block.GetRlp())
 
-	statisticsObj.Statistics()
+	p.statisticsObj.Statistics()
 	return nil
 }
 
-func linkCheckAndSave(block types.Block) error {
+func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
@@ -266,7 +335,7 @@ func linkCheckAndSave(block types.Block) error {
 		if hash == core.GenesisHash {
 			haveLinkGenesis = true
 		} else {
-			linkBlockEI := storage.ReadBlock(db, hash) //the 'EI' is empty interface logogram
+			linkBlockEI := storage.ReadBlock(p.db, hash) //the 'EI' is empty interface logogram
 			if linkBlockEI != nil {
 				if linkBlockI, ok := linkBlockEI.(types.Block); ok {
 					if linkBlockI.GetTime() > block.GetTime() {
@@ -289,40 +358,47 @@ func linkCheckAndSave(block types.Block) error {
 
 	if isIsolated {
 		log.Warn(block.GetHash().String() + "is a Isolated block")
-		addIsolatedBlock(block, linksLackBlock)
-		for _, linkBlock := range linksLackBlock {
-			pm.GetBlock(linkBlock)
-		}
+		p.addIsolatedBlock(block, linksLackBlock)
+		/* for _, linkBlock := range linksLackBlock {
+			//p.pm.GetBlock(linkBlock)
+
+		} */
+		event := &core.GetBlocksEvent{Hashes: linksLackBlock}
+		p.blockEvent.Post(event)
+
 	} else {
 		//log.Trace("Verification passed")
 		if haveLinkGenesis {
-			deleteUnverifiedBlock(core.GenesisHash)
+			p.deleteUnverifiedBlock(core.GenesisHash)
 		}
-		verifyAncestors(linkBlockIs)
-		mainChainI.ComputeCumulativeDiff(block)
-		saveBlock(block)
-		deleteIsolatedBlock(block)
-		pm.RelayBlock(block.GetRlp())
+		p.verifyAncestors(linkBlockIs)
+		//p.mainChainI.ComputeCumulativeDiff(block)
+		p.saveBlock(block)
+		p.deleteIsolatedBlock(block)
+
+		event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
+		event.Blocks = append(event.Blocks, block)
+		p.blockEvent.Post(event)
 	}
 	return nil
 }
 
-func saveBlock(block types.Block) {
-	storage.WriteBlock(db, block)
-	addUnverifiedBlock(block.GetHash())
+func (p *BlockPool) saveBlock(block types.Block) {
+	storage.WriteBlock(p.db, block)
+	p.addUnverifiedBlock(block.GetHash())
 	/* hash := block.GetHash()
 	   addUnverifiedBlockList(hash) */
 }
 
-func verifyAncestor(ancestor types.Block) {
+func (p *BlockPool) verifyAncestor(ancestor types.Block) {
 	ancestor.SetStatus(ancestor.GetStatus() | types.BlockVerify)
-	storage.WriteBlockMutableInfoRlp(db, ancestor.GetHash(), types.GetMutableRlp(ancestor.GetMutableInfo()))
-	deleteUnverifiedBlock(ancestor.GetHash())
+	storage.WriteBlockMutableInfoRlp(p.db, ancestor.GetHash(), types.GetMutableRlp(ancestor.GetMutableInfo()))
+	p.deleteUnverifiedBlock(ancestor.GetHash())
 }
 
-func verifyAncestors(ancestors []types.Block) {
+func (p *BlockPool) verifyAncestors(ancestors []types.Block) {
 	for _, ancestor := range ancestors {
-		verifyAncestor(ancestor)
+		p.verifyAncestor(ancestor)
 	}
 }
 
@@ -336,28 +412,28 @@ func verifyAncestors(ancestors []types.Block) {
 	return fmt.Errorf("Not found the linkHash")
 }
 */
-func addUnverifiedBlock(hash common.Hash) {
+func (p *BlockPool) addUnverifiedBlock(hash common.Hash) {
 	select {
-	case unverifiedAddChan <- hash:
+	case p.unverifiedAddChan <- hash:
 		return
 	}
 }
 
-func deleteUnverifiedBlock(hash common.Hash) {
+func (p *BlockPool) deleteUnverifiedBlock(hash common.Hash) {
 	//p.tempSlice = append(p.tempSlice, hash)
 	select {
-	case unverifiedDelChan <- hash:
+	case p.unverifiedDelChan <- hash:
 		return
 		/* 	default:
 		log.Trace("dropping request") */
 	}
 }
 
-func SelectUnverifiedBlock(number int) []common.Hash {
+func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	i := 0
 	var links []common.Hash
-	listLock.RLock()
-	for itr, _ := unverifiedBlocks.Front(); itr != nil && i < number; itr = itr.Next() {
+	p.listLock.RLock()
+	for itr, _ := p.unverifiedBlocks.Front(); itr != nil && i < number; itr = itr.Next() {
 		if hash, ok := itr.Data().(common.Hash); ok {
 			links = append(links, hash)
 			i++
@@ -365,6 +441,6 @@ func SelectUnverifiedBlock(number int) []common.Hash {
 			log.Error("error hash.(common.Hash): ", hash)
 		}
 	}
-	listLock.RUnlock()
+	p.listLock.RUnlock()
 	return links
 }

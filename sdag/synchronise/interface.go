@@ -39,8 +39,8 @@ type BlockStorageI interface {
 	GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error)
 }
 
-type MemPoolI interface {
-	AddBlock(block []byte) error
+type BlockPoolI interface {
+	EnQueue(block []byte) error
 }
 
 type SynchroniserI interface {

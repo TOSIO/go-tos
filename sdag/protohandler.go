@@ -43,6 +43,10 @@ type ProtocolManager struct {
 
 	peers *peerSet
 
+	blockPoolEvent *event.TypeMux
+	relaySub       *event.TypeMuxSubscription
+	getSub         *event.TypeMuxSubscription
+
 	networkFeed *event.Feed
 	feeded      bool
 
@@ -79,7 +83,7 @@ type NodeInfo struct {
 // NewProtocolManager returns a new tos sub protocol manager. The tos sub protocol manages peers capable
 // with the tos network.
 func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.MainChainI,
-	db tosdb.Database, feed *event.Feed) (*ProtocolManager, error) {
+	db tosdb.Database, feed *event.Feed, poolFeed *event.TypeMux) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkID:   networkID,
@@ -87,12 +91,17 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 		newPeerCh:   make(chan *peer),
 		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
-		blockChain:  chain,
-		networkFeed: feed,
-		feeded:      false,
-		stat:        status{nodeNum: 0, progress: STAT_NONE},
-		syncResult:  make(chan error),
+
+		blockChain:     chain,
+		networkFeed:    feed,
+		blockPoolEvent: poolFeed,
+		feeded:         false,
+		stat:           status{nodeNum: 0, progress: STAT_NONE},
+		syncResult:     make(chan error),
 	}
+
+	manager.relaySub = manager.blockPoolEvent.Subscribe(&core.RelayBlocksEvent{})
+	manager.getSub = manager.blockPoolEvent.Subscribe(&core.GetBlocksEvent{})
 
 	// Initiate a sub-protocol for every implemented version we can handle
 	var err error
@@ -100,18 +109,18 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 		return nil, err
 	}
 	var storageProxy *synchronise.StorageProxy
-	var mempoolProxy *synchronise.MemPoolProxy
+	//var mempoolProxy *synchronise.MemPoolProxy
 	if storageProxy, err = synchronise.NewStorage(db); err != nil {
 		log.Error("Initialising Sdag storageproxy failed.")
 		return nil, err
 	}
-	if mempoolProxy, err = synchronise.NewMempol(); err != nil {
+	/* if mempoolProxy, err = synchronise.NewMempol(); err != nil {
 		log.Error("Initialising Sdag mempool failed.")
 		return nil, err
-	}
+	} */
 
 	if manager.synchroniser, err = synchronise.NewSynchroinser(manager.Peers(),
-		chain, storageProxy, mempoolProxy, manager.syncResult); err != nil {
+		chain, storageProxy, poolFeed, manager.syncResult); err != nil {
 		log.Error("Initialising Sdag synchroniser failed.")
 		return nil, err
 	}
@@ -123,6 +132,14 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 func (pm *ProtocolManager) loop() {
 	for {
 		select {
+		case ev := <-pm.relaySub.Chan():
+			if event, ok := ev.Data.(*core.RelayBlocksEvent); ok {
+				pm.relayBlock(event)
+			}
+		case ev := <-pm.getSub.Chan():
+			if event, ok := ev.Data.(*core.GetBlocksEvent); ok {
+				pm.getBlock(event)
+			}
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
 			log.Trace("Receive a new peer,", "peer.id", peer.NodeID)
@@ -448,15 +465,20 @@ func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
 	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
 }
 
-func (pm *ProtocolManager) RelayBlock(blockRLP []byte) error {
+func (pm *ProtocolManager) relayBlock(event *core.RelayBlocksEvent) error {
 	log.Trace("Relay block")
 	for _, p := range pm.peers.Peers() {
-		p.AsyncSendBlock(blockRLP)
+		for _, block := range event.Blocks {
+			p.AsyncSendBlock(block.GetRlp())
+		}
 	}
 	return nil
 }
 
-func (pm *ProtocolManager) GetBlock(hashBlock common.Hash) error {
+func (pm *ProtocolManager) getBlock(event *core.GetBlocksEvent) error {
 	log.Trace("Process block query")
-	return pm.synchroniser.AsyncRequestBlock(hashBlock)
+	for _, hash := range event.Hashes {
+		pm.synchroniser.AsyncRequestBlock(hash)
+	}
+	return nil
 }

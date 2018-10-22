@@ -20,10 +20,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/params"
 	"math/big"
 	"strings"
+
+	"github.com/TOSIO/go-tos/devbase/statistics"
+	"github.com/TOSIO/go-tos/params"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
@@ -107,7 +108,7 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	}
 
 	//emptyC <- struct{}{}
-	err = transaction.Transaction(&txRequestInfo)
+	err = transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
 	if err != nil {
 		return err.Error()
 	}

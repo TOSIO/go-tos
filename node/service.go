@@ -17,8 +17,9 @@
 package node
 
 import (
-	"github.com/TOSIO/go-tos/devbase/log"
 	"reflect"
+
+	"github.com/TOSIO/go-tos/devbase/log"
 
 	//"github.com/TOSIO/go-tos/rpc"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -47,7 +48,7 @@ func (ctx *ServiceContext) OpenDatabase(name string, cache int, handles int) (to
 	if err != nil {
 		return nil, err
 	}
-	log.Info("deb OpenDatabase", ctx.config.ResolvePath(name))
+	log.Info("deb OpenDatabase", "path", ctx.config.ResolvePath(name))
 	return db, nil
 }
 

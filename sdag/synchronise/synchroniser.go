@@ -5,6 +5,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TOSIO/go-tos/devbase/event"
+
+	"github.com/TOSIO/go-tos/sdag/core"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -22,7 +26,8 @@ type Synchroniser struct {
 	peers      PeerSetI
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
-	mempool    MemPoolI
+	//mempool    BlockPoolI
+	blockPoolEvent *event.TypeMux
 
 	oneSliceSyncDone chan uint64
 
@@ -45,11 +50,11 @@ type Synchroniser struct {
 
 }
 
-func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, mp MemPoolI, resultCh chan error) (*Synchroniser, error) {
+func NewSynchroinser(ps PeerSetI, mc mainchain.MainChainI, bs BlockStorageI, feed *event.TypeMux, resultCh chan error) (*Synchroniser, error) {
 	syncer := &Synchroniser{peers: ps,
-		mainChain:  mc,
-		blkstorage: bs,
-		mempool:    mp}
+		mainChain:      mc,
+		blkstorage:     bs,
+		blockPoolEvent: feed}
 	syncer.oneSliceSyncDone = make(chan uint64)
 	syncer.peerSliceCh = make(chan RespPacketI)
 	syncer.blockhashesCh = make(chan RespPacketI)
@@ -105,17 +110,20 @@ func (s *Synchroniser) processBlockResp(packet RespPacketI) {
 	s.blockQueueLock.Lock()
 	defer s.blockQueueLock.Unlock()
 
+	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
 	if response, ok := packet.(*NewBlockPacket); ok {
 		for _, item := range response.blocks {
 			if block, err := types.BlockDecode(item); err == nil {
-				s.mempool.AddBlock(item)
+				newblockEvent.Blocks = append(newblockEvent.Blocks, block)
 				delete(s.blockUnfinishQueue, block.GetHash()) //已经在未完成队列中
 				log.Trace("Add block to mempool.")
 			} else {
 				log.Trace("Error Add block to mempool", "err", err)
 			}
-
 		}
+	}
+	if len(newblockEvent.Blocks) > 0 {
+		s.blockPoolEvent.Post(newblockEvent)
 	}
 }
 
@@ -216,8 +224,15 @@ func (s *Synchroniser) syncTimeslice(p PeerI, ts uint64, errCh chan error) {
 		}
 	case response := <-s.blocksCh:
 		if blks, ok := response.(*SliceBlkDatasPacket); ok {
+			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
 			for _, blk := range blks.blocks {
-				s.mempool.AddBlock(blk)
+				//s.mempool.EnQueue(blk)
+				if block, err := types.BlockDecode(blk); err == nil {
+					newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+				}
+			}
+			if len(newblockEvent.Blocks) > 0 {
+				s.blockPoolEvent.Post(newblockEvent)
 			}
 		}
 	case <-timeout:

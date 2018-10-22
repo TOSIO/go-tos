@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/sdag/miner"
 
@@ -37,6 +38,10 @@ type Sdag struct {
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
 	networkFeed *event.Feed
+
+	blockPoolEvent *event.TypeMux
+
+	blockPool *manager.BlockPool
 
 	miner        *miner.Miner
 	synchroniser *synchronise.Synchroniser
@@ -74,12 +79,14 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
-	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDB, netFeed)
+	event := &event.TypeMux{}
+	protocolManager, err := NewProtocolManager(nil, config.NetworkId, chain, chainDB, netFeed, event)
 	if err != nil {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
 
+	pool := manager.New(chain, chainDB, event)
 	minerParam := miner.MinerInfo{}
 	sdag := &Sdag{
 		//初始化
@@ -91,14 +98,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
-		miner:           miner.New(&minerParam,chain,netFeed),
+		miner:           miner.New(pool, &minerParam, chain, netFeed),
+		blockPool:       pool,
+		blockPoolEvent:  event,
 	}
-	//sdag.mempool = manager.NewMemPool()
 
-	manager.SetDB(sdag.chainDb)
-	manager.SetProtocolManager(sdag.protocolManager)
-	manager.SetMainChain(chain)
-	//manager.SetMemPool(sdag.mempool)
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
 
 	sdag.APIBackend = &SdagAPIBackend{sdag}
@@ -162,6 +166,14 @@ func (s *Sdag) Stop() error {
 
 func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *Sdag) NetVersion() uint64 { return s.networkID }
+
+func (s *Sdag) BlockPool() core.BlockPoolI {
+	return s.blockPool
+}
+
+func (s *Sdag) BlockPoolEvent() *event.TypeMux {
+	return s.blockPoolEvent
+}
 
 func (s *Sdag) Status() string {
 	status := s.protocolManager.GetStatus()

@@ -3,14 +3,17 @@ package transaction
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/TOSIO/go-tos/params"
 	"math/big"
+
+	"github.com/TOSIO/go-tos/params"
+
+	"github.com/TOSIO/go-tos/devbase/event"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/TOSIO/go-tos/sdag/manager"
 )
 
 var (
@@ -30,7 +33,7 @@ type TransInfo struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
+func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	if txRequestInfo.From != crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) {
 		return nil, fmt.Errorf("PrivateKey err")
 	}
@@ -48,7 +51,14 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 
 	//2. links
 	for len(txBlock.Links) == 0 {
-		txBlock.Links = manager.SelectUnverifiedBlock(params.MaxLinksNum)
+		txBlock.Links = pool.SelectUnverifiedBlock(params.MaxLinksNum)
+		/* 	unverifyReq := &core.GetUnverifyBlocksEvent{Hashes: txBlock.Links, Done: make(chan struct{})}
+		event.Post(unverifyReq)
+		<-unverifyReq.Done
+		for _, hash := range unverifyReq.Hashes {
+			txBlock.Links = append(txBlock.Links, hash)
+		} */
+		//copy(txBlock.Links, unverifyReq.Hashes)
 	}
 
 	//3. accoutnonce
@@ -74,12 +84,12 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	return txBlock, nil
 }
 
-func Transaction(txRequestInfo *TransInfo) error {
-	TxBlock, err := txBlockConstruction(txRequestInfo)
+func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) error {
+	TxBlock, err := txBlockConstruction(pool, event, txRequestInfo)
 	if err != nil {
 		return err
 	}
-	err = manager.SyncAddBlock(TxBlock)
+	err = pool.EnQueue(TxBlock)
 	if err != nil {
 		return err
 	}
