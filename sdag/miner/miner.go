@@ -25,7 +25,11 @@ import (
 	"crypto/ecdsa"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"math/rand"
-	"time"
+	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/sdag/core"
+	"github.com/TOSIO/go-tos/sdag/mainchain"
+	"github.com/TOSIO/go-tos/sdag/manager"
+	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 )
 
@@ -37,12 +41,17 @@ const (
 )
 
 var (
-	ismining        chan bool
+	ismining =  make(chan bool)
+	feed 			*event.Feed
+	mineBlockI types.Block
+
 )
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
 	mineinfo *MinerInfo
+	netstatus   chan int
+	mainchin   mainchain.MainChainI
 }
 
 type MinerInfo struct {
@@ -50,21 +59,23 @@ type MinerInfo struct {
 	GasPrice   *big.Int //tls
 	GasLimit   uint64   //gas max value
 	PrivateKey *ecdsa.PrivateKey
-	event      *interface{}   //监听外部事件
+}
+
+type MainChain struct {
+	Links []common.Hash // 上一时间片主块hash
+	diff   *big.Int
 }
 
 
 
-func New(minerinfo *MinerInfo) *Miner {
+
+func New(minerinfo *MinerInfo,mc mainchain.MainChainI) *Miner {
 
 	mine := &Miner{
 		mineinfo: minerinfo,
+		netstatus:make(chan int,2),
+		mainchin:mc,
 	}
-
-	//3.links
-	//if len(mineBlock.Links) == 0 {
-	//	mineBlock.Links = manager.SelectUnverifiedBlock(mineBlock.Links)
-	//}
 	mine.Start()
  return mine
 
@@ -78,41 +89,81 @@ func (m *Miner) Start() {
 
 //挖矿
 func work(m *Miner) {
+	//外部事件监听
+	sub  := feed.Subscribe(m.netstatus)
+	defer sub.Unsubscribe()
 	//get random nonce
 	nonce := m.getNonceSeed()
 	//循环计算nonce值
+	//累计循环次数
+	var count uint64
 	go func() {
 	loop:
 		for {
 			//create mine header
-			mineBlock := new(types.MinerBlock)
-			mineBlock.Header = types.BlockHeader{
-				Type:MinerBlockType,
-				Time:(utils.GetTimeStamp()+1)-60000,
-				GasPrice:m.mineinfo.GasPrice,
-				GasLimit:m.mineinfo.GasLimit,
-			}
+
 			//calc nonce and compare diff
 			select {
+			//Subscribe  external netstatus
+			case ev , ok := <-m.netstatus:
+				if !ok{
+					return
+				}
+				switch ev {
+
+				case core.NETWORK_CONNECTED://net ok
+					ismining <- true
+				case core.NETWORK_CLOSED://net closed
+					ismining <- false
+				}
 			case mining, _ := <-ismining:
 				if !mining {
 					log.Trace("stop mine nonce", "nonce")
 					break loop
 				}
 			}
-			nonce++
-			//compare time
-			if mineBlock.GetTime() > uint64(time.Now().UnixNano()){
-				//add block
-				mineBlock.Nonce = types.EncodeNonce(nonce)
-				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
-				//send block
-				m.sender(mineBlock)
-			}
-			//compare diff value
-			if mineBlock.GetDiff().Cmp(MianchainDiff()) < 0 {
 
+			mineBlock := new(types.MinerBlock)
+			mineBlock.Header = types.BlockHeader{
+				Type:MinerBlockType,
+				Time:(utils.GetMainTime(utils.GetTimeStamp())+1)*params.TimePeriod - 1 ,
+				GasPrice:m.mineinfo.GasPrice,
+				GasLimit:m.mineinfo.GasLimit,
 			}
+
+			fh ,fDiff := m.mainchin.GetPervTail()
+			mineBlock.Links[0] = fh
+			mineBlock.Links = append(mineBlock.Links,manager.SelectUnverifiedBlock(3)...)
+
+			for {
+				nonce++
+				count++
+				//每循环1024次检测主链是否更新
+				if count ==1024{
+					if len(mineBlock.Links) == 0 {
+						mineBlock.Links = manager.SelectUnverifiedBlock(mineBlock.Links)
+					}
+					count = 0
+				}
+
+				h ,diff := m.mainchin.GetPervTail()
+				//compare diff value
+				if diff.Cmp(fDiff) >0 {
+					mineBlock.Links[0] = h
+				}
+
+				//compare time
+				if mineBlock.Header.Time > utils.GetTimeStamp(){
+					//add block
+					mineBlock.Nonce = types.EncodeNonce(nonce)
+					mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+
+					//send block
+					m.sender(mineBlock)
+					break
+				}
+			}
+
 		}
 	}()
 }
@@ -125,7 +176,9 @@ func (m *Miner) Stop() {
 
 //发送挖矿结果
 func (m *Miner) sender(mineblock *types.MinerBlock) {
-	//m.mineinfo.Sign(m.mintinfo.PrivateKey)
+	mineBlockI = mineblock
+	mineBlockI.Sign(m.mineinfo.PrivateKey)
+	manager.SyncAddBlock(mineblock)
 }
 
 //获取随机数种子
@@ -133,11 +186,7 @@ func(m *Miner)getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
 
-//main block diff value
-func MianchainDiff() *big.Int {
-	return big.NewInt(100)
-}
 
-func GetPervTail(){
-	
-}
+
+
+
