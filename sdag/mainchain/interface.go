@@ -10,5 +10,6 @@ type MainChainI interface {
 	// 返回最近一次临时主块所在的时间片
 	GetLastTempMainBlkSlice() uint64
 	GetPervTail() (common.Hash, *big.Int)
+	GetTail() *TailBlock
 	ComputeCumulativeDiff(toBeAddedBlock types.Block) error
 }

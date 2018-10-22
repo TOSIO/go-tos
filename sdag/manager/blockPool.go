@@ -353,10 +353,11 @@ func deleteUnverifiedBlock(hash common.Hash) {
 	}
 }
 
-func SelectUnverifiedBlock(links []common.Hash) []common.Hash {
+func SelectUnverifiedBlock(number int) []common.Hash {
 	i := 0
+	var links []common.Hash
 	listLock.RLock()
-	for itr, _ := unverifiedBlocks.Front(); itr != nil && i < params.MaxLinksNum; itr = itr.Next() {
+	for itr, _ := unverifiedBlocks.Front(); itr != nil && i < number; itr = itr.Next() {
 		if hash, ok := itr.Data().(common.Hash); ok {
 			links = append(links, hash)
 			i++

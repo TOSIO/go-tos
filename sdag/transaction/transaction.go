@@ -3,6 +3,7 @@ package transaction
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/TOSIO/go-tos/params"
 	"math/big"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -10,13 +11,6 @@ import (
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/manager"
-)
-
-const (
-	TxBlockType     = 1
-	MinerBlockType  = 2
-	defaultGasPrice = 100
-	defaultGasLimit = 1 << 32
 )
 
 var (
@@ -46,7 +40,7 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	txBlock := new(types.TxBlock)
 	txBlockI = txBlock
 	txBlock.Header = types.BlockHeader{
-		TxBlockType,
+		types.BlockTypeTx,
 		utils.GetTimeStamp(),
 		txRequestInfo.GasPrice,
 		txRequestInfo.GasLimit,
@@ -54,7 +48,7 @@ func txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 
 	//2. links
 	for len(txBlock.Links) == 0 {
-		txBlock.Links = manager.SelectUnverifiedBlock(txBlock.Links)
+		txBlock.Links = manager.SelectUnverifiedBlock(params.MaxLinksNum)
 	}
 
 	//3. accoutnonce

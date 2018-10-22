@@ -7,7 +7,9 @@ const (
 )
 
 const (
-	OneTos                     = 1e18      //1 tos = 1e18 tls
+	OneTos                     = 1e18 //1 tos = 1e18 tls
+	DefaultGasPrice            = 100
+	DefaultGasLimit            = 1 << 32
 	TransferTransactionGasUsed = 21000     // 21000 tls
 	MiningGasUsed              = 21000     // 21000 tls
 	InitialRewardMiner         = 50 * 1e18 //50 tos
