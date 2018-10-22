@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/statistics"
+	"github.com/TOSIO/go-tos/params"
 	"math/big"
 	"strings"
 
@@ -77,8 +78,8 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	}
 	var txRequestInfo transaction.TransInfo
 
-	txRequestInfo.GasPrice = big.NewInt(0)
-	txRequestInfo.GasLimit = 0
+	txRequestInfo.GasPrice = big.NewInt(params.DefaultGasPrice)
+	txRequestInfo.GasLimit = params.DefaultGasLimit
 
 	err := hexString2Address(transactionInfo.Form.Address, &txRequestInfo.From)
 	if err != nil {
@@ -124,8 +125,8 @@ func hexString2Address(in string, out *common.Address) error {
 		return err
 	}
 	if len(bytes) > common.AddressLength {
-		log.Error("Address too length : %s", len(bytes))
-		return fmt.Errorf("Address too length : %s", len(bytes))
+		log.Error("address too length :", "len", len(bytes))
+		return fmt.Errorf("address too length : %d", len(bytes))
 	}
 	for k, byte1 := range bytes {
 		out[k] = byte1
