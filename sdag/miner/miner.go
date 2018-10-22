@@ -141,30 +141,30 @@ func work(m *Miner) {
 	for {
 		select {
 		case mining, _ := <-ismining:
-			if mining {
-				nonce++
-				count++
-				//每循环1024次检测主链是否更新
-				if count == 1024 {
-					hash, diff := m.mainchin.GetPervTail()
-					//compare diff value
-					if diff.Cmp(fDiff) > 0 {
-						mineBlock.Links[0] = hash
-					}
-					count = 0
-					continue
+			if !mining {
+				break
+			}
+			nonce++
+			count++
+			//每循环1024次检测主链是否更新
+			if count == 1024 {
+				hash, diff := m.mainchin.GetPervTail()
+				//compare diff value
+				if diff.Cmp(fDiff) > 0 {
+					mineBlock.Links[0] = hash
 				}
+				count = 0
+				continue
+			}
 
-				//compare time
-				if mineBlock.Header.Time > utils.GetTimeStamp() {
-					//add block
-					mineBlock.Nonce = types.EncodeNonce(nonce)
-					mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+			//compare time
+			if mineBlock.Header.Time > utils.GetTimeStamp() {
+				//add block
+				mineBlock.Nonce = types.EncodeNonce(nonce)
+				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
-					//send block
-					m.sender(mineBlock)
-				}
-
+				//send block
+				m.sender(mineBlock)
 			}
 		}
 
