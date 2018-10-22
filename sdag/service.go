@@ -91,7 +91,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
-		miner:           miner.New(&minerParam,chain),
+		miner:           miner.New(&minerParam,chain,netFeed),
 	}
 	//sdag.mempool = manager.NewMemPool()
 

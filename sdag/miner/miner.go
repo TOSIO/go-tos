@@ -23,7 +23,6 @@ import (
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"math/big"
 	"crypto/ecdsa"
-	"github.com/TOSIO/go-tos/devbase/log"
 	"math/rand"
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
@@ -31,6 +30,7 @@ import (
 	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/devbase/log"
 )
 
 const (
@@ -42,7 +42,6 @@ const (
 
 var (
 	ismining =  make(chan bool)
-	feed 		*event.Feed
 	mineBlockI types.Block
 
 )
@@ -52,6 +51,7 @@ type Miner struct {
 	mineinfo *MinerInfo
 	netstatus   chan int
 	mainchin   mainchain.MainChainI
+	feed     *event.Feed
 }
 
 type MinerInfo struct {
@@ -61,115 +61,123 @@ type MinerInfo struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-type MainChain struct {
-	Links []common.Hash // 上一时间片主块hash
-	diff   *big.Int
-}
 
-
-
-
-func New(minerinfo *MinerInfo,mc mainchain.MainChainI) *Miner {
+func New(minerinfo *MinerInfo,mc mainchain.MainChainI,feed *event.Feed) *Miner {
 
 	mine := &Miner{
 		mineinfo: minerinfo,
 		netstatus:make(chan int,2),
 		mainchin:mc,
+		feed:feed,
 	}
-	mine.Start()
- return mine
+	go mine.listen()
+	ismining <- true
+ 	return mine
 
 }
 
+//listen chanel mod
+func (m *Miner)listen()  {
+	//listen subscribe event
+	sub  := m.feed.Subscribe(m.netstatus)
+	defer sub.Unsubscribe()
+
+	for {
+		select {
+		//Subscribe  external netstatus
+		case ev , ok := <-m.netstatus:
+			if !ok{
+				return
+			}
+			switch ev {
+
+			case core.NETWORK_CONNECTED://net ok
+				ismining <- true
+			case core.NETWORK_CLOSED://net closed
+				ismining <- false
+			}
+		case mining, _ := <-ismining:
+			if mining {
+			  log.Trace("start miner",mining)
+			  m.Start()
+			}else{
+				log.Trace("stop miner",mining)
+				m.Stop()
+			}
+		}
+	}
+}
+
+
 //start miner work
 func (m *Miner) Start() {
-	work(m)
+	go work(m)
 	ismining <- true
 }
 
 //miner work
 func work(m *Miner) {
-	//listen subscribe event
-	sub  := feed.Subscribe(m.netstatus)
-	defer sub.Unsubscribe()
+
 	//get random nonce
 	nonce := m.getNonceSeed()
+
 	//Cumulative count of cycles
 	var count uint64
-	go func() {
-	loop:
-		for {
-			//create mine header
 
-			//calc nonce and compare diff
-			select {
-			//Subscribe  external netstatus
-			case ev , ok := <-m.netstatus:
-				if !ok{
-					return
-				}
-				switch ev {
-
-				case core.NETWORK_CONNECTED://net ok
-					ismining <- true
-				case core.NETWORK_CLOSED://net closed
-					ismining <- false
-				}
-			case mining, _ := <-ismining:
-				if !mining {
-					log.Trace("stop mine nonce", "nonce")
-					break loop
-				}
-			}
-
-			mineBlock := new(types.MinerBlock)
-			mineBlock.Header = types.BlockHeader{
-				Type:MinerBlockType,
-				Time:(utils.GetMainTime(utils.GetTimeStamp())+1)*params.TimePeriod - 1 ,
-				GasPrice:m.mineinfo.GasPrice,
-				GasLimit:m.mineinfo.GasLimit,
-			}
-
-			fh ,fDiff := m.mainchin.GetPervTail()
-			mineBlock.Links[0] = fh
-			mineBlock.Links = append(mineBlock.Links,manager.SelectUnverifiedBlock(3)...)
-			search:
+	//creat heander
+	mineBlock := new(types.MinerBlock)
+	mineBlock.Header = types.BlockHeader{
+		Type:MinerBlockType,
+		Time:(utils.GetMainTime(utils.GetTimeStamp())+1)*params.TimePeriod - 1 ,
+		GasPrice:m.mineinfo.GasPrice,
+		GasLimit:m.mineinfo.GasLimit,
+	}
+	//first get prevtail hash  and diff
+	fhash ,fDiff := m.mainchin.GetPervTail()
+	//set PervTailhash  to be best diff
+	mineBlock.Links[0] = fhash
+	//select params.MaxLinksNum-1 unverifiedblock to links
+	mineBlock.Links =manager.SelectUnverifiedBlock(params.MaxLinksNum-1)
+	// search nonce
 			for {
-				nonce++
-				count++
-				//每循环1024次检测主链是否更新
-				if count ==1024{
-					if len(mineBlock.Links) == 0 {
-						mineBlock.Links = manager.SelectUnverifiedBlock(3)
+				select {
+				case mining, _ := <-ismining:
+					if mining {
+						nonce++
+						count++
+						//每循环1024次检测主链是否更新
+						if count ==1024{
+							hash ,diff := m.mainchin.GetPervTail()
+							//compare diff value
+							if diff.Cmp(fDiff) >0 {
+								mineBlock.Links[0] = hash
+							}
+							count =0
+							continue
+						}
+
+						//compare time
+						if mineBlock.Header.Time > utils.GetTimeStamp(){
+							//add block
+							mineBlock.Nonce = types.EncodeNonce(nonce)
+							mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+
+							//send block
+							m.sender(mineBlock)
+						}
+
 					}
-					count = 0
 				}
 
-				h ,diff := m.mainchin.GetPervTail()
-				//compare diff value
-				if diff.Cmp(fDiff) >0 {
-					mineBlock.Links[0] = h
-				}
-
-				//compare time
-				if mineBlock.Header.Time > utils.GetTimeStamp(){
-					//add block
-					mineBlock.Nonce = types.EncodeNonce(nonce)
-					mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
-
-					//send block
-					m.sender(mineBlock)
-					break search
-				}
 			}
 
-		}
-	}()
+
+
 }
 
 //stop miner work
 func (m *Miner) Stop() {
-	work(m)
+	go work(m)
 	ismining <- false
 }
 
