@@ -141,7 +141,7 @@ func work(m *Miner) {
 				//每循环1024次检测主链是否更新
 				if count ==1024{
 					if len(mineBlock.Links) == 0 {
-						mineBlock.Links = manager.SelectUnverifiedBlock(mineBlock.Links)
+						mineBlock.Links = manager.SelectUnverifiedBlock(3)
 					}
 					count = 0
 				}
