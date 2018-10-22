@@ -446,9 +446,9 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	return links
 }
 
-func GetUserBlockStatus(hash common.Hash) string {
+func (p *BlockPool) GetUserBlockStatus(hash common.Hash) string {
 
-	mutableInfo, err := storage.ReadBlockMutableInfo(db, hash)
+	mutableInfo, err := storage.ReadBlockMutableInfo(p.db, hash)
 
 	if err != nil {
 		log.Error("Read block stauts fail")
@@ -462,13 +462,13 @@ func GetUserBlockStatus(hash common.Hash) string {
 	return blockStatus
 }
 
-func GetBlockInfo(hash common.Hash) string {
+func (p *BlockPool) GetBlockInfo(hash common.Hash) string {
 
 	//commonHash := common.HexToHash(string(hash))
 
-	mutableInfo, _ := storage.ReadBlockMutableInfo(db, hash)
+	mutableInfo, _ := storage.ReadBlockMutableInfo(p.db, hash)
 
-	trmpBlockStatus := GetUserBlockStatus(hash)
+	trmpBlockStatus := p.GetUserBlockStatus(hash)
 	tempTimeSlice := mutableInfo.ConfirmItsTimeSlice
 	tempDifficulty := mutableInfo.Difficulty
 	tempCumulativeDifficulty := mutableInfo.CumulativeDiff

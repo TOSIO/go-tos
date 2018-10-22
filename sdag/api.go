@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"math/big"
 	"strings"
 
@@ -29,8 +30,8 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
-	"github.com/TOSIO/go-tos/sdag/core/storage"
-	"github.com/TOSIO/go-tos/sdag/manager"
+	//"github.com/TOSIO/go-tos/sdag/core/storage"
+	//"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -89,7 +90,8 @@ func (api *PublicSdagAPI) Apigetstatus(jsonString string) string {
 	db := api.s.chainDb
 
 	reandBlockInfo, _ := storage.ReadBlockMutableInfo(db, tempblockInfo.BlockHash)
-	blockStatus := manager.GetUserBlockStatus(tempblockInfo.BlockHash)
+	//var reandBlockInfo *types.MutableInfo
+	blockStatus := api.s.BlockPool().GetUserBlockStatus(tempblockInfo.BlockHash)
 	jsonData, _ := json.Marshal(blockStatus)
 	tempblockInfo.Status = string(jsonData)
 	jsonData1, _ := json.Marshal(reandBlockInfo.ConfirmItsTimeSlice)

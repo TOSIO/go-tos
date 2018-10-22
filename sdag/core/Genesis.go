@@ -16,7 +16,7 @@ import (
 	"math/big"
 )
 
-func New(mainChainI mainchain.MainChainI, db tosdb.Database, stateDb state.Database, InitialFilePath string) {
+func NewGenesis(mainChainI mainchain.MainChainI, db tosdb.Database, stateDb state.Database, InitialFilePath string) *Genesis {
 	var genesis Genesis
 	genesis.mainChainI = mainChainI
 	genesis.db = db
@@ -26,6 +26,7 @@ func New(mainChainI mainchain.MainChainI, db tosdb.Database, stateDb state.Datab
 	} else {
 		genesis.InitialFilePath = InitialFilePath
 	}
+	return &genesis
 }
 
 type InitialAccount struct {
