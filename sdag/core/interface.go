@@ -8,4 +8,6 @@ import (
 type BlockPoolI interface {
 	SelectUnverifiedBlock(num int) []common.Hash
 	EnQueue(block types.Block) error
+	GetUserBlockStatus(hash common.Hash) string
+	GetBlockInfo(hash common.Hash) string
 }

@@ -1,17 +1,25 @@
 package types
 
 import (
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
-	"fmt"
+	"math/big"
 )
 
-type MainBlock struct {
-	Hash common.Hash  //block hash
+type MainBlockInfo struct {
+	Hash common.Hash //block hash
 	Root common.Hash //status root
 }
 
-func (mb *MainBlock)Rlp() []byte {
+type TailMainBlockInfo struct {
+	Hash           common.Hash
+	CumulativeDiff *big.Int
+	Number         uint64
+	Time           uint64
+}
+
+func (mb *MainBlockInfo) Rlp() []byte {
 	rlpByte, err := rlp.EncodeToBytes(mb)
 	if err != nil {
 		fmt.Println("err: ", err)
@@ -19,7 +27,7 @@ func (mb *MainBlock)Rlp() []byte {
 	return rlpByte
 }
 
-func (mb *MainBlock)UnRlp(rlpByte []byte) (*MainBlock , error) {
+func (mb *MainBlockInfo) UnRlp(rlpByte []byte) (*MainBlockInfo, error) {
 	if err := rlp.DecodeBytes(rlpByte, mb); err != nil {
 		return nil, err
 	}

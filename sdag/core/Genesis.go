@@ -1,30 +1,49 @@
 package core
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
+	"io/ioutil"
 	"math/big"
 )
 
-func New(mainChainI mainchain.MainChainI) {
+func NewGenesis(mainChainI mainchain.MainChainI, db tosdb.Database, stateDb state.Database, InitialFilePath string) *Genesis {
 	var genesis Genesis
 	genesis.mainChainI = mainChainI
+	genesis.db = db
+	genesis.stateDb = stateDb
+	if len(InitialFilePath) == 0 {
+		genesis.InitialFilePath = "./Genesis.json"
+	} else {
+		genesis.InitialFilePath = InitialFilePath
+	}
+	return &genesis
 }
 
 type InitialAccount struct {
-	address common.Address
-	amount  *big.Int //tls
+	Address string
+	Amount  string //tls
 }
 
 type InitialGenesisBlockInfo struct {
-	Time           uint64
-	initialAccount []InitialAccount
+	Time            uint64
+	InitialAccounts []InitialAccount
 }
 
 type Genesis struct {
-	mainChainI mainchain.MainChainI
+	db              tosdb.Database
+	stateDb         state.Database
+	mainChainI      mainchain.MainChainI
+	InitialFilePath string
 	InitialGenesisBlockInfo
 }
 
@@ -39,8 +58,17 @@ func init() {
 	})
 }
 
-func (genesis *Genesis) ReadGenesisConfiguration() *InitialGenesisBlockInfo {
-	return &InitialGenesisBlockInfo{}
+func (genesis *Genesis) ReadGenesisConfiguration() error {
+	jsonString, err := ioutil.ReadFile(genesis.InitialFilePath)
+	if err != nil {
+		return fmt.Errorf("open file fail fileName %s", genesis.InitialFilePath)
+	}
+
+	if err := json.Unmarshal([]byte(jsonString), &genesis.InitialGenesisBlockInfo); err != nil {
+		return fmt.Errorf("JSON unmarshaling failed: %s", err)
+	}
+
+	return nil
 }
 
 func (genesis *Genesis) Genesis() {
@@ -49,16 +77,57 @@ func (genesis *Genesis) Genesis() {
 		return
 	}
 
-	initialInfo := genesis.ReadGenesisConfiguration()
+	err := genesis.ReadGenesisConfiguration()
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
 
-	//1. set header
 	minerBlock := new(types.MinerBlock)
 	minerBlock.Header = types.BlockHeader{
 		types.BlockTypeMiner,
-		initialInfo.Time,
+		genesis.Time,
 		common.Big0,
 		params.DefaultGasLimit,
 	}
 
-	//minerBlock.Miner
+	info := minerBlock.GetMutableInfo()
+	info.Difficulty = minerBlock.GetDiff()
+	info.CumulativeDiff = minerBlock.GetCumulativeDiff()
+	info.ConfirmItsTimeSlice = utils.GetMainTime(genesis.Time)
+	info.Status = types.BlockMain
+	storage.WriteBlock(genesis.db, minerBlock)
+
+	state, err := state.New(common.Hash{}, genesis.stateDb)
+	if err != nil {
+		log.Error("state.New fail [%s]", err.Error())
+		return
+	}
+	for _, initialAccount := range genesis.InitialAccounts {
+		amount := new(big.Int)
+		if _, ok := amount.SetString(initialAccount.Amount, 10); !ok {
+			log.Error("parse amount  err", "Address", initialAccount.Address, "Amount", initialAccount.Amount)
+			continue
+		}
+		state.AddBalance(common.HexToAddress(initialAccount.Address), amount)
+	}
+
+	root, err := state.Commit(false)
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	err = state.Database().TrieDB().Commit(root, true)
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+
+	var mainBlock types.MainBlockInfo
+	mainBlock.Hash = minerBlock.GetHash()
+	mainBlock.Root = root
+	err = storage.WriteMainBlock(genesis.db, &mainBlock, info.ConfirmItsTimeSlice)
+	if err != nil {
+		log.Error(err.Error())
+	}
 }
