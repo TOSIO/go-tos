@@ -7,6 +7,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
@@ -23,6 +24,7 @@ type MainChain struct {
 	stateDb  state.Database
 	Tail     types.TailMainBlockInfo
 	pervTail types.TailMainBlockInfo
+	MianTail types.TailMainBlockInfo
 }
 
 func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
@@ -32,10 +34,80 @@ func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
 	return tail.Hash, tail.CumulativeDiff
 }
 
-func New(chainDb tosdb.Database, Db state.Database) (*MainChain, error) {
+func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
+	emptyChan <- struct{}{}
+	tail := mainChain.MianTail
+	<-emptyChan
+	return &tail
+}
+
+func (mainChain *MainChain) setPerv() error {
+	hash := mainChain.Tail.Hash
+	notSelf := false
+	Number := mainChain.Tail.Number
+	for {
+		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
+		if err != nil {
+			return err
+		}
+		block := storage.ReadBlock(mainChain.db, mainChain.Tail.Hash)
+		if block == nil {
+			return fmt.Errorf("ReadBlock err")
+		}
+
+		if notSelf && ((mutableInfo.Status & types.BlockTmpMaxDiff) != 0) {
+			Number--
+			if mainChain.pervTail.Hash != (common.Hash{}) {
+				mainChain.pervTail.Hash = hash
+				mainChain.pervTail.Time = block.GetTime()
+				mainChain.pervTail.Number = Number
+				mainChain.pervTail.CumulativeDiff = block.GetCumulativeDiff()
+			}
+		}
+
+		if (mutableInfo.Status & types.BlockMain) != 0 {
+			Number--
+			mainChain.MianTail.Hash = hash
+			mainChain.MianTail.Time = block.GetTime()
+			mainChain.MianTail.Number = Number
+			mainChain.MianTail.CumulativeDiff = block.GetCumulativeDiff()
+			break
+		}
+
+		hash = block.GetLinks()[mutableInfo.MaxLink]
+		notSelf = true
+	}
+	return nil
+}
+
+func (mainChain *MainChain) initTail() error {
+	tailMainBlockInfo, err := storage.ReadTailMainBlockInfo(mainChain.db)
+	if err != nil {
+		log.Info("generate genesis")
+		genesis := core.NewGenesis(mainChain.db, mainChain.stateDb, "")
+		tail, err := genesis.Genesis()
+		if err != nil {
+			return err
+		}
+		mainChain.Tail = *tail
+		mainChain.pervTail = *tail
+		return nil
+	}
+	mainChain.Tail = *tailMainBlockInfo
+	err = mainChain.setPerv()
+	return err
+}
+
+func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
 	var mainChain MainChain
 	mainChain.db = chainDb
-	mainChain.stateDb = Db
+	mainChain.stateDb = stateDb
+
+	err := mainChain.initTail()
+	if err != nil {
+		return nil, err
+	}
+
 	go func() {
 		currentTime := time.Now().Unix()
 		lastTime := currentTime
@@ -172,7 +244,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 				}
 				if (mutableInfo.Status & types.BlockTmpMaxDiff) != 0 {
 					block.SetMutableInfo(mutableInfo)
-					listBlock = append(listBlock, block)
+					listBlock = append([]types.Block{block}, listBlock...)
 					currentTimeSliceAdded = true
 					number--
 				}
@@ -231,6 +303,12 @@ func (mainChain *MainChain) Confirm() error {
 		err = storage.WriteMainBlock(mainChain.db, &types.MainBlockInfo{Hash: block.GetHash(), Root: root}, mainTimeSlice)
 		if err != nil {
 			return err
+		}
+		if block == listMainBlock[len(listMainBlock)-1] {
+			mainChain.MianTail.Hash = block.GetHash()
+			mainChain.MianTail.Time = block.GetTime()
+			mainChain.MianTail.Number = blockNumber
+			mainChain.MianTail.CumulativeDiff = block.GetCumulativeDiff()
 		}
 		blockNumber++
 	}

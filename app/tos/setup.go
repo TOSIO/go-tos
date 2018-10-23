@@ -69,7 +69,7 @@ func activePPROF(ctx *cli.Context) error {
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		logdir = (&node.Config{DataDir: utils.MakeDataDir(ctx)}).ResolvePath("logs")
 	}
-	fmt.Printf("Log dir is %s", logdir)
+	fmt.Printf("Log dir is %s\n", logdir)
 	if err := debug.Setup(ctx, logdir); err != nil {
 		return err
 	}

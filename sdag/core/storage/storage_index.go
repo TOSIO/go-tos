@@ -40,3 +40,7 @@ func blockInfoKey(hash common.Hash) []byte {
 func mainBlockKey(slice uint64) []byte {
 	return append([]byte("M"), hexutil.EncodeUnit64ToByte(slice)...)
 }
+
+func tailMainBlockInfoKey() []byte {
+	return []byte("MainChainInfo")
+}

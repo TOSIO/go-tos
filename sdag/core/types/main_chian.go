@@ -34,3 +34,19 @@ func (mb *MainBlockInfo) UnRlp(rlpByte []byte) (*MainBlockInfo, error) {
 
 	return mb, nil
 }
+
+func (tm *TailMainBlockInfo) Rlp() []byte {
+	rlpByte, err := rlp.EncodeToBytes(tm)
+	if err != nil {
+		fmt.Println("err: ", err)
+	}
+	return rlpByte
+}
+
+func (tm *TailMainBlockInfo) UnRlp(rlpByte []byte) (*TailMainBlockInfo, error) {
+	if err := rlp.DecodeBytes(rlpByte, tm); err != nil {
+		return nil, err
+	}
+
+	return tm, nil
+}

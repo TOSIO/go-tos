@@ -52,9 +52,6 @@ type Sdag struct {
 	// DB interfaces
 	chainDb tosdb.Database // Block chain database
 
-	//genesis
-	genesis *core.Genesis
-
 	//statedb
 	stateDb state.Database //mpt trie
 
@@ -105,7 +102,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		miner:           miner.New(pool, &minerParam, chain, netFeed),
 		blockPool:       pool,
 		blockPoolEvent:  event,
-		genesis:         core.NewGenesis(chain, chainDB, stateDB, ""),
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
