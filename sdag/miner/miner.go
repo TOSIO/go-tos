@@ -23,7 +23,6 @@ import (
 	"math/rand"
 
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -31,6 +30,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
+	"github.com/TOSIO/go-tos/devbase/crypto"
 )
 
 const (
@@ -70,8 +70,9 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		mainchin:  mc,
 		feed:      feed,
 	}
-	go mine.listen()
-	ismining <- true
+
+	//go mine.listen()
+	//ismining <- true
 	return mine
 
 }
@@ -134,9 +135,9 @@ func work(m *Miner) {
 	//first get prevtail hash  and diff
 	fhash, fDiff := m.mainchin.GetPervTail()
 	//set PervTailhash  to be best diff
-	mineBlock.Links[0] = fhash
+	mineBlock.Links=append(mineBlock.Links,fhash)
 	//select params.MaxLinksNum-1 unverifiedblock to links
-	mineBlock.Links = m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum - 1)
+	mineBlock.Links=append(mineBlock.Links,m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum - 1)...)
 	// search nonce
 	for {
 		select {
@@ -161,6 +162,7 @@ func work(m *Miner) {
 			if mineBlock.Header.Time > utils.GetTimeStamp() {
 				//add block
 				mineBlock.Nonce = types.EncodeNonce(nonce)
+
 				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
 				//send block
