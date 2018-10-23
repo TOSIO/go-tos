@@ -30,7 +30,7 @@ func txBlockExample() (*TxBlock, error){
 	//1. set header
 	tx := new(TxBlock)
 	tx.Header = BlockHeader{
-		BlockTypeTx,
+		1,
 		utils.GetTimeStamp(),
 		big.NewInt(10),
 		1222,
@@ -59,7 +59,8 @@ func txBlockExample() (*TxBlock, error){
 	}
 
 	//5. vm code
-	tx.Payload = []byte{0x0, 0x3b}
+	tx.Payload = []byte{0x0, 0x3b,0x0,
+	}
 
 	//6. sign
 	privateKey, err := crypto.GenerateKey()

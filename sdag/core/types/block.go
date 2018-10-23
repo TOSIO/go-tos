@@ -111,19 +111,10 @@ type MutableInfo struct {
 func BlockDecode(rlpData []byte) (Block, error) {
 
 	var ty BlockType
-	isList, lenNum := RLPList(rlpData[0])
-	if isList {
-		if lenNum+1 > len(rlpData) {
-			return nil, errors.New("rlpData is err")
-		}
 
-		isList1, lenNum1 := RLPList(rlpData[lenNum+1])
-		if isList1 {
-			if lenNum+1+lenNum1+1 > len(rlpData) {
-				return nil, errors.New("rlpData is err")
-			}
-
-			ty = BlockType(rlpData[lenNum+1+lenNum1+1])
+	if isList, lenNum := RLPList(rlpData[0]); isList && lenNum  < len(rlpData) {
+		if isList, lenNum1 := RLPList(rlpData[lenNum + 1]); isList && lenNum + 1 + lenNum1 < len(rlpData) {
+			ty = BlockType(rlpData[lenNum + 1 + lenNum1 + 1])
 		} else {
 			return nil, errors.New("rlpData is err")
 		}
