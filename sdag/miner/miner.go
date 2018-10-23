@@ -31,6 +31,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"fmt"
 )
 
 const (
@@ -62,7 +63,16 @@ type MinerInfo struct {
 }
 
 func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, feed *event.Feed) *Miner {
-
+	//init start
+	minerinfo.GasLimit = 2000
+	minerinfo.GasPrice = big.NewInt(20)
+	PrivateKey ,err  := crypto.GenerateKey()
+	if err!=nil{
+		fmt.Errorf("PrivateKey err")
+		return nil
+	}
+	minerinfo.PrivateKey = PrivateKey
+	//init end
 	mine := &Miner{
 		blockPool: pool,
 		mineinfo:  minerinfo,
@@ -71,8 +81,9 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		feed:      feed,
 	}
 
-	//go mine.listen()
-	//ismining <- true
+
+	go mine.listen()
+	ismining <- true
 	return mine
 
 }
