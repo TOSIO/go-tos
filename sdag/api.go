@@ -68,8 +68,12 @@ type TransactionInfo struct {
 	Amount string
 }
 
-type BlockInfo struct {
+type BlockHash struct {
 	BlockHash           common.Hash
+}
+
+type BlockInfo struct {
+	//BlockHash           common.Hash
 	Status              string
 	ConfirmItsTimeSlice string
 	Difficulty          string
@@ -80,32 +84,32 @@ type BlockInfo struct {
 func (api *PublicSdagAPI) Apigetstatus(jsonString string) string {
 
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
-	var tempblockInfo BlockInfo
+	var tempblockInfo BlockHash
 	if err := json.Unmarshal([]byte(jsonString), &tempblockInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
 		return err.Error()
 	}
 
 	db := api.s.chainDb
-
+	var BlockInfo BlockInfo
 	reandBlockInfo, _ := storage.ReadBlockMutableInfo(db, tempblockInfo.BlockHash)
 	blockStatus := manager.GetUserBlockStatus(tempblockInfo.BlockHash)
 	jsonData, _ := json.Marshal(blockStatus)
-	tempblockInfo.Status = string(jsonData)
+	BlockInfo.Status = string(jsonData)
 	jsonData1, _ := json.Marshal(reandBlockInfo.ConfirmItsTimeSlice)
-	tempblockInfo.ConfirmItsTimeSlice = string(jsonData1)
+	BlockInfo.ConfirmItsTimeSlice = string(jsonData1)
 	jsonData2, _ := json.Marshal(reandBlockInfo.Difficulty)
-	tempblockInfo.Difficulty = string(jsonData2)
+	BlockInfo.Difficulty = string(jsonData2)
 	jsonData3, _ := json.Marshal(reandBlockInfo.CumulativeDiff)
-	tempblockInfo.CumulativeDiff = string(jsonData3)
+	BlockInfo.CumulativeDiff = string(jsonData3)
 	jsonData4, _ := json.Marshal(reandBlockInfo.MaxLink)
-	tempblockInfo.MaxLink = string(jsonData4)
+	BlockInfo.MaxLink = string(jsonData4)
 
-	returnblockInfo := fmt.Sprintln("BlockStatus: ", tempblockInfo.Status,
-		"BlockConfirmItsTimeSlice: ", tempblockInfo.ConfirmItsTimeSlice,
-		"BlockDifficulty: ", tempblockInfo.Difficulty,
-		"BlockCumulativeDiff: ", tempblockInfo.CumulativeDiff,
-		"BlockMaxLink: ", tempblockInfo.MaxLink,
+	returnblockInfo := fmt.Sprintln("BlockStatus: ", BlockInfo.Status,
+		"BlockConfirmItsTimeSlice: ", BlockInfo.ConfirmItsTimeSlice,
+		"BlockDifficulty: ", BlockInfo.Difficulty,
+		"BlockCumulativeDiff: ", BlockInfo.CumulativeDiff,
+		"BlockMaxLink: ", BlockInfo.MaxLink,
 	)
 
 	return returnblockInfo
