@@ -82,7 +82,7 @@ type BlockInfo struct {
 	MaxLink             string
 }
 
-func (api *PublicSdagAPI) ApiGetStatus(jsonString string) string {
+func (api *PublicSdagAPI) ApiGetBlockInfo(jsonString string) string {
 
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var tempblockInfo BlockHash
