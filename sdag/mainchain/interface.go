@@ -12,4 +12,5 @@ type MainChainI interface {
 	GetPervTail() (common.Hash, *big.Int)
 	GetTail() *types.TailMainBlockInfo
 	ComputeCumulativeDiff(toBeAddedBlock types.Block) error
+	GetMainTail() *types.TailMainBlockInfo
 }
