@@ -172,9 +172,10 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) er
 			if block == nil {
 				return fmt.Errorf("ReadBlock Not found")
 			}
+			block.SetMutableInfo(mutableInfo)
 
 			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				SingleChainCumulativeDiff = SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
+				SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
 				linksIsUpdateDiff[i] = true
 				break
 			}

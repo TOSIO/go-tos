@@ -51,8 +51,9 @@ const (
 type BlockType uint
 
 const (
-	BlockTypeTx    BlockType = 1
-	BlockTypeMiner BlockType = 2
+	BlockTypeTx      BlockType = 1
+	BlockTypeMiner   BlockType = 2
+	BlockTypeGenesis BlockType = 3
 )
 
 const (
@@ -112,17 +113,17 @@ func BlockDecode(rlpData []byte) (Block, error) {
 	var ty BlockType
 	isList, lenNum := RLPList(rlpData[0])
 	if isList {
-		if lenNum + 1 > len(rlpData) {
+		if lenNum+1 > len(rlpData) {
 			return nil, errors.New("rlpData is err")
 		}
 
-		isList1, lenNum1 := RLPList(rlpData[lenNum + 1])
+		isList1, lenNum1 := RLPList(rlpData[lenNum+1])
 		if isList1 {
-			if lenNum + 1 + lenNum1 + 1 > len(rlpData) {
+			if lenNum+1+lenNum1+1 > len(rlpData) {
 				return nil, errors.New("rlpData is err")
 			}
 
-			ty = BlockType(rlpData[lenNum + 1 + lenNum1 + 1])
+			ty = BlockType(rlpData[lenNum+1+lenNum1+1])
 		} else {
 			return nil, errors.New("rlpData is err")
 		}
@@ -134,22 +135,23 @@ func BlockDecode(rlpData []byte) (Block, error) {
 		return new(TxBlock).UnRlp(rlpData)
 	} else if ty == BlockTypeMiner {
 		return new(MinerBlock).UnRlp(rlpData)
+	} else if ty == BlockTypeGenesis {
+		return new(GenesisBlock).UnRlp(rlpData)
 	}
 
 	return nil, errors.New("block upRlp error")
 }
 
-func RLPList(b byte) (bool, int){
+func RLPList(b byte) (bool, int) {
 	if b < 0xF8 && b > 0xC0 {
 		return true, 0
-	} else if b >= 0xF8{
+	} else if b >= 0xF8 {
 		len := int(b) - 0xF7
 		return true, len
 	} else {
 		return false, 0
 	}
 }
-
 
 func GetMutableRlp(mutableInfo *MutableInfo) []byte {
 	enc, err := rlp.EncodeToBytes(mutableInfo)

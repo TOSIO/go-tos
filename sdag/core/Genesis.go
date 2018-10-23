@@ -64,20 +64,13 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 		return nil, err
 	}
 
-	genesisBlock := new(types.MinerBlock)
+	genesisBlock := new(types.GenesisBlock)
 	genesisBlock.Header = types.BlockHeader{
-		types.BlockTypeMiner,
+		types.BlockTypeGenesis,
 		genesis.Time,
 		common.Big0,
 		params.DefaultGasLimit,
 	}
-
-	info := genesisBlock.GetMutableInfo()
-	info.Difficulty = genesisBlock.GetDiff()
-	info.CumulativeDiff = genesisBlock.GetDiff()
-	info.ConfirmItsTimeSlice = utils.GetMainTime(genesis.Time)
-	info.Status = types.BlockMain
-	storage.WriteBlock(genesis.db, genesisBlock)
 
 	state, err := state.New(common.Hash{}, genesis.stateDb)
 	if err != nil {
@@ -103,6 +96,17 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 		log.Error(err.Error())
 		return nil, err
 	}
+
+	genesisBlock.RootHash = root
+
+	info := genesisBlock.GetMutableInfo()
+	info.Difficulty = genesisBlock.GetDiff()
+	info.CumulativeDiff = genesisBlock.GetDiff()
+	info.ConfirmItsTimeSlice = utils.GetMainTime(genesis.Time)
+	info.Status = types.BlockMain
+	genesisBlock.SetMutableInfo(info)
+
+	storage.WriteBlock(genesis.db, genesisBlock)
 
 	var mainBlock types.MainBlockInfo
 	mainBlock.Hash = genesisBlock.GetHash()

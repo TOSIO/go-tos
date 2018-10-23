@@ -333,6 +333,12 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 					log.Error("links time error")
 					return fmt.Errorf("links time error")
 				} else {
+					info, err := storage.ReadBlockMutableInfo(p.db, hash)
+					if err != nil {
+						log.Error("ReadBlockMutableInfo error")
+						return fmt.Errorf("ReadBlockMutableInfo error")
+					}
+					linkBlockI.SetMutableInfo(info)
 					linkBlockIs = append(linkBlockIs, linkBlockI)
 					//log.Trace("links time legal")
 				}
