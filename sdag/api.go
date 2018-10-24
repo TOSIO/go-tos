@@ -20,7 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"math/big"
 	"strings"
 
@@ -33,6 +32,8 @@ import (
 	//"github.com/TOSIO/go-tos/sdag/core/storage"
 	//"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/sdag/transaction"
+	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/sdag/manager"
 )
 
 var (
@@ -69,20 +70,16 @@ type TransactionInfo struct {
 	Amount string
 }
 
+type MainBlockInfo struct {
+	Slice uint64
+}
+
 type BlockHash struct {
-	BlockHash           common.Hash
+	BlockHash common.Hash
 }
 
-type BlockInfo struct {
-	//BlockHash           common.Hash
-	Status              string
-	ConfirmItsTimeSlice string
-	Difficulty          string
-	CumulativeDiff      string
-	MaxLink             string
-}
 
-func (api *PublicSdagAPI) ApiGetBlockInfo(jsonString string) string {
+func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var tempblockInfo BlockHash
@@ -92,30 +89,35 @@ func (api *PublicSdagAPI) ApiGetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
-	var BlockInfo BlockInfo
-	reandBlockInfo, _ := storage.ReadBlockMutableInfo(db, tempblockInfo.BlockHash)
-	//var reandBlockInfo *types.MutableInfo
-	blockStatus := api.s.BlockPool().GetUserBlockStatus(tempblockInfo.BlockHash)
-	jsonData, _ := json.Marshal(blockStatus)
-	BlockInfo.Status = string(jsonData)
-	jsonData1, _ := json.Marshal(reandBlockInfo.ConfirmItsTimeSlice)
-	BlockInfo.ConfirmItsTimeSlice = string(jsonData1)
-	jsonData2, _ := json.Marshal(reandBlockInfo.Difficulty)
-	BlockInfo.Difficulty = string(jsonData2)
-	jsonData3, _ := json.Marshal(reandBlockInfo.CumulativeDiff)
-	BlockInfo.CumulativeDiff = string(jsonData3)
-	jsonData4, _ := json.Marshal(reandBlockInfo.MaxLink)
-	BlockInfo.MaxLink = string(jsonData4)
+    blockInfo := manager.GetBlockInfo(db, tempblockInfo.BlockHash)
 
-	returnblockInfo := fmt.Sprintln("BlockStatus: ", BlockInfo.Status,
-		"BlockConfirmItsTimeSlice: ", BlockInfo.ConfirmItsTimeSlice,
-		"BlockDifficulty: ", BlockInfo.Difficulty,
-		"BlockCumulativeDiff: ", BlockInfo.CumulativeDiff,
-		"BlockMaxLink: ", BlockInfo.MaxLink,
-	)
-
-	return returnblockInfo
+	return blockInfo
 }
+
+func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string)string{
+	jsonString = strings.Replace(jsonString, `\`, "", -1)
+	var RPCmainBlockInfo MainBlockInfo
+	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+
+	maintime := RPCmainBlockInfo.Slice
+	Time := utils.GetMainTime(maintime)
+
+	tempQueryMainBlockInfo := manager.GetMainBlockInfo(api.s.chainDb, Time)
+
+	return tempQueryMainBlockInfo
+}
+
+func (api *PublicSdagAPI) GetFinalMainBlockInfo() string{
+
+	mainBlockInfo := manager.GetFinalMainBlockInfo(api.s.chainDb)
+
+	return mainBlockInfo
+}
+
+
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	//emptyC <- struct{}{}

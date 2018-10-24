@@ -1,7 +1,6 @@
 package manager
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -438,40 +437,4 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	return links
 }
 
-func (p *BlockPool) GetUserBlockStatus(hash common.Hash) string {
 
-	mutableInfo, err := storage.ReadBlockMutableInfo(p.db, hash)
-
-	if err != nil {
-		log.Error("Read block stauts fail")
-		return ""
-	}
-
-	tempBlockStatus := mutableInfo.Status
-
-	blockStatus := types.GetBlockStatus(tempBlockStatus)
-
-	return blockStatus
-}
-
-func (p *BlockPool) GetBlockInfo(hash common.Hash) string {
-
-	//commonHash := common.HexToHash(string(hash))
-
-	mutableInfo, _ := storage.ReadBlockMutableInfo(p.db, hash)
-
-	trmpBlockStatus := p.GetUserBlockStatus(hash)
-	tempTimeSlice := mutableInfo.ConfirmItsTimeSlice
-	tempDifficulty := mutableInfo.Difficulty
-	tempCumulativeDifficulty := mutableInfo.CumulativeDiff
-	tempMaxLink := mutableInfo.MaxLink
-
-	Data0 := fmt.Sprintln(trmpBlockStatus, tempTimeSlice, tempDifficulty, tempCumulativeDifficulty, tempMaxLink)
-
-	jsonData, err := json.Marshal(Data0)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonData)
-}
