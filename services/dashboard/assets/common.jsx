@@ -45,7 +45,7 @@ const menuSkeletons: Array<{|id: string, menu: ProvidedMenuProp|}> = [
 	}, {
 		id:   'system',
 		menu: {
-			title: 'System',
+			title: 'Systems',
 			icon:  'tachometer',
 		},
 	}, {
@@ -53,6 +53,12 @@ const menuSkeletons: Array<{|id: string, menu: ProvidedMenuProp|}> = [
 		menu: {
 			title: 'Logs',
 			icon:  'list',
+		},
+	}, {
+		id:   'messeges',
+		menu: {
+			title: 'Messeges',
+			icon:  'globe',
 		},
 	},
 ];

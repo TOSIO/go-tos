@@ -24,6 +24,7 @@ export type Content = {
 	network: Network,
 	system:  System,
 	logs:    Logs,
+	nodeMsg: NodeMsg,
 };
 
 export type ChartEntries = Array<ChartEntry>;
@@ -37,6 +38,10 @@ export type General = {
 	version: ?string,
 	commit:  ?string,
 };
+
+export type NodeMsg = {
+	nodeId: ?string,
+}
 
 export type Home = {
 	/* TODO (kurkomisi) */

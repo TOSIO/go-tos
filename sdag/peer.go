@@ -133,6 +133,7 @@ func (ps *peerSet) Register(p *peer) error {
 		return errAlreadyRegistered
 	}
 	ps.peers[p.id] = p
+
 	go p.broadcast()
 
 	return nil

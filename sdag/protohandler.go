@@ -70,6 +70,17 @@ type ProtocolManager struct {
 	wg sync.WaitGroup
 }
 
+func (pm *ProtocolManager) RealNodeIdMessage() []string {
+	var peerId []string
+	peerSetMessage := pm.peers
+	peerMessage := peerSetMessage.peers
+	for _, peerIdMessage := range peerMessage {
+		peerId = append(peerId, peerIdMessage.id)
+	}
+	return peerId
+
+}
+
 // NodeInfo represents a short summary of the tos sub-protocol metadata
 // known about the host peer.
 type NodeInfo struct {
@@ -267,7 +278,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
 	}
-	//p.Log().Debug("TOS peer connected", "name", p.Name())
+	p.Log().Debug("TOS peer connected", "name", p.Name())
 
 	// Execute the TOS handshake
 

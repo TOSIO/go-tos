@@ -197,3 +197,8 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (tosdb.Data
 	}
 	return db, nil
 }
+func (s *Sdag) SdagNodeIDMessage() []string {
+	var NodeIdMessage []string
+	NodeIdMessage = s.protocolManager.RealNodeIdMessage()
+	return NodeIdMessage
+}

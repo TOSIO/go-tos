@@ -156,6 +156,7 @@ class Footer extends Component<Props> {
 							{data: system.networkIngress, tooltip: bytePerSecPlotter('Download')},
 							{data: system.networkEgress, tooltip: bytePerSecPlotter('Upload', multiplier(-1))},
 						)}
+						
 					</ChartRow>
 				</Grid>
 				<Grid item >
@@ -166,7 +167,7 @@ class Footer extends Component<Props> {
 						<Typography type='caption' color='inherit'>
 							<span style={commonStyles.light}>{'Commit '}</span>
 							<a href={`https://github.com/ethereum/go-ethereum/commit/${general.commit}`} target='_blank' style={{color: 'inherit', textDecoration: 'none'}} >
-								{general.commit.substring(0, 8)}
+								{general.commit.substring(0, 10)}
 							</a>
 						</Typography>
 					)}

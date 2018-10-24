@@ -24,6 +24,7 @@ package dashboard
 //go:generate gofmt -w -s assets.go
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,13 +33,19 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TOSIO/go-tos/app/sendTx/httpSend"
+
+	"github.com/TOSIO/go-tos/sdag"
+
 	"io"
 
+	//"github.com/TOSIO/go-tos/app/sendTx/httpSend"
 	"github.com/TOSIO/go-tos/devbase/log"
-	"github.com/elastic/gosigar"
-
 	"github.com/TOSIO/go-tos/devbase/metrics"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/elastic/gosigar"
+
+	//"github.com/TOSIO/go-tos/sdag"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
 	"github.com/mohae/deepcopy"
@@ -62,12 +69,12 @@ var nextID uint32 // Next connection id
 type Dashboard struct {
 	config *Config
 
-	listener net.Listener
-	conns    map[uint32]*client // Currently live websocket connections
-	history  *Message
-	lock     sync.RWMutex // Lock protecting the dashboard's internals
-
-	logdir string
+	listener   net.Listener
+	conns      map[uint32]*client // Currently live websocket connections
+	history    *Message
+	lock       sync.RWMutex // Lock protecting the dashboard's internals
+	sdagObject *sdag.Sdag
+	logdir     string
 
 	quit chan chan error // Channel used for graceful exit
 	wg   sync.WaitGroup
@@ -106,6 +113,9 @@ func New(config *Config, commit string, logdir string) *Dashboard {
 				DiskRead:       emptyChartEntries(now, diskReadSampleLimit, config.Refresh),
 				DiskWrite:      emptyChartEntries(now, diskWriteSampleLimit, config.Refresh),
 			},
+			/*	Msg: &NodeMessage{
+
+				},*/
 		},
 		logdir: logdir,
 	}
@@ -305,6 +315,7 @@ func (db *Dashboard) collectData() {
 			return
 		case <-time.After(db.config.Refresh):
 			systemCPUUsage.Get()
+			nodeId := NodeMessagefun()
 			var (
 				curNetworkIngress = collectNetworkIngress()
 				curNetworkEgress  = collectNetworkEgress()
@@ -385,7 +396,11 @@ func (db *Dashboard) collectData() {
 					DiskRead:       ChartEntries{diskRead},
 					DiskWrite:      ChartEntries{diskWrite},
 				},
+				Msg: &NodeMessage{
+					nodeId,
+				},
 			})
+
 		}
 	}
 }
@@ -401,4 +416,50 @@ func (db *Dashboard) sendToAll(msg *Message) {
 		}
 	}
 	db.lock.Unlock()
+}
+
+func NodeMessagefun() string {
+	var (
+		nodeIdstring     string
+		urlString        = "http://localhost:8545"
+		jsonStringFormat = `
+{
+"jsonrpc":"2.0",
+"method":"sdag_getActiveNodeList",
+"params":["ok"],
+"id":1
+}`
+	)
+	type resultInfo struct {
+		Jsonrpc string
+		Id      uint64
+		//	Error   resultError
+		Result string
+	}
+	/*	type resultNodeId struct {
+			Realid string
+		}
+	*/
+	jsonString := fmt.Sprintf(jsonStringFormat)
+	NodeIdMsg, err := httpSend.SendHttp(urlString, jsonString)
+	if err != nil {
+		fmt.Printf("SendHttp error")
+	}
+
+	var result resultInfo
+	err = json.Unmarshal(NodeIdMsg, &result)
+	if err != nil {
+		fmt.Println("Unmarshal error:", err)
+	}
+	//var resultNode resultNodeId
+	/*	err = json.Unmarshal(NodeIdMsg.Result, &resultNode)
+		if err != nil {
+			fmt.Println("Unmarshal error:", err)
+		}*/
+	nodeIdstring = result.Result
+	if nodeIdstring == "" {
+		nodeIdstring = "connection is none"
+	}
+	return nodeIdstring
+
 }

@@ -106,6 +106,9 @@ const defaultContent: () => Content = () => ({
 		topChanged:    0,
 		bottomChanged: 0,
 	},
+	nodeMsg:{
+			NodeId:"",
+		},
 });
 
 // updaters contains the state updater functions for each path of the state.
@@ -131,6 +134,9 @@ const updaters = {
 		diskWrite:      appender(200),
 	},
 	logs: logInserter(5),
+	nodeMsg:{                           //跟dashboard传过来的数据json内容对应
+            nodeId:replacer,
+        },
 };
 
 // styles contains the constant styles of the component.
@@ -197,6 +203,10 @@ class Dashboard extends Component<Props, State> {
 				console.error(`Incoming message is ${msg}`);
 				return;
 			}
+
+			console.log("Dashboard.log: ");
+			console.log(msg);
+
 			this.update(msg);
 		};
 		server.onclose = () => {

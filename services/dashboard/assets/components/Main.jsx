@@ -88,13 +88,20 @@ class Main extends Component<Props> {
 
 		let children = null;
 		switch (active) {
+		case MENU.get('messeges').id:
+            children = <div>{this.props.content.nodeMsg.nodeId}</div>;
+                break;
 		case MENU.get('home').id:
 		case MENU.get('chain').id:
 		case MENU.get('txpool').id:
 		case MENU.get('network').id:
+	//	case MENU.get('messeges').id:
+		
 		case MENU.get('system').id:
 			children = <div>Work in progress.</div>;
 			break;
+
+
 		case MENU.get('logs').id:
 			children = (
 				<Logs

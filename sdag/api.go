@@ -29,11 +29,12 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
+
 	//"github.com/TOSIO/go-tos/sdag/core/storage"
 	//"github.com/TOSIO/go-tos/sdag/manager"
-	"github.com/TOSIO/go-tos/sdag/transaction"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/manager"
+	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
 var (
@@ -78,7 +79,6 @@ type BlockHash struct {
 	BlockHash common.Hash
 }
 
-
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
@@ -89,12 +89,12 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
-    blockInfo := manager.GetBlockInfo(db, tempblockInfo.BlockHash)
+	blockInfo := manager.GetBlockInfo(db, tempblockInfo.BlockHash)
 
 	return blockInfo
 }
 
-func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string)string{
+func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var RPCmainBlockInfo MainBlockInfo
 	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
@@ -110,14 +110,12 @@ func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string)string{
 	return tempQueryMainBlockInfo
 }
 
-func (api *PublicSdagAPI) GetFinalMainBlockInfo() string{
+func (api *PublicSdagAPI) GetFinalMainBlockInfo() string {
 
 	mainBlockInfo := manager.GetFinalMainBlockInfo(api.s.chainDb)
 
 	return mainBlockInfo
 }
-
-
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	//emptyC <- struct{}{}
@@ -167,6 +165,23 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	}
 	//<-emptyC
 	return "OK"
+}
+
+func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard RPC server function
+	//emptyC <- struct{}{}
+	//statisticsObj.Statistics()
+	//<-emptyC
+	//return "OK"
+	if accept != "ok" {
+		fmt.Printf("accept params error")
+	}
+	nodeIdMessage := api.s.SdagNodeIDMessage()
+	nodeIdMsg, err := json.Marshal(nodeIdMessage)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(nodeIdMsg)
+
 }
 
 func hexString2Address(in string, out *common.Address) error {

@@ -29,7 +29,14 @@ type Message struct {
 	Network *NetworkMessage `json:"network,omitempty"`
 	System  *SystemMessage  `json:"system,omitempty"`
 	Logs    *LogsMessage    `json:"logs,omitempty"`
+	Msg     *NodeMessage    `json:"nodeMsg,omitempty"`
 }
+
+type NodeMessage struct {
+	NodeId string `json:"nodeId,omitempty"`
+}
+
+//type p2pMessage struct
 
 type ChartEntries []*ChartEntry
 
