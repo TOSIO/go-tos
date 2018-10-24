@@ -20,7 +20,5 @@ func CalculateWork(hash common.Hash) *big.Int {
 	num := new(big.Int).Div(little_hash, math.BigPow(2, 160))
 	hd := new(big.Int).Div(den, num)
 
-	fmt.Println(hd)
-
 	return hd
 }
