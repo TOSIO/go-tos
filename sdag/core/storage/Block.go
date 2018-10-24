@@ -155,3 +155,22 @@ func WriteMainBlock(db Writer, mb *types.MainBlockInfo, slice uint64) error {
 
 	return nil
 }
+
+func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
+	data, err := db.Get(tailMainBlockInfoKey())
+	if err != nil {
+		log.Error("Read Tail Main Block Info Failed", "err", err)
+		return nil, err
+	}
+
+	return new(types.TailMainBlockInfo).UnRlp(data)
+}
+
+func WriteTailMainBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
+	if err := db.Put(tailMainBlockInfoKey(), tm.Rlp()); err != nil {
+		log.Error("Write Tail Main Block Info Failed", "err", err)
+		return err
+	}
+
+	return nil
+}

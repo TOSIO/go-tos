@@ -22,7 +22,9 @@ import (
 	"math/big"
 	"math/rand"
 
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -30,8 +32,6 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
-	"github.com/TOSIO/go-tos/devbase/crypto"
-	"fmt"
 )
 
 const (
@@ -66,8 +66,8 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	//init start
 	minerinfo.GasLimit = 2000
 	minerinfo.GasPrice = big.NewInt(20)
-	PrivateKey ,err  := crypto.GenerateKey()
-	if err!=nil{
+	PrivateKey, err := crypto.GenerateKey()
+	if err != nil {
 		fmt.Errorf("PrivateKey err")
 		return nil
 	}
@@ -80,7 +80,6 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		mainchin:  mc,
 		feed:      feed,
 	}
-
 
 	go mine.listen()
 	ismining <- true
@@ -122,6 +121,7 @@ func (m *Miner) listen() {
 
 //start miner work
 func (m *Miner) Start() {
+	return
 	go work(m)
 	ismining <- true
 }
@@ -146,9 +146,9 @@ func work(m *Miner) {
 	//first get prevtail hash  and diff
 	fhash, fDiff := m.mainchin.GetPervTail()
 	//set PervTailhash  to be best diff
-	mineBlock.Links=append(mineBlock.Links,fhash)
+	mineBlock.Links = append(mineBlock.Links, fhash)
 	//select params.MaxLinksNum-1 unverifiedblock to links
-	mineBlock.Links=append(mineBlock.Links,m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum - 1)...)
+	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
 	for {
 		select {

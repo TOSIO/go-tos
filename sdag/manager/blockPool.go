@@ -107,7 +107,7 @@ func (p *BlockPool) SubscribeNewBlocksEvent(ev chan<- core.NewBlocksEvent) {
 func (p *BlockPool) loop() {
 	//UnverifiedBlockList = list.New()
 	//UnverifiedBlockList.PushFront(genesis)
-	p.unverifiedBlocks.Push(GetMainBlockTail())
+	p.unverifiedBlocks.Push(p.mainChainI.GetTail().Hash)
 	go func() {
 		var n int64 = 0
 		currentTime := time.Now().UnixNano()
@@ -162,12 +162,6 @@ func (p *BlockPool) loop() {
 			}
 		}
 	}()
-}
-
-func GetMainBlockTail() common.Hash {
-	var hash common.Hash
-	hash = core.GenesisHash
-	return hash
 }
 
 /* func SetDB(chainDb tosdb.Database) {
@@ -330,30 +324,31 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
-	var haveLinkGenesis bool
 
 	for _, hash := range block.GetLinks() {
-		if hash == core.GenesisHash {
-			haveLinkGenesis = true
-		} else {
-			linkBlockEI := storage.ReadBlock(p.db, hash) //the 'EI' is empty interface logogram
-			if linkBlockEI != nil {
-				if linkBlockI, ok := linkBlockEI.(types.Block); ok {
-					if linkBlockI.GetTime() > block.GetTime() {
-						log.Error("links time error")
-						return fmt.Errorf("links time error")
-					} else {
-						linkBlockIs = append(linkBlockIs, linkBlockI)
-						//log.Trace("links time legal")
-					}
+		linkBlockEI := storage.ReadBlock(p.db, hash) //the 'EI' is empty interface logogram
+		if linkBlockEI != nil {
+			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
+				if linkBlockI.GetTime() > block.GetTime() {
+					log.Error("links time error")
+					return fmt.Errorf("links time error")
 				} else {
-					log.Error("linkBlockEI assertion failure")
-					return fmt.Errorf("linkBlockEI assertion failure")
+					info, err := storage.ReadBlockMutableInfo(p.db, hash)
+					if err != nil {
+						log.Error("ReadBlockMutableInfo error")
+						return fmt.Errorf("ReadBlockMutableInfo error")
+					}
+					linkBlockI.SetMutableInfo(info)
+					linkBlockIs = append(linkBlockIs, linkBlockI)
+					//log.Trace("links time legal")
 				}
 			} else {
-				isIsolated = true
-				linksLackBlock = append(linksLackBlock, hash)
+				log.Error("linkBlockEI assertion failure")
+				return fmt.Errorf("linkBlockEI assertion failure")
 			}
+		} else {
+			isIsolated = true
+			linksLackBlock = append(linksLackBlock, hash)
 		}
 	}
 
@@ -369,11 +364,8 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 
 	} else {
 		//log.Trace("Verification passed")
-		if haveLinkGenesis {
-			p.deleteUnverifiedBlock(core.GenesisHash)
-		}
 		p.verifyAncestors(linkBlockIs)
-		//p.mainChainI.ComputeCumulativeDiff(block)
+		p.mainChainI.ComputeCumulativeDiff(block)
 		p.saveBlock(block)
 		p.deleteIsolatedBlock(block)
 

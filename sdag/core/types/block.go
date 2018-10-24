@@ -51,8 +51,9 @@ const (
 type BlockType uint
 
 const (
-	BlockTypeTx    BlockType = 1
-	BlockTypeMiner BlockType = 2
+	BlockTypeTx      BlockType = 1
+	BlockTypeMiner   BlockType = 2
+	BlockTypeGenesis BlockType = 3
 )
 
 const (
@@ -108,18 +109,39 @@ type MutableInfo struct {
 
 //数据解析
 func BlockDecode(rlpData []byte) (Block, error) {
-	if len(rlpData) < 5 {
-		return nil, errors.New("rlpData is too short")
+
+	var ty BlockType
+
+	if isList, lenNum := RLPList(rlpData[0]); isList && lenNum  < len(rlpData) {
+		if isList, lenNum1 := RLPList(rlpData[lenNum + 1]); isList && lenNum + 1 + lenNum1 < len(rlpData) {
+			ty = BlockType(rlpData[lenNum + 1 + lenNum1 + 1])
+		} else {
+			return nil, errors.New("rlpData is err")
+		}
+	} else {
+		return nil, errors.New("rlpData is err")
 	}
 
-	ty := BlockType(rlpData[3])
 	if ty == BlockTypeTx {
 		return new(TxBlock).UnRlp(rlpData)
 	} else if ty == BlockTypeMiner {
 		return new(MinerBlock).UnRlp(rlpData)
+	} else if ty == BlockTypeGenesis {
+		return new(GenesisBlock).UnRlp(rlpData)
 	}
 
 	return nil, errors.New("block upRlp error")
+}
+
+func RLPList(b byte) (bool, int) {
+	if b < 0xF8 && b > 0xC0 {
+		return true, 0
+	} else if b >= 0xF8 {
+		len := int(b) - 0xF7
+		return true, len
+	} else {
+		return false, 0
+	}
 }
 
 func GetMutableRlp(mutableInfo *MutableInfo) []byte {
