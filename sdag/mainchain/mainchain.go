@@ -23,20 +23,20 @@ type MainChain struct {
 	db       tosdb.Database
 	stateDb  state.Database
 	Tail     types.TailMainBlockInfo
-	pervTail types.TailMainBlockInfo
-	MianTail types.TailMainBlockInfo
+	PervTail types.TailMainBlockInfo
+	MainTail types.TailMainBlockInfo
 }
 
 func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
 	emptyChan <- struct{}{}
-	tail := mainChain.pervTail
+	tail := mainChain.PervTail
 	<-emptyChan
 	return tail.Hash, tail.CumulativeDiff
 }
 
 func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
 	emptyChan <- struct{}{}
-	tail := mainChain.MianTail
+	tail := mainChain.MainTail
 	<-emptyChan
 	return &tail
 }
@@ -45,6 +45,8 @@ func (mainChain *MainChain) setPerv() error {
 	hash := mainChain.Tail.Hash
 	notSelf := false
 	Number := mainChain.Tail.Number
+	currentTimeSliceTraversed := true
+	currentTimeSlice := utils.GetMainTime(mainChain.Tail.Time)
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -54,28 +56,45 @@ func (mainChain *MainChain) setPerv() error {
 		if block == nil {
 			return fmt.Errorf("ReadBlock err")
 		}
+		block.SetMutableInfo(mutableInfo)
 
-		if notSelf && ((mutableInfo.Status & types.BlockTmpMaxDiff) != 0) {
-			Number--
-			if mainChain.pervTail.Hash != (common.Hash{}) {
-				mainChain.pervTail.Hash = hash
-				mainChain.pervTail.Time = block.GetTime()
-				mainChain.pervTail.Number = Number
-				mainChain.pervTail.CumulativeDiff = block.GetCumulativeDiff()
+		if notSelf {
+			if currentTimeSlice != utils.GetMainTime(block.GetTime()) {
+				currentTimeSliceTraversed = false
+				currentTimeSlice = utils.GetMainTime(block.GetTime())
+			}
+			if !currentTimeSliceTraversed {
+				if (block.GetStatus() & types.BlockTmpMaxDiff) != 0 {
+					Number--
+					currentTimeSliceTraversed = true
+					if mainChain.PervTail.Hash == (common.Hash{}) {
+						mainChain.PervTail.Hash = hash
+						mainChain.PervTail.Time = block.GetTime()
+						mainChain.PervTail.Number = Number
+						mainChain.PervTail.CumulativeDiff = block.GetCumulativeDiff()
+					}
+				}
 			}
 		}
-
-		if (mutableInfo.Status & types.BlockMain) != 0 {
-			Number--
-			mainChain.MianTail.Hash = hash
-			mainChain.MianTail.Time = block.GetTime()
-			mainChain.MianTail.Number = Number
-			mainChain.MianTail.CumulativeDiff = block.GetCumulativeDiff()
+		if (block.GetStatus() & types.BlockMain) != 0 {
+			mainChain.MainTail.Hash = hash
+			mainChain.MainTail.Time = block.GetTime()
+			mainChain.MainTail.Number = Number
+			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
 			break
 		}
-
-		hash = block.GetLinks()[mutableInfo.MaxLink]
+		if len(block.GetLinks()) == 0 {
+			log.Trace("len(block.GetLinks()) == 0", "blockType", block.GetType())
+			break
+		}
+		hash = block.GetLinks()[block.GetMutableInfo().MaxLink]
 		notSelf = true
+	}
+	if mainChain.MainTail.Hash == (common.Hash{}) {
+		return fmt.Errorf("not found MainTail")
+	}
+	if mainChain.PervTail.Hash == (common.Hash{}) {
+		mainChain.PervTail = mainChain.MainTail
 	}
 	return nil
 }
@@ -90,7 +109,7 @@ func (mainChain *MainChain) initTail() error {
 			return err
 		}
 		mainChain.Tail = *tail
-		mainChain.pervTail = *tail
+		mainChain.PervTail = *tail
 		return nil
 	}
 	mainChain.Tail = *tailMainBlockInfo
@@ -114,7 +133,10 @@ func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
 		for {
 			currentTime = time.Now().Unix()
 			if lastTime+params.TimePeriod/1000 < currentTime {
-				mainChain.Confirm()
+				err := mainChain.Confirm()
+				if err != nil {
+					log.Error(err.Error())
+				}
 				lastTime = currentTime
 			}
 			time.Sleep(time.Second)
@@ -128,7 +150,7 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 	if mainChain.Tail.CumulativeDiff.Cmp(block.GetCumulativeDiff()) < 0 {
 		emptyChan <- struct{}{}
 		if !IsTheSameTimeSlice(mainChain.Tail.Time, block.GetTime()) {
-			mainChain.pervTail = mainChain.Tail
+			mainChain.PervTail = mainChain.Tail
 			mainChain.Tail.Number++
 		}
 		mainChain.Tail.Hash = block.GetHash()
@@ -267,6 +289,10 @@ func (mainChain *MainChain) Confirm() error {
 		}
 	}
 
+	if len(listMainBlock) == 0 {
+		return nil
+	}
+
 	mainBlock, err := storage.ReadMainBlock(mainChain.db, lastMainTimeSlice)
 	if err == nil {
 		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", lastMainTimeSlice)
@@ -306,10 +332,10 @@ func (mainChain *MainChain) Confirm() error {
 			return err
 		}
 		if block == listMainBlock[len(listMainBlock)-1] {
-			mainChain.MianTail.Hash = block.GetHash()
-			mainChain.MianTail.Time = block.GetTime()
-			mainChain.MianTail.Number = blockNumber
-			mainChain.MianTail.CumulativeDiff = block.GetCumulativeDiff()
+			mainChain.MainTail.Hash = block.GetHash()
+			mainChain.MainTail.Time = block.GetTime()
+			mainChain.MainTail.Number = blockNumber
+			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
 		}
 		blockNumber++
 	}

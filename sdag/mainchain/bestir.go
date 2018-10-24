@@ -124,7 +124,7 @@ func CheckTransactionAmount(balance *big.Int, Outs []types.TxOut, cost *big.Int)
 
 func ComputeConfirmReward(reward *ConfirmRewardInfo) *ConfirmRewardInfo {
 	temp := big.NewInt(0)
-	temp.Div(temp.Mul(reward.userReward, big.NewInt(params.ConfirmUserRewardRate*10)), big.NewInt(10))
+	temp.Div(temp.Mul(reward.userReward, big.NewInt(int64(params.ConfirmUserRewardRate*10))), big.NewInt(10))
 	reward.minerReward.Add(reward.minerReward, reward.userReward.Sub(reward.userReward, temp))
 	return &ConfirmRewardInfo{temp, reward.minerReward}
 }
