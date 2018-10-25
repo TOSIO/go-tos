@@ -37,6 +37,8 @@ type Sdag struct {
 	blockchain      mainchain.MainChainI
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
+	queryBlockInfo *manager.QueryBlockInfoInterface //查询区块状态接口
+
 	networkFeed *event.Feed
 
 	blockPoolEvent *event.TypeMux
