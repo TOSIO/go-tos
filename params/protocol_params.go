@@ -1,9 +1,9 @@
 package params
 
 const (
-	TimePeriod   = 1000 // 60000 毫秒
-	MaxLinksNum  = 4    //最大链接次数
-	ConfirmBlock = 8    //最大确定个数
+	TimePeriod   = 10000 // 60000 毫秒
+	MaxLinksNum  = 4     //最大链接次数
+	ConfirmBlock = 8     //最大确定个数
 )
 
 const (
