@@ -154,7 +154,9 @@ func (p *peer) RequestBlockHashBySlice(slice uint64) error {
 
 func (p *peer) RequestLastMainSlice() error {
 
-	return p2p.Send(p.rw, GetLastMainTimeSlice, 1)
+	err := p2p.Send(p.rw, GetLastMainTimeSlice, GetLastMainBlockTSReq{})
+	p.Log().Debug(">> GET-LAST-MAINBLOCK-TIMESLICE", "err", err)
+	return err
 }
 
 func (p *peer) AsyncSendBlock(block []byte) {

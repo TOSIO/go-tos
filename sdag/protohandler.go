@@ -55,7 +55,7 @@ type ProtocolManager struct {
 
 	chainDb tosdb.Database // Block chain database
 
-	blockChain   mainchain.MainChainI
+	//blockChain   mainchain.MainChainI
 	synchroniser synchronise.SynchroniserI
 	blkstorage   synchronise.BlockStorageI
 	SubProtocols []p2p.Protocol
@@ -106,7 +106,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 		noMorePeers: make(chan struct{}),
 		quitSync:    make(chan struct{}),
 
-		blockChain:     chain,
+		mainChain:      chain,
 		networkFeed:    feed,
 		blockPoolEvent: poolFeed,
 		feeded:         false,

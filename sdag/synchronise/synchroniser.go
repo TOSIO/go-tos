@@ -167,11 +167,13 @@ loop:
 
 		// 查询其当前最近一次临时主块的时间片
 		go peer.RequestLastMainSlice()
+		log.Debug("Request last-mainblock-timeslice", "origin", peer.NodeID())
 
 		select {
 		case resp := <-s.peerSliceCh:
 			if timesliceResp, ok := resp.(*TimeslicePacket); ok {
 				if lastSyncSlice > timesliceResp.timeslice {
+					log.Debug("The timeslice of remote peer is too small", "response.Slice", timesliceResp.timeslice)
 					continue
 				}
 				timesliceEnd = utils.GetMainTime(timesliceResp.timeslice)

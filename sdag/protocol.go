@@ -67,6 +67,9 @@ func MsgCodeToString(code int) string {
 	return msgcodeToString[code]
 }
 
+type GetLastMainBlockTSReq struct {
+}
+
 type GetBlockHashBySliceResp struct {
 	Timeslice uint64
 	Hashes    []common.Hash

@@ -360,6 +360,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 			//p.pm.GetBlock(linkBlock)
 
 		} */
+		log.Debug("Request ancestor", "hash", block.GetHash().String())
 		event := &core.GetBlocksEvent{Hashes: linksLackBlock}
 		p.blockEvent.Post(event)
 
@@ -376,6 +377,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		}
 		p.deleteIsolatedBlock(block)
 
+		log.Debug("Relay block", "hash", block.GetHash().String())
 		event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
 		event.Blocks = append(event.Blocks, block)
 		p.blockEvent.Post(event)
@@ -384,6 +386,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 }
 
 func (p *BlockPool) saveBlock(block types.Block) {
+	log.Debug("Save block", "hash", block.GetHash().String())
 	storage.WriteBlock(p.db, block)
 	p.addUnverifiedBlock(block.GetHash())
 	/* hash := block.GetHash()
