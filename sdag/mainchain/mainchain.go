@@ -248,7 +248,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 	now := utils.GetTimeStamp()
 	var canConfirm bool
 	var currentTimeSliceAdded bool
-	var currentTimeSlice uint64
+	currentTimeSlice := utils.GetMainTime(tail.Time)
 	var listBlock []types.Block
 	var lastMainTimeSlice uint64
 	for {
@@ -261,11 +261,13 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 			canConfirm = true
 		}
 
+		if currentTimeSlice != utils.GetMainTime(block.GetTime()) {
+			number--
+			currentTimeSliceAdded = false
+			currentTimeSlice = utils.GetMainTime(block.GetTime())
+		}
+
 		if canConfirm {
-			if currentTimeSlice != utils.GetMainTime(block.GetTime()) {
-				currentTimeSliceAdded = false
-				currentTimeSlice = utils.GetMainTime(block.GetTime())
-			}
 			if !currentTimeSliceAdded {
 				mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 				if err != nil {
