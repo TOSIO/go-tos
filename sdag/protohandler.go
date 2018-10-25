@@ -47,6 +47,9 @@ type ProtocolManager struct {
 	relaySub       *event.TypeMuxSubscription
 	getSub         *event.TypeMuxSubscription
 
+	syncEvent   *event.TypeMux
+	syncstatSub *event.TypeMuxSubscription
+
 	networkFeed *event.Feed
 	feeded      bool
 
@@ -114,6 +117,8 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	manager.relaySub = manager.blockPoolEvent.Subscribe(&core.RelayBlocksEvent{})
 	manager.getSub = manager.blockPoolEvent.Subscribe(&core.GetBlocksEvent{})
 
+	manager.syncEvent = &event.TypeMux{}
+	manager.syncstatSub = manager.syncEvent.Subscribe(core.SYNCStatusEvent{})
 	// Initiate a sub-protocol for every implemented version we can handle
 	var err error
 	if err = manager.initProtocols(); err != nil {
@@ -131,7 +136,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	} */
 
 	if manager.synchroniser, err = synchronise.NewSynchroinser(manager.Peers(),
-		chain, storageProxy, poolFeed, manager.syncResult); err != nil {
+		chain, storageProxy, feed, poolFeed, manager.syncEvent); err != nil {
 		log.Error("Initialising Sdag synchroniser failed.")
 		return nil, err
 	}
@@ -145,20 +150,35 @@ func (pm *ProtocolManager) loop() {
 		select {
 		case ev := <-pm.relaySub.Chan():
 			if event, ok := ev.Data.(*core.RelayBlocksEvent); ok {
-				pm.relayBlock(event)
+				for _, block := range event.Blocks {
+					pm.synchroniser.Broadcast(block.GetHash())
+				}
 			}
 		case ev := <-pm.getSub.Chan():
 			if event, ok := ev.Data.(*core.GetBlocksEvent); ok {
-				pm.getBlock(event)
+				for _, block := range event.Hashes {
+					//log.Debug("Request", "peer.id", peer.NodeID)
+					pm.synchroniser.RequestBlock(block)
+				}
 			}
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
-			log.Trace("Receive a new peer,", "peer.id", peer.NodeID)
+			log.Debug("Receive a new peer,", "peer.id", peer.NodeID())
 		case <-pm.noMorePeers:
 			return
-		case result := <-pm.syncResult:
-			if result == nil {
-				pm.stat.progress = STAT_WORKING
+		case ev := <-pm.syncstatSub.Chan():
+			if event, ok := ev.Data.(core.SYNCStatusEvent); ok {
+				if event.Progress == core.SYNC_END && event.Err == nil {
+					pm.stat.progress = STAT_WORKING
+				}
+				log.Debug("Synchronizing", "progress", core.SyncCodeToString(event.Progress), "curorigin", event.CurOrigin, "curTS", event.CurTS,
+					"startTS", event.BeginTS,
+					"endTS", event.EndTS,
+					"beginTime", event.BeginTime,
+					"endTime", event.EndTime,
+					"tiredOrigins", event.TriedOrigin,
+					"err", event.Err)
+
 			}
 		}
 	}
@@ -250,6 +270,8 @@ func (pm *ProtocolManager) Stop() {
 	// Quit fetcher, txsyncLoop.
 	close(pm.quitSync)
 
+	pm.synchroniser.Stop()
+
 	// Disconnect existing sessions.
 	// This also closes the gate for any new registrations on the peer set.
 	// sessions which are already established but not added to pm.peers yet
@@ -273,7 +295,7 @@ func (pm *ProtocolManager) Peers() *peerSet {
 }
 
 func (pm *ProtocolManager) handle(p *peer) error {
-	p.Log().Info("Handle income-node")
+	p.Log().Info("Handle income-node", "name", p.Name())
 	// Ignore maxPeers if this is a trusted peer
 	if pm.peers.Len() >= pm.maxPeers && !p.Peer.Info().Network.Trusted {
 		return p2p.DiscTooManyPeers
@@ -317,7 +339,7 @@ func (pm *ProtocolManager) GetStatus() status {
 }
 
 func (pm *ProtocolManager) handleMsg(p *peer) error {
-	p.Log().Info("Starting handle message")
+	//p.Log().Info("Starting handle message")
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
@@ -326,7 +348,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
 	}
 	defer msg.Discard()
-	p.Log().Debug("Receive message", "msg.Code", msg.Code)
+	p.Log().Debug("Handle message", "msg.Code", MsgCodeToString(int(msg.Code)))
 	//dispatch message here
 	switch msg.Code {
 	case StatusMsg:
@@ -342,8 +364,11 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleBlocksBySlice(p, msg)
 	case GetBlockByHashMsg:
 		return pm.handleGetBlockByHash(p, msg)
+	case NewBlockHashMsg:
+		return pm.handleNewBlockAnnounce(p, msg)
 	case NewBlockMsg:
 		return pm.handleNewBlocks(p, msg)
+
 	}
 	return nil
 }
@@ -358,55 +383,63 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 
 // 获取最近一次临时主块所在时间片消息处理
 func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process the last main timeslice query.")
+	p.Log().Trace("Handle GET-LAST-MAIN-TIMESLICE request")
+
 	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
+	p.Log().Trace("Send timeslice back to remote node", "timeslice", lastMainSlice)
 	return p.SendTimeSlice(lastMainSlice)
 }
 
 // 获取最近一次临时主块所在时间片消息处理
 func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process the last main timeslice response.")
-	var peerTimeSlice uint64
-	err := msg.Decode(&peerTimeSlice)
+	//p.Log().Trace("Process the last main timeslice response.")
+	var timeslice uint64
+	err := msg.Decode(&timeslice)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+	p.Log().Trace("Handle GET-LAST-MAIN-TIMESLICE response", "timeslice", timeslice)
 	// 将回复结果递送到同步器
-	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, peerTimeSlice)
+	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, timeslice)
 }
 
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process block hash query.")
+	//p.Log().Trace("Process block hash query.")
 	//lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
 	var targetSlice uint64 = 0
 	err := msg.Decode(&targetSlice)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+	p.Log().Trace("<< Handle GET-BLOCK-HASH-BY-TIMESLICE request", "timeslice", targetSlice)
+
 	var hashes []common.Hash
 	hashes, err = pm.blkstorage.GetBlockHashByTmSlice(targetSlice)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+	p.Log().Debug(">> Send hash back to remote node", "response-hash-size", len(hashes))
 	return p.SendBlockHashes(targetSlice, hashes)
 }
 
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process block hashes response.")
+
 	var response GetBlockHashBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+	p.Log().Trace("<< Handle GET-BLOCK-HASH-BY-TIMESLICE response", "timeslice", response.Timeslice, "size", len(response.Hashes))
 	// 将回复结果递送到同步器
+
 	return pm.synchroniser.DeliverBlockHashesResp(p.id, response.Timeslice, response.Hashes)
 }
 
 // 根据区块hash返回对应区块（字节流）消息处理
 func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process block data query by slice.")
+
 	var req GetBlockDataBySliceReq
 	err := msg.Decode(&req)
 	if err != nil {
@@ -417,6 +450,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 		log.Trace("Param 'Hashes' is empty.")
 		return nil
 	}
+	p.Log().Trace("<< Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req.Hashes)
 	if err != nil {
@@ -426,22 +460,25 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 		return nil
 	}
 	// 将结果回复给对方
+	//p.Log().Trace("Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
+	p.Log().Debug(">> Send block back to remote node", "response-block-size", len(blocks))
 	return p.SendSliceBlocks(req.Timeslice, blocks)
 }
 
 func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process block hashes response.")
+
 	var response GetBlockDataBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
+	p.Log().Trace("<< handle GET-BLOCK-BY-TIMESLICE response", "timeslice", response.Timeslice, "size", len(response.Blocks))
 	// 将回复结果递送到同步器
 	return pm.synchroniser.DeliverBlockDatasResp(p.id, response.Timeslice, response.Blocks)
 }
 
 func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process block query by hash.")
+	//p.Log().Trace("Process block query by hash.")
 	var req []common.Hash
 	err := msg.Decode(&req)
 	if err != nil {
@@ -452,7 +489,9 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		log.Trace("Param 'Hashes' is empty.")
 		return nil
 	}
-
+	for _, item := range req {
+		p.Log().Debug("<< Handle GET-BLOCK-BY-HASH request", "hash", item.String())
+	}
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req)
 	if err != nil {
@@ -462,21 +501,34 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		return nil
 	}
 	// 将结果回复给对方
+	p.Log().Debug(">> Send block back to remote node", "response-block-size", len(blocks))
 	return p.SendNewBlocks(blocks)
 }
 
 func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Process new block arrive")
+
 	var response [][]byte
 	err := msg.Decode(&response)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-
+	p.Log().Debug("<< Handle NEW-BLOCK response/announce", "size", len(response))
 	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
 }
 
-func (pm *ProtocolManager) relayBlock(event *core.RelayBlocksEvent) error {
+func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
+
+	var response common.Hash
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< Handle NEW-BLOCK-HASH,new block announced", "hash", response.String())
+	pm.synchroniser.MarkAnnounced(response, p.NodeID())
+	return nil
+}
+
+/* func (pm *ProtocolManager) relayBlock(event *core.RelayBlocksEvent) error {
 	log.Trace("Relay block")
 	for _, p := range pm.peers.Peers() {
 		for _, block := range event.Blocks {
@@ -493,3 +545,4 @@ func (pm *ProtocolManager) getBlock(event *core.GetBlocksEvent) error {
 	}
 	return nil
 }
+*/

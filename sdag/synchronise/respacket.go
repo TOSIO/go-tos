@@ -9,13 +9,13 @@ type TimeslicePacket struct {
 	timeslice uint64
 }
 
-type SliceBlkHashesPacket struct {
+type TSHashesPacket struct {
 	peerId    string
 	timeslice uint64
 	hashes    []common.Hash
 }
 
-type SliceBlkDatasPacket struct {
+type TSBlocksPacket struct {
 	peerId    string
 	timeslice uint64
 	blocks    [][]byte
@@ -26,34 +26,34 @@ type NewBlockPacket struct {
 	blocks [][]byte
 }
 
-func (ts *TimeslicePacket) NodeId() string {
+func (ts *TimeslicePacket) NodeID() string {
 	return ts.peerId
 }
 
-func (ts *TimeslicePacket) Items() int {
+func (ts *TimeslicePacket) ItemCount() int {
 	return 1
 }
 
-func (bhs *SliceBlkHashesPacket) NodeId() string {
+func (bhs *TSHashesPacket) NodeID() string {
 	return bhs.peerId
 }
 
-func (bhs *SliceBlkHashesPacket) Items() int {
+func (bhs *TSHashesPacket) ItemCount() int {
 	return len(bhs.hashes)
 }
 
-func (bds *SliceBlkDatasPacket) NodeId() string {
+func (bds *TSBlocksPacket) NodeID() string {
 	return bds.peerId
 }
 
-func (bds *SliceBlkDatasPacket) Items() int {
+func (bds *TSBlocksPacket) ItemCount() int {
 	return len(bds.blocks)
 }
 
-func (bds *NewBlockPacket) NodeId() string {
+func (bds *NewBlockPacket) NodeID() string {
 	return bds.peerId
 }
 
-func (bds *NewBlockPacket) Items() int {
+func (bds *NewBlockPacket) ItemCount() int {
 	return 1
 }
