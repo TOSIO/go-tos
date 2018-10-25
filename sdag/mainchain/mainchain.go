@@ -12,33 +12,36 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"math/big"
+	"sync"
 	"time"
 )
 
-var (
-	emptyChan = make(chan struct{}, 1)
-)
-
 type MainChain struct {
-	db       tosdb.Database
-	stateDb  state.Database
-	Tail     types.TailMainBlockInfo
-	PervTail types.TailMainBlockInfo
-	MainTail types.TailMainBlockInfo
+	db             tosdb.Database
+	stateDb        state.Database
+	Tail           types.TailMainBlockInfo
+	PervTail       types.TailMainBlockInfo
+	MainTail       types.TailMainBlockInfo
+	tailRWLock     sync.RWMutex
+	mainTailRWLock sync.RWMutex
 }
 
-func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
-	emptyChan <- struct{}{}
-	tail := mainChain.PervTail
-	<-emptyChan
-	return tail.Hash, tail.CumulativeDiff
-}
-
-func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
-	emptyChan <- struct{}{}
-	tail := mainChain.MainTail
-	<-emptyChan
-	return &tail
+func (mainChain *MainChain) initTail() error {
+	tailMainBlockInfo, err := storage.ReadTailMainBlockInfo(mainChain.db)
+	if err != nil {
+		log.Info("generate genesis")
+		genesis := core.NewGenesis(mainChain.db, mainChain.stateDb, "")
+		tail, err := genesis.Genesis()
+		if err != nil {
+			return err
+		}
+		mainChain.Tail = *tail
+		mainChain.PervTail = *tail
+		return nil
+	}
+	mainChain.Tail = *tailMainBlockInfo
+	err = mainChain.setPerv()
+	return err
 }
 
 func (mainChain *MainChain) setPerv() error {
@@ -47,12 +50,13 @@ func (mainChain *MainChain) setPerv() error {
 	Number := mainChain.Tail.Number
 	currentTimeSliceTraversed := true
 	currentTimeSlice := utils.GetMainTime(mainChain.Tail.Time)
+	count := 0
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
 			return err
 		}
-		block := storage.ReadBlock(mainChain.db, mainChain.Tail.Hash)
+		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
 			return fmt.Errorf("ReadBlock err")
 		}
@@ -89,7 +93,9 @@ func (mainChain *MainChain) setPerv() error {
 		}
 		hash = block.GetLinks()[block.GetMutableInfo().MaxLink]
 		notSelf = true
+		count++
 	}
+	log.Warn("setPerv loop", "count", count)
 	if mainChain.MainTail.Hash == (common.Hash{}) {
 		return fmt.Errorf("not found MainTail")
 	}
@@ -97,24 +103,6 @@ func (mainChain *MainChain) setPerv() error {
 		mainChain.PervTail = mainChain.MainTail
 	}
 	return nil
-}
-
-func (mainChain *MainChain) initTail() error {
-	tailMainBlockInfo, err := storage.ReadTailMainBlockInfo(mainChain.db)
-	if err != nil {
-		log.Info("generate genesis")
-		genesis := core.NewGenesis(mainChain.db, mainChain.stateDb, "")
-		tail, err := genesis.Genesis()
-		if err != nil {
-			return err
-		}
-		mainChain.Tail = *tail
-		mainChain.PervTail = *tail
-		return nil
-	}
-	mainChain.Tail = *tailMainBlockInfo
-	err = mainChain.setPerv()
-	return err
 }
 
 func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
@@ -146,28 +134,52 @@ func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
 	return &mainChain, nil
 }
 
+func (mainChain *MainChain) GetTail() *types.TailMainBlockInfo {
+	mainChain.tailRWLock.RLock()
+	tail := mainChain.Tail
+	mainChain.tailRWLock.RUnlock()
+	return &tail
+}
+
+func (mainChain *MainChain) GetPervTail() (common.Hash, *big.Int) {
+	mainChain.tailRWLock.RLock()
+	tail := mainChain.PervTail
+	mainChain.tailRWLock.RUnlock()
+	return tail.Hash, tail.CumulativeDiff
+}
+
+func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
+	mainChain.mainTailRWLock.RLock()
+	tail := mainChain.MainTail
+	mainChain.mainTailRWLock.RUnlock()
+	return &tail
+}
+
 func (mainChain *MainChain) UpdateTail(block types.Block) {
+	mainChain.tailRWLock.RLock()
 	if mainChain.Tail.CumulativeDiff.Cmp(block.GetCumulativeDiff()) < 0 {
-		emptyChan <- struct{}{}
+		mainChain.tailRWLock.RUnlock()
+		mainChain.tailRWLock.Lock()
 		if !IsTheSameTimeSlice(mainChain.Tail.Time, block.GetTime()) {
 			mainChain.PervTail = mainChain.Tail
 			mainChain.Tail.Number++
 		}
 		mainChain.Tail.Hash = block.GetHash()
 		mainChain.Tail.CumulativeDiff = block.GetCumulativeDiff()
-		<-emptyChan
-		//todo: wirte DB
+		mainChain.Tail.Time = block.GetTime()
+		err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.Tail)
+		if err != nil {
+			log.Error(err.Error())
+		}
+		mainChain.tailRWLock.Unlock()
+	} else {
+		mainChain.tailRWLock.RUnlock()
 	}
 }
 
-func (mainChain *MainChain) GetTail() *types.TailMainBlockInfo {
-	emptyChan <- struct{}{}
-	tail := mainChain.Tail
-	<-emptyChan
-	return &tail
-}
-
 func (mainChain *MainChain) GetLastTempMainBlkSlice() uint64 {
+	mainChain.mainTailRWLock.RLock()
+	defer mainChain.mainTailRWLock.RUnlock()
 	return utils.GetMainTime(mainChain.GetTail().Time)
 }
 
@@ -179,8 +191,9 @@ func TimeSliceDifference(t1, t2 uint64) uint64 {
 	return utils.GetMainTime(t1) - utils.GetMainTime(t2)
 }
 
-func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) error {
+func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (bool, error) {
 	CumulativeDiff := big.NewInt(0)
+	var hasUpdateCumulativeDiff bool
 	var index int
 	linksIsUpdateDiff := make(map[int]bool)
 	for i, hash := range toBeAddedBlock.GetLinks() {
@@ -188,11 +201,11 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) er
 		for {
 			mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 			if err != nil {
-				return err
+				return hasUpdateCumulativeDiff, err
 			}
 			block := storage.ReadBlock(mainChain.db, hash)
 			if block == nil {
-				return fmt.Errorf("ReadBlock Not found")
+				return hasUpdateCumulativeDiff, fmt.Errorf("ComputeCumulativeDiff ReadBlock Not found")
 			}
 			block.SetMutableInfo(mutableInfo)
 
@@ -203,7 +216,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) er
 			}
 			if (mutableInfo.Status & types.BlockTmpMaxDiff) != 0 {
 				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					SingleChainCumulativeDiff = SingleChainCumulativeDiff.Add(SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
+					SingleChainCumulativeDiff.Add(SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
 					linksIsUpdateDiff[i] = true
 				} else {
 					SingleChainCumulativeDiff = block.GetCumulativeDiff()
@@ -222,12 +235,9 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) er
 	toBeAddedBlock.SetMaxLinks(uint8(index))
 	if linksIsUpdateDiff[index] {
 		toBeAddedBlock.SetStatus(toBeAddedBlock.GetStatus() | types.BlockTmpMaxDiff)
-		mainChain.UpdateTail(toBeAddedBlock)
-		//if err := storage.WriteBlockMutableInfo(mainChain.db, toBeAddedBlock.GetHash(), toBeAddedBlock.GetMutableInfo()); err != nil {
-		//	return err
-		//}
+		hasUpdateCumulativeDiff = true
 	}
-	return nil
+	return hasUpdateCumulativeDiff, nil
 }
 
 //Find the main block that can confirm other blocks
@@ -244,7 +254,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 	for {
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
-			return nil, 0, 0, fmt.Errorf("ReadBlock Not found")
+			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found")
 		}
 
 		if !canConfirm && TimeSliceDifference(now, block.GetTime()) > params.ConfirmBlock {
@@ -284,7 +294,7 @@ func (mainChain *MainChain) Confirm() error {
 		return err
 	}
 	for _, block := range listMainBlock {
-		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err != nil {
+		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
 			mainChain.RollBackStatus(block.Hash)
 		}
 	}
@@ -294,7 +304,7 @@ func (mainChain *MainChain) Confirm() error {
 	}
 
 	mainBlock, err := storage.ReadMainBlock(mainChain.db, lastMainTimeSlice)
-	if err == nil {
+	if err != nil {
 		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", lastMainTimeSlice)
 	}
 	state, err := state.New(mainBlock.Root, mainChain.stateDb)
@@ -332,10 +342,12 @@ func (mainChain *MainChain) Confirm() error {
 			return err
 		}
 		if block == listMainBlock[len(listMainBlock)-1] {
+			mainChain.mainTailRWLock.Lock()
 			mainChain.MainTail.Hash = block.GetHash()
 			mainChain.MainTail.Time = block.GetTime()
 			mainChain.MainTail.Number = blockNumber
 			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
+			mainChain.mainTailRWLock.Unlock()
 		}
 		blockNumber++
 	}
@@ -345,7 +357,7 @@ func (mainChain *MainChain) Confirm() error {
 func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 	block := storage.ReadBlock(mainChain.db, hash)
 	if block == nil {
-		return fmt.Errorf("ReadBlock Not found")
+		return fmt.Errorf("RollBackStatus ReadBlock Not found")
 	}
 	mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 	if err != nil {
@@ -419,6 +431,7 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, MainTimeSlice 
 		block.SetMutableInfo(mutableInfo)
 		linksReward, err := mainChain.singleBlockConfirm(block, MainTimeSlice, state)
 		if err != nil {
+			log.Error(err.Error())
 		}
 		if linksReward != nil {
 			confirmRewardInfo.userReward.Add(confirmRewardInfo.userReward, linksReward.userReward)

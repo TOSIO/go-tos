@@ -33,7 +33,6 @@ import (
 	//"github.com/TOSIO/go-tos/sdag/core/storage"
 	//"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/devbase/utils"
-	"github.com/TOSIO/go-tos/sdag/manager"
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -89,7 +88,8 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
-	blockInfo := manager.GetBlockInfo(db, tempblockInfo.BlockHash)
+
+	blockInfo := api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash)
 
 	return blockInfo
 }
@@ -105,14 +105,14 @@ func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 	maintime := RPCmainBlockInfo.Slice
 	Time := utils.GetMainTime(maintime)
 
-	tempQueryMainBlockInfo := manager.GetMainBlockInfo(api.s.chainDb, Time)
+	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, Time)
 
 	return tempQueryMainBlockInfo
 }
 
 func (api *PublicSdagAPI) GetFinalMainBlockInfo() string {
 
-	mainBlockInfo := manager.GetFinalMainBlockInfo(api.s.chainDb)
+	mainBlockInfo := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
 
 	return mainBlockInfo
 }
@@ -145,6 +145,10 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	}
 	Amount := new(big.Int)
 	_, ok := Amount.SetString(transactionInfo.Amount, 10)
+	if Amount.Sign() < 0 {
+		log.Error("The amount must be positive: %s", transactionInfo.Amount)
+		return "The amount must be positive"
+	}
 	if !ok {
 		log.Error("Amount is invalid: %s", transactionInfo.Amount)
 		return "Amount is invalid"

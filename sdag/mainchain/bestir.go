@@ -18,7 +18,7 @@ type ConfirmRewardInfo struct {
 
 func (reward *ConfirmRewardInfo) Init() {
 	reward.userReward = big.NewInt(0)
-	reward.userReward = big.NewInt(0)
+	reward.minerReward = big.NewInt(0)
 }
 
 func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state.StateDB) (*big.Int, error) {
@@ -28,22 +28,24 @@ func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state
 		log.Error(err.Error())
 		return big.NewInt(0), err
 	}
+
 	state.AddBalance(address, confirmReward)
 	balance := state.GetBalance(address)
-	actualDeduction := deductCost(address, balance, cost, state)
+
+	actualCostDeduction := deductCost(address, balance, cost, state)
 	if block.GetType() == types.BlockTypeTx {
 		if !IsGasCostOverrun {
 			txBlock, ok := block.(*types.TxBlock)
 			if !ok {
 				err = fmt.Errorf("assert fail")
 				log.Error(err.Error())
-				return actualDeduction, err
+				return actualCostDeduction, err
 			}
 
-			if CheckTransactionAmount(balance, txBlock.Outs, cost) {
-				err = fmt.Errorf("insufficient balance")
-				log.Error(err.Error())
-				return actualDeduction, err
+			if !CheckTransactionAmount(balance, txBlock.Outs, cost) {
+				err = fmt.Errorf("%s insufficient balance", address.String())
+				log.Info(err.Error())
+				return actualCostDeduction, err
 			}
 
 			for _, out := range txBlock.Outs {
@@ -53,7 +55,7 @@ func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state
 		}
 	}
 
-	return actualDeduction, nil
+	return actualCostDeduction, nil
 }
 
 func ComputeCost(block types.Block) (*big.Int, bool, error) {
@@ -95,20 +97,21 @@ func ComputeCostGas(block types.Block) (uint64, bool, error) {
 }
 
 func ComputeTransactionCost(costGas uint64, gasPrice *big.Int) *big.Int {
-	return gasPrice.Mul(gasPrice, big.NewInt(int64(costGas)))
+	return new(big.Int).Mul(gasPrice, big.NewInt(int64(costGas)))
 }
 
 func deductCost(address common.Address, balance *big.Int, cost *big.Int, state *state.StateDB) *big.Int {
 	if balance.Cmp(cost) < 0 {
 		state.SetBalance(address, big.NewInt(0))
-		return balance
+		return new(big.Int).Set(balance)
 	} else {
 		state.SubBalance(address, cost)
-		return cost
+		return new(big.Int).Set(cost)
 	}
 }
 
 func CheckTransactionAmount(balance *big.Int, Outs []types.TxOut, cost *big.Int) bool {
+	balance = new(big.Int).Set(balance)
 	for _, out := range Outs {
 		balance.Sub(balance, out.Amount)
 		if balance.Sign() < 0 {
@@ -130,7 +133,7 @@ func ComputeConfirmReward(reward *ConfirmRewardInfo) *ConfirmRewardInfo {
 }
 
 func ComputeMainConfirmReward(reward *ConfirmRewardInfo) *big.Int {
-	return reward.userReward.Add(reward.userReward, reward.minerReward)
+	return new(big.Int).Add(reward.userReward, reward.minerReward)
 }
 
 func CalculatingMinerReward(block types.Block, blockNumber uint64, state *state.StateDB) error {
@@ -146,5 +149,5 @@ func CalculatingMinerReward(block types.Block, blockNumber uint64, state *state.
 
 //1/2^(n/HalfLife)*Initial
 func RewardMiner(number uint64) *big.Int {
-	return new(big.Int).Mul(big.NewInt(int64(math.Exp2(float64(-number/params.HalfLifeRewardMiner))*(params.InitialRewardMiner/params.OneTos))), big.NewInt(params.OneTos))
+	return new(big.Int).Mul(big.NewInt(int64(math.Exp2(-float64(number/params.HalfLifeRewardMiner))*(params.InitialRewardMiner/params.OneTos))), big.NewInt(params.OneTos))
 }

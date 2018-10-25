@@ -311,12 +311,14 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 	}
 
 	err = p.linkCheckAndSave(block)
-
+	if err != nil {
+		log.Error(err.Error())
+	}
 	//deleteIsolatedBlock(block)
 	//go pm.RelayBlock(block.GetRlp())
 
 	p.statisticsObj.Statistics()
-	return nil
+	return err
 }
 
 func (p *BlockPool) linkCheckAndSave(block types.Block) error {
@@ -364,8 +366,14 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	} else {
 		//log.Trace("Verification passed")
 		p.verifyAncestors(linkBlockIs)
-		p.mainChainI.ComputeCumulativeDiff(block)
+		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
+		if err != nil {
+			return err
+		}
 		p.saveBlock(block)
+		if hasUpdateCumulativeDiff {
+			p.mainChainI.UpdateTail(block)
+		}
 		p.deleteIsolatedBlock(block)
 
 		event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
@@ -436,5 +444,3 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	p.listLock.RUnlock()
 	return links
 }
-
-

@@ -37,6 +37,8 @@ type Sdag struct {
 	blockchain      mainchain.MainChainI
 	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
 
+	queryBlockInfo *manager.QueryBlockInfoInterface //查询区块状态接口
+
 	networkFeed *event.Feed
 
 	blockPoolEvent *event.TypeMux
@@ -70,8 +72,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	stateDB := state.NewDatabase(tosdb.NewMemDatabase())
+	stateDb, err := CreateDB(ctx, config, "tos/db/sdagData/stateDB")
+	if err != nil {
+		return nil, err
+	}
+	stateDB := state.NewDatabase(stateDb)
 
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI

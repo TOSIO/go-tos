@@ -11,6 +11,12 @@ import (
 	"math/big"
 )
 
+type QueryBlockInfoInterface struct{
+
+}
+
+
+
 type MutableInfo struct {
 	Status string
 	ConfirmItsTimeSlice uint64      //Confirm its time slice
@@ -19,7 +25,7 @@ type MutableInfo struct {
 	MaxLink             uint8
 }
 
-func GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
+func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
 
 	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
 
@@ -35,12 +41,12 @@ func GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
 	return blockStatus
 }
 
-func  GetBlockInfo(h tosdb.Database, hash common.Hash) string {
+func  (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) string {
 
 	//commonHash := common.HexToHash(hash)
 
 	mutableInfo, _ := storage.ReadBlockMutableInfo(h, hash)
-	blockStatus := GetUserBlockStatus(h, hash)
+	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
 		Status: blockStatus,
 		ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
@@ -57,7 +63,7 @@ func  GetBlockInfo(h tosdb.Database, hash common.Hash) string {
 	return string(jsonData)
 }
 
-func  GetMainBlockInfo(h tosdb.Database, slice uint64) string {
+func  (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
 
 	mainInfo, err := storage.ReadMainBlock(h, slice)
 	if err != nil {
@@ -66,12 +72,12 @@ func  GetMainBlockInfo(h tosdb.Database, slice uint64) string {
 
 	 mainHash := mainInfo.Hash
 
-	 MainBlockInfo := GetBlockInfo(h, mainHash)
+	 MainBlockInfo := q.GetBlockInfo(h, mainHash)
 
 	 return MainBlockInfo
 }
 
-func  GetFinalMainBlockInfo (h tosdb.Database) string {
+func  (q *QueryBlockInfoInterface) GetFinalMainBlockInfo (h tosdb.Database) string {
 
 	var mianBlock *mainchain.MainChain
 	finalMainBlockSlice := mianBlock.GetMainTail()
@@ -83,7 +89,7 @@ func  GetFinalMainBlockInfo (h tosdb.Database) string {
 
 	mainHash := mainInfo.Hash
 
-	MainBlockInfo := GetBlockInfo(h, mainHash)
+	MainBlockInfo := q.GetBlockInfo(h, mainHash)
 
 	return MainBlockInfo
 

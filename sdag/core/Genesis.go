@@ -98,7 +98,6 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	}
 
 	genesisBlock.RootHash = root
-
 	info := genesisBlock.GetMutableInfo()
 	info.Difficulty = genesisBlock.GetDiff()
 	info.CumulativeDiff = genesisBlock.GetDiff()
@@ -111,6 +110,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	var mainBlock types.MainBlockInfo
 	mainBlock.Hash = genesisBlock.GetHash()
 	mainBlock.Root = root
+
 	err = storage.WriteMainBlock(genesis.db, &mainBlock, info.ConfirmItsTimeSlice)
 	if err != nil {
 		log.Error(err.Error())
