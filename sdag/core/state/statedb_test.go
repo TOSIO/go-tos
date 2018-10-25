@@ -27,17 +27,42 @@ import (
 	"strings"
 	"testing"
 	"testing/quick"
-	
 
-	check "gopkg.in/check.v1"
+	"gopkg.in/check.v1"
 
-	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
 // actually committing the state.
+func TestLoop(t *testing.T) {
+	// Create an empty state database
+	db := tosdb.NewMemDatabase()
+	stateDB, _ := New(common.Hash{}, NewDatabase(db))
+	address := common.HexToAddress("0x32641C78A64Ba40691A8ff9757Ef3E96C0B26D5E")
+	var root common.Hash
+	var err error
+	for i := 0; i < 10; i++ {
+		go func() {
+			stateDB.AddBalance(address, big.NewInt(111111111))
+			root, err = stateDB.Commit(false)
+		}()
+	}
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(stateDB.GetBalance(address).String())
+	err = stateDB.Database().TrieDB().Commit(root, true)
+	if err != nil {
+		fmt.Println(err)
+	}
+	stateDBNew, _ := New(root, NewDatabase(db))
+	fmt.Println(stateDBNew.GetBalance(address).String())
+}
+
 func TestUpdateLeaks(t *testing.T) {
 	// Create an empty state database
 	db := tosdb.NewMemDatabase()

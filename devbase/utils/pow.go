@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"github.com/TOSIO/go-tos/devbase/common"
 	"math/big"
-	"fmt"
+
+	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/common/math"
 )
 

@@ -145,6 +145,10 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	}
 	Amount := new(big.Int)
 	_, ok := Amount.SetString(transactionInfo.Amount, 10)
+	if Amount.Sign() < 0 {
+		log.Error("The amount must be positive: %s", transactionInfo.Amount)
+		return "The amount must be positive"
+	}
 	if !ok {
 		log.Error("Amount is invalid: %s", transactionInfo.Amount)
 		return "Amount is invalid"

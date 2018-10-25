@@ -70,8 +70,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	stateDB := state.NewDatabase(tosdb.NewMemDatabase())
+	stateDb, err := CreateDB(ctx, config, "tos/db/sdagData/stateDB")
+	if err != nil {
+		return nil, err
+	}
+	stateDB := state.NewDatabase(stateDb)
 
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI

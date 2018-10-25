@@ -17,7 +17,7 @@ import (
 
 var (
 	//8545
-	urlString        = "http://10.10.10.34:8545"
+	urlString        = "http://10.10.10.37:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -112,7 +112,7 @@ func main() {
 
 	fmt.Println("Parse all  ReadFile complete")
 
-	allAccountList[0].Balance.SetBytes([]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	allAccountList[0].Balance.SetString("100000000000000000000000000", 10)
 	haveBalanceAccountList = append(haveBalanceAccountList, allAccountList[0])
 	haveBalanceAccountMap[allAccountList[0].Address] = true
 	lastTime = time.Now().Unix()
@@ -164,8 +164,8 @@ func main() {
 			total.Add(total, v.Balance)
 		}
 
-		if total.String() != "4722366482869645213696" {
-			fmt.Println(total.String(), "errr------------------------")
+		if total.String() != "100000000000000000000000000" {
+			fmt.Println(total.String(), "error------------------------")
 		}
 		totalCount = totalCount.Add(totalCount, big.NewInt(1))
 		nowTime := time.Now().Unix()

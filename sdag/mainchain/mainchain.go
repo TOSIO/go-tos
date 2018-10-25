@@ -47,12 +47,13 @@ func (mainChain *MainChain) setPerv() error {
 	Number := mainChain.Tail.Number
 	currentTimeSliceTraversed := true
 	currentTimeSlice := utils.GetMainTime(mainChain.Tail.Time)
+	count := 0
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
 			return err
 		}
-		block := storage.ReadBlock(mainChain.db, mainChain.Tail.Hash)
+		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
 			return fmt.Errorf("ReadBlock err")
 		}
@@ -89,7 +90,9 @@ func (mainChain *MainChain) setPerv() error {
 		}
 		hash = block.GetLinks()[block.GetMutableInfo().MaxLink]
 		notSelf = true
+		count++
 	}
+	log.Warn("setPerv loop", "count", count)
 	if mainChain.MainTail.Hash == (common.Hash{}) {
 		return fmt.Errorf("not found MainTail")
 	}
@@ -155,8 +158,12 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 		}
 		mainChain.Tail.Hash = block.GetHash()
 		mainChain.Tail.CumulativeDiff = block.GetCumulativeDiff()
+		mainChain.Tail.Time = block.GetTime()
 		<-emptyChan
-		//todo: wirte DB
+		err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.Tail)
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 }
 
@@ -203,7 +210,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) er
 			}
 			if (mutableInfo.Status & types.BlockTmpMaxDiff) != 0 {
 				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					SingleChainCumulativeDiff = SingleChainCumulativeDiff.Add(SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
+					SingleChainCumulativeDiff.Add(SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
 					linksIsUpdateDiff[i] = true
 				} else {
 					SingleChainCumulativeDiff = block.GetCumulativeDiff()
@@ -284,7 +291,7 @@ func (mainChain *MainChain) Confirm() error {
 		return err
 	}
 	for _, block := range listMainBlock {
-		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err != nil {
+		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
 			mainChain.RollBackStatus(block.Hash)
 		}
 	}
@@ -294,7 +301,7 @@ func (mainChain *MainChain) Confirm() error {
 	}
 
 	mainBlock, err := storage.ReadMainBlock(mainChain.db, lastMainTimeSlice)
-	if err == nil {
+	if err != nil {
 		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", lastMainTimeSlice)
 	}
 	state, err := state.New(mainBlock.Root, mainChain.stateDb)

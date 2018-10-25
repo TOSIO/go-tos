@@ -162,7 +162,13 @@ func (tx *TxBlock) Validation() error {
 	}
 
 	if !(amount.Cmp(GlobalTosTotal) < 0) {
-		return fmt.Errorf("The amount is not less than the GlobalTosTotal")
+		return fmt.Errorf("the amount is not less than the GlobalTosTotal")
+	}
+
+	for _, out := range tx.Outs {
+		if out.Amount.Sign() < 0 {
+			return fmt.Errorf("the amount must be positive")
+		}
 	}
 
 	//4
