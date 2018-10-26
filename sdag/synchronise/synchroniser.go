@@ -112,7 +112,7 @@ func (s *Synchroniser) loop() {
 		select {
 		case netStat := <-s.netCh:
 			if netStat == core.NETWORK_CONNECTED {
-				if lastNetUnavilableTime.IsZero() || time.Since(lastNetUnavilableTime) >= 30*time.Minute && atomic.LoadInt32(&s.syncing) == 0 {
+				if lastNetUnavilableTime.IsZero() || time.Since(lastNetUnavilableTime) >= 5*time.Minute && atomic.LoadInt32(&s.syncing) == 0 {
 					atomic.StoreInt32(&s.syncing, 1)
 					go s.SyncHeavy()
 				}
