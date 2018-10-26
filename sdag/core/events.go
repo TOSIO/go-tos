@@ -13,16 +13,16 @@ const (
 )
 
 const (
-	SYNC_BEGIN = iota
+	SYNC_READY = iota
 	SYNC_SYNCING
-	SYNC_PAUSE
+	SYNC_ERROR
 	SYNC_END
 )
 
 var syncStrDICT = map[int]string{
-	SYNC_BEGIN:   "SYNC-BEGIN",
+	SYNC_READY:   "SYNC-READY",
 	SYNC_SYNCING: "SYNC-SYNCING",
-	SYNC_PAUSE:   "SYNC-PUSE",
+	SYNC_ERROR:   "SYNC-ERROR",
 	SYNC_END:     "SYNC-END",
 }
 

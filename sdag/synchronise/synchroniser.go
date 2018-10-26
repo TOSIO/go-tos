@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/event"
@@ -39,6 +40,7 @@ type Synchroniser struct {
 	fetcher *Fetcher
 	relayer *Relayer
 
+	syncing          int32
 	oneSliceSyncDone chan uint64
 
 	peerSliceCh   chan core.Response
@@ -47,11 +49,13 @@ type Synchroniser struct {
 
 	blockReqCh chan struct{}
 
+	netStatus int
 	/* 	blockReqQueue      map[common.Hash]string
 	   	blockUnfinishQueue map[common.Hash]string
 	   	blockQueueLock     sync.RWMutex // Lock to protect the cancel channel and peer in delivers
 	*/
 	cancelCh chan struct{} // Channel to cancel mid-flight syncs
+	quitCh   chan struct{} // Channel to cancel mid-flight syncs
 
 	//syncResultCh chan error
 
@@ -65,14 +69,17 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 		blkstorage:     bs,
 		blockPoolEvent: poolEvent,
 		syncEvent:      event,
-		netFeed:        feed}
+		netFeed:        feed,
+		syncing:        0,
+		netStatus:      core.NETWORK_CLOSED}
 	syncer.oneSliceSyncDone = make(chan uint64)
-	syncer.peerSliceCh = make(chan core.Response)
+	syncer.peerSliceCh = make(chan core.Response, 1)
 	syncer.blockhashesCh = make(chan core.Response)
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
 
 	syncer.cancelCh = make(chan struct{})
+	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
 
 	syncer.fetcher = NewFetcher(ps)
@@ -84,24 +91,47 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 }
 
 func (s *Synchroniser) Start() error {
-	s.wg.Add(1)
 	go s.fetcher.loop()
 	go s.relayer.loop()
-	go s.SyncHeavy()
+	go s.loop()
 	return nil
 }
 
 func (s *Synchroniser) Stop() {
+	s.quitCh <- struct{}{}
 	s.cancelCh <- struct{}{}
 	s.fetcher.stop()
 	s.relayer.stop()
 	s.wg.Wait()
 }
 
+func (s *Synchroniser) loop() {
+	var lastNetUnavilableTime time.Time
+	s.wg.Add(1)
+	defer s.wg.Done()
+	for {
+		select {
+		case netStat := <-s.netCh:
+			if netStat == core.NETWORK_CONNECTED {
+				if lastNetUnavilableTime.IsZero() || time.Since(lastNetUnavilableTime) >= 30*time.Minute && atomic.LoadInt32(&s.syncing) == 0 {
+					atomic.StoreInt32(&s.syncing, 1)
+					go s.SyncHeavy()
+				}
+			} else {
+				lastNetUnavilableTime = time.Now()
+			}
+		case <-s.quitCh:
+
+			return
+		}
+	}
+}
+
 func (s *Synchroniser) SyncHeavy() error {
+	s.wg.Add(1)
 	defer s.wg.Done()
 	var timesliceEnd uint64
-	timeout := time.After(s.requestTTL())
+
 	triedNodes := make(map[string]string)
 	errCh := make(chan error)
 
@@ -111,7 +141,7 @@ func (s *Synchroniser) SyncHeavy() error {
 	}
 
 	stat := core.SYNCStatusEvent{
-		Progress:          core.SYNC_BEGIN,
+		Progress:          core.SYNC_READY,
 		BeginTS:           lastSyncSlice,
 		EndTS:             0,
 		CurTS:             0,
@@ -121,40 +151,17 @@ func (s *Synchroniser) SyncHeavy() error {
 
 	s.syncEvent.Post(stat)
 
-	var lastNetUnavilableTime time.Time
 loop:
 	for {
-	internalloop:
-		//detect the network is whether available
-		for {
-			select {
-			case netStat := <-s.netCh:
-				if netStat == core.NETWORK_CONNECTED {
-					if stat.Progress != core.SYNC_END {
-						break internalloop
-					} else if time.Since(lastNetUnavilableTime) > 30*time.Minute {
-						stat.AccumulateSYNCNum = 0
-						break internalloop
-					}
-				} else {
-					lastNetUnavilableTime = time.Now()
-					stat.Progress = core.SYNC_PAUSE
-					s.syncEvent.Post(stat)
-				}
-			case <-s.cancelCh:
-				stat.Err = fmt.Errorf("canceled")
-				stat.EndTime = time.Now()
-				return nil
-				//return nil
-			}
-		}
 		// 随机挑选一个节点
 		peer, err := s.peerset.RandomSelectIdlePeer()
 		if err != nil {
 			//s.syncResultCh <- err
 			//return err
 			stat.Err = err
-			continue
+			stat.Progress = core.SYNC_ERROR
+			s.syncEvent.Post(stat)
+			break
 		}
 		if _, existed := triedNodes[peer.NodeID()]; existed {
 			continue
@@ -168,7 +175,7 @@ loop:
 		// 查询其当前最近一次临时主块的时间片
 		go peer.RequestLastMainSlice()
 		log.Debug("Request last-mainblock-timeslice", "origin", peer.NodeID())
-
+		timeout := time.After(s.requestTTL())
 		select {
 		case resp := <-s.peerSliceCh:
 			if timesliceResp, ok := resp.(*TimeslicePacket); ok {
@@ -182,33 +189,50 @@ loop:
 				stat.Progress = core.SYNC_SYNCING
 				s.syncEvent.Post(stat)
 				go s.syncTimeslice(peer, &stat, lastSyncSlice, errCh)
+
+			internalloop:
+				for {
+					select {
+					case stat.Err = <-errCh:
+						break internalloop
+					case ts := <-s.oneSliceSyncDone:
+						if ts >= timesliceEnd {
+							stat.EndTime = time.Now()
+							stat.Progress = core.SYNC_END
+							stat.Err = nil
+							s.syncEvent.Post(stat)
+							break loop
+						}
+						lastSyncSlice = ts + 1
+						stat.CurTS = lastSyncSlice
+						stat.Err = nil
+						s.syncEvent.Post(stat)
+						go s.syncTimeslice(peer, &stat, lastSyncSlice, errCh)
+					case <-s.cancelCh:
+						stat.Err = fmt.Errorf("canceled")
+						stat.EndTime = time.Now()
+						s.syncEvent.Post(stat)
+						return nil
+					}
+				}
 			}
-		case stat.Err = <-errCh:
-			continue
-		case ts := <-s.oneSliceSyncDone:
-			if ts >= timesliceEnd {
-				stat.EndTime = time.Now()
-				stat.Progress = core.SYNC_END
-				stat.Err = nil
-				s.syncEvent.Post(stat)
-				continue loop
-			}
-			lastSyncSlice = ts + 1
-			stat.CurTS = lastSyncSlice
-			stat.Err = nil
-			s.syncEvent.Post(stat)
-			go s.syncTimeslice(peer, &stat, lastSyncSlice, errCh)
+
 		case <-timeout:
 			stat.Err = fmt.Errorf("timeout")
+			s.syncEvent.Post(stat)
+			log.Debug("Wait response timeout")
 			continue
 		case <-s.cancelCh:
 			stat.Err = fmt.Errorf("canceled")
 			stat.EndTime = time.Now()
+			s.syncEvent.Post(stat)
 			return nil
+
 		}
+
 	}
 
-	//s.syncResultCh <- nil
+	atomic.StoreInt32(&s.syncing, 0)
 	return nil
 }
 
@@ -267,10 +291,11 @@ func (s *Synchroniser) MarkAnnounced(hash common.Hash, nodeID string) {
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
-	return time.Duration(2000)
+	return time.Duration(3 * time.Second)
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
+	log.Debug("Deliver LAST-MAINBLOCK-TIMESLICE response")
 	return s.deliverResponse(id, s.peerSliceCh, &TimeslicePacket{peerId: id, timeslice: timeslice})
 }
 
@@ -304,7 +329,7 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan core.Response, res
 	}
 	select {
 	case destCh <- response:
-		log.Trace("Deliver was finished")
+		log.Debug("Deliver was finished")
 		return nil
 	case <-cancel:
 		return errNoSyncActive

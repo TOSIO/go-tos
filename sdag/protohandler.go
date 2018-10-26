@@ -356,6 +356,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 	case GetLastMainTimeSlice: //获取最近一次临时主块的时间片
 		return pm.handleGetLastMainTimeSlice(p, msg)
+	case LastMainTimeSlice:
+		return pm.handleLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
 		return pm.handleGetBlockHashBySlice(p, msg)
 	case GetBlocksBySliceMsg: //获取区块数据
@@ -398,7 +400,7 @@ func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Trace("Handle GET-LAST-MAIN-TIMESLICE response", "timeslice", timeslice)
+	p.Log().Trace("<< Handle GET-LAST-MAIN-TIMESLICE response", "timeslice", timeslice)
 	// 将回复结果递送到同步器
 	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, timeslice)
 }
