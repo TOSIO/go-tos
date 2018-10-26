@@ -69,7 +69,7 @@ func (p *peer) broadcast() {
 			var blocks [][]byte
 			blocks = append(blocks, block)
 			err := p.SendNewBlocks(blocks)
-			p.Log().Trace("Peer.broadcast() | send new block", "nodeID", p.id, "err", err)
+			p.Log().Debug(">> NEW-BLOCK", "size", len(blocks), "err", err)
 		case <-p.term:
 			p.Log().Info("Broadcast stopped")
 			return
@@ -127,7 +127,9 @@ func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
 }
 
 func (p *peer) RequestBlocksBySlice(timeslice uint64, hashes []common.Hash) error {
-	return p2p.Send(p.rw, GetBlocksBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+	err := p2p.Send(p.rw, GetBlocksBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+	p.Log().Debug(">> GET-BLOCK-BY-TIMESLICE-HASH", "timeslice", timeslice, "hash.size", len(hashes), "err", err)
+	return err
 }
 
 /* func (p *peer) RequestBlocks(hashes []common.Hash) error {
@@ -137,11 +139,15 @@ func (p *peer) RequestBlocksBySlice(timeslice uint64, hashes []common.Hash) erro
 func (p *peer) RequestBlock(hash common.Hash) error {
 	hashes := make([]common.Hash, 0)
 	hashes = append(hashes, hash)
+	p.Log().Debug(">> GET-BLOCK-BY-HASH", "hash", hash.String())
 	return p2p.Send(p.rw, GetBlockByHashMsg, hashes)
 }
 
 func (p *peer) NodeID() string {
 	return p.id
+}
+func (p *peer) Address() string {
+	return p.RemoteAddr().String()
 }
 
 func (p *peer) SetIdle(idle bool) {
@@ -149,11 +155,12 @@ func (p *peer) SetIdle(idle bool) {
 }
 
 func (p *peer) RequestBlockHashBySlice(slice uint64) error {
-	return p2p.Send(p.rw, GetBlockHashBySliceMsg, slice)
+	err := p2p.Send(p.rw, GetBlockHashBySliceMsg, slice)
+	p.Log().Debug(">> GET-BLOCK-HASH-BY-TIMESLICE", "timeslice", slice, "err", err)
+	return err
 }
 
 func (p *peer) RequestLastMainSlice() error {
-
 	err := p2p.Send(p.rw, GetLastMainTimeSlice, GetLastMainBlockTSReq{})
 	p.Log().Debug(">> GET-LAST-MAINBLOCK-TIMESLICE", "err", err)
 	return err

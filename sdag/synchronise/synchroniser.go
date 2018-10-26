@@ -13,7 +13,6 @@ import (
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
-	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 )
@@ -73,7 +72,7 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 		syncing:        0,
 		netStatus:      core.NETWORK_CLOSED}
 	syncer.oneSliceSyncDone = make(chan uint64)
-	syncer.peerSliceCh = make(chan core.Response, 1)
+	syncer.peerSliceCh = make(chan core.Response)
 	syncer.blockhashesCh = make(chan core.Response)
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
@@ -169,21 +168,23 @@ loop:
 			triedNodes[peer.NodeID()] = peer.NodeID()
 		}
 
-		stat.CurOrigin = peer.NodeID()
-		stat.TriedOrigin = append(stat.TriedOrigin, peer.NodeID())
+		origin := peer.NodeID() + "[" + peer.Address() + "]"
+		stat.CurOrigin = origin
+		stat.TriedOrigin = append(stat.TriedOrigin, origin)
 
 		// 查询其当前最近一次临时主块的时间片
 		go peer.RequestLastMainSlice()
-		log.Debug("Request last-mainblock-timeslice", "origin", peer.NodeID())
+		log.Debug("Request last-mainblock-timeslice", "origin", origin)
 		timeout := time.After(s.requestTTL())
+
 		select {
 		case resp := <-s.peerSliceCh:
 			if timesliceResp, ok := resp.(*TimeslicePacket); ok {
-				if lastSyncSlice > timesliceResp.timeslice {
+				if lastSyncSlice >= timesliceResp.timeslice {
 					log.Debug("The timeslice of remote peer is too small", "response.Slice", timesliceResp.timeslice)
 					continue
 				}
-				timesliceEnd = utils.GetMainTime(timesliceResp.timeslice)
+				timesliceEnd = timesliceResp.timeslice
 				stat.EndTS = timesliceEnd
 				stat.CurTS = lastSyncSlice
 				stat.Progress = core.SYNC_SYNCING
@@ -248,8 +249,18 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 	select {
 	case response := <-s.blockhashesCh:
 		if all, ok := response.(*TSHashesPacket); ok {
+			if len(all.hashes) <= 0 {
+				break
+			}
 			var diff []common.Hash
 			diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
+			if err != nil {
+				errCh <- errInternal
+				return
+			}
+			if len(diff) <= 0 {
+				break
+			}
 			if err = p.RequestBlocksBySlice(all.timeslice, diff); err != nil {
 				errCh <- err
 				return
@@ -296,7 +307,7 @@ func (s *Synchroniser) requestTTL() time.Duration {
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
-	log.Debug("Deliver LAST-MAINBLOCK-TIMESLICE response")
+	log.Trace("Deliver LAST-MAINBLOCK-TIMESLICE response")
 	return s.deliverResponse(id, s.peerSliceCh, &TimeslicePacket{peerId: id, timeslice: timeslice})
 }
 
@@ -330,7 +341,7 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan core.Response, res
 	}
 	select {
 	case destCh <- response:
-		log.Debug("Deliver was finished")
+		log.Trace("Deliver was finished")
 		return nil
 	case <-cancel:
 		return errNoSyncActive

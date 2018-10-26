@@ -176,6 +176,7 @@ func (pm *ProtocolManager) loop() {
 					"endTS", event.EndTS,
 					"beginTime", event.BeginTime,
 					"endTime", event.EndTime,
+					"accumlatedNum", event.AccumulateSYNCNum,
 					"tiredOrigins", event.TriedOrigin,
 					"err", event.Err)
 
@@ -360,6 +361,8 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleLastMainTimeSlice(p, msg)
 	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
 		return pm.handleGetBlockHashBySlice(p, msg)
+	case BlockHashBySliceMsg:
+		return pm.handleBlockHashBySlice(p, msg)
 	case GetBlocksBySliceMsg: //获取区块数据
 		return pm.handleGetBlocksBySlice(p, msg)
 	case BlocksBySliceMsg:
@@ -385,10 +388,10 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 
 // 获取最近一次临时主块所在时间片消息处理
 func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
-	p.Log().Trace("Handle GET-LAST-MAIN-TIMESLICE request")
+	p.Log().Debug("<< GET-LAST-MAINBLOCK-TIMESLICE")
 
 	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
-	p.Log().Trace(">> LAST-MAIN-TIMESLICE (Send timeslice back to remote node)", "timeslice", lastMainSlice)
+	p.Log().Debug(">> LAST-MAINBLOCK-TIMESLICE", "timeslice", lastMainSlice)
 	return p.SendTimeSlice(lastMainSlice)
 }
 
@@ -400,7 +403,7 @@ func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Trace("<< Handle GET-LAST-MAIN-TIMESLICE response", "timeslice", timeslice)
+	p.Log().Debug("<< LAST-MAINBLOCK-TIMESLICE", "timeslice", timeslice)
 	// 将回复结果递送到同步器
 	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, timeslice)
 }
@@ -414,15 +417,17 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Trace("<< Handle GET-BLOCK-HASH-BY-TIMESLICE request", "timeslice", targetSlice)
+	p.Log().Debug("<< GET-BLOCK-HASH-BY-TIMESLICE", "timeslice", targetSlice)
 
 	var hashes []common.Hash
 	hashes, err = pm.blkstorage.GetBlockHashByTmSlice(targetSlice)
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Debug(">> BLOCK-HASH-BY-TIMESLICE (Send hash back to remote node)", "response-hash-size", len(hashes))
-	return p.SendBlockHashes(targetSlice, hashes)
+
+	err = p.SendBlockHashes(targetSlice, hashes)
+	p.Log().Debug(">> BLOCK-HASH-BY-TIMESLICE", "size", len(hashes), "err", err)
+	return err
 }
 
 // 根据时间片获取对应所有区块hash消息处理
@@ -433,7 +438,7 @@ func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Trace("<< Handle GET-BLOCK-HASH-BY-TIMESLICE response", "timeslice", response.Timeslice, "size", len(response.Hashes))
+	p.Log().Debug("<< BLOCK-HASH-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Hashes))
 	// 将回复结果递送到同步器
 
 	return pm.synchroniser.DeliverBlockHashesResp(p.id, response.Timeslice, response.Hashes)
@@ -449,10 +454,10 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	}
 
 	if len(req.Hashes) <= 0 {
-		log.Trace("Param 'Hashes' is empty.")
+		log.Debug("Param 'Hashes' is empty.")
 		return nil
 	}
-	p.Log().Trace("<< Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
+	p.Log().Debug("<< GET-BLOCK-BY-SLICEHASH", "timeslice", req.Timeslice, "size", len(req.Hashes))
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req.Hashes)
 	if err != nil {
@@ -463,7 +468,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	}
 	// 将结果回复给对方
 	//p.Log().Trace("Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
-	p.Log().Debug(">> BLOCK-BY-SLICEHASH (Send block back to remote node)", "response-block-size", len(blocks))
+	p.Log().Debug(">> BLOCK-BY-SLICEHASH", "response-block-size", len(blocks))
 	return p.SendSliceBlocks(req.Timeslice, blocks)
 }
 
@@ -474,7 +479,7 @@ func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Trace("<< handle GET-BLOCK-BY-TIMESLICE response", "timeslice", response.Timeslice, "size", len(response.Blocks))
+	p.Log().Debug("<< BLOCK-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Blocks))
 	// 将回复结果递送到同步器
 	return pm.synchroniser.DeliverBlockDatasResp(p.id, response.Timeslice, response.Blocks)
 }
@@ -488,11 +493,11 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 	}
 
 	if len(req) <= 0 {
-		log.Trace("Param 'Hashes' is empty.")
+		log.Debug("Param 'Hashes' is empty.")
 		return nil
 	}
 	for _, item := range req {
-		p.Log().Debug("<< Handle GET-BLOCK-BY-HASH request", "hash", item.String())
+		p.Log().Debug("<< GET-BLOCK-BY-HASH", "hash", item.String())
 	}
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req)
@@ -503,7 +508,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		return nil
 	}
 	// 将结果回复给对方
-	p.Log().Debug(">> BLOCK-BY-HASH (Send block back to remote node)", "response-block-size", len(blocks))
+	p.Log().Debug(">> BLOCK-BY-HASH", "size", len(blocks))
 	return p.SendNewBlocks(blocks)
 }
 
@@ -514,7 +519,7 @@ func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Debug("<< Handle NEW-BLOCK response/announce", "size", len(response))
+	p.Log().Debug("<< NEW-BLOCK(response/sync)", "size", len(response))
 	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
 }
 
@@ -525,7 +530,7 @@ func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Debug("<< Handle NEW-BLOCK-HASH,new block announced", "hash", response.String())
+	p.Log().Debug("<< NEW-BLOCK-HASH", "hash", response.String())
 	pm.synchroniser.MarkAnnounced(response, p.NodeID())
 	return nil
 }

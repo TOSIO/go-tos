@@ -14,6 +14,7 @@ type BlockPoolI interface {
 
 type Peer interface {
 	NodeID() string
+	Address() string
 
 	SetIdle(idle bool)
 	RequestBlockHashBySlice(slice uint64) error
