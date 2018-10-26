@@ -124,9 +124,9 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	if err = manager.initProtocols(); err != nil {
 		return nil, err
 	}
-	var storageProxy *synchronise.StorageProxy
+	//var storageProxy *synchronise.StorageProxy
 	//var mempoolProxy *synchronise.MemPoolProxy
-	if storageProxy, err = synchronise.NewStorage(db); err != nil {
+	if manager.blkstorage, err = synchronise.NewStorage(db); err != nil {
 		log.Error("Initialising Sdag storageproxy failed.")
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	} */
 
 	if manager.synchroniser, err = synchronise.NewSynchroinser(manager.Peers(),
-		chain, storageProxy, feed, poolFeed, manager.syncEvent); err != nil {
+		chain, manager.blkstorage, feed, poolFeed, manager.syncEvent); err != nil {
 		log.Error("Initialising Sdag synchroniser failed.")
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) erro
 	p.Log().Trace("Handle GET-LAST-MAIN-TIMESLICE request")
 
 	lastMainSlice := pm.mainChain.GetLastTempMainBlkSlice()
-	p.Log().Trace("Send timeslice back to remote node", "timeslice", lastMainSlice)
+	p.Log().Trace(">> LAST-MAIN-TIMESLICE (Send timeslice back to remote node)", "timeslice", lastMainSlice)
 	return p.SendTimeSlice(lastMainSlice)
 }
 
@@ -421,7 +421,7 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 	if err != nil {
 		return errResp(ErrDecode, "msg %v: %v", msg, err)
 	}
-	p.Log().Debug(">> Send hash back to remote node", "response-hash-size", len(hashes))
+	p.Log().Debug(">> BLOCK-HASH-BY-TIMESLICE (Send hash back to remote node)", "response-hash-size", len(hashes))
 	return p.SendBlockHashes(targetSlice, hashes)
 }
 
@@ -463,7 +463,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	}
 	// 将结果回复给对方
 	//p.Log().Trace("Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
-	p.Log().Debug(">> Send block back to remote node", "response-block-size", len(blocks))
+	p.Log().Debug(">> BLOCK-BY-SLICEHASH (Send block back to remote node)", "response-block-size", len(blocks))
 	return p.SendSliceBlocks(req.Timeslice, blocks)
 }
 
@@ -503,7 +503,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		return nil
 	}
 	// 将结果回复给对方
-	p.Log().Debug(">> Send block back to remote node", "response-block-size", len(blocks))
+	p.Log().Debug(">> BLOCK-BY-HASH (Send block back to remote node)", "response-block-size", len(blocks))
 	return p.SendNewBlocks(blocks)
 }
 

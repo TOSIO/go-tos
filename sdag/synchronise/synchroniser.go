@@ -218,10 +218,11 @@ loop:
 			}
 
 		case <-timeout:
+			stat.Progress = core.SYNC_ERROR
 			stat.Err = fmt.Errorf("timeout")
 			s.syncEvent.Post(stat)
 			log.Debug("Wait response timeout")
-			continue
+			continue loop
 		case <-s.cancelCh:
 			stat.Err = fmt.Errorf("canceled")
 			stat.EndTime = time.Now()
