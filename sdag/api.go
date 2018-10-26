@@ -118,10 +118,7 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo() string {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
-	//emptyC <- struct{}{}
-	//statisticsObj.Statistics()
-	//<-emptyC
-	//return "OK"
+	log.Debug("RPC receives Transaction", "receives jsonString", jsonString)
 	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var transactionInfo TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
@@ -162,12 +159,10 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 		return "HexToECDSA failed"
 	}
 
-	//emptyC <- struct{}{}
 	err = transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
 	if err != nil {
 		return err.Error()
 	}
-	//<-emptyC
 	return "OK"
 }
 

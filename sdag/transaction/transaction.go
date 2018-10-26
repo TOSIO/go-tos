@@ -3,6 +3,7 @@ package transaction
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"math/big"
 
 	"github.com/TOSIO/go-tos/params"
@@ -89,9 +90,11 @@ func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *Tran
 	if err != nil {
 		return err
 	}
+	log.Debug("block construction success", "hash", TxBlock.GetHash().String(), "block", TxBlock)
 	err = pool.EnQueue(TxBlock)
 	if err != nil {
 		return err
 	}
+	log.Debug("Added to the block pool successfully")
 	return nil
 }

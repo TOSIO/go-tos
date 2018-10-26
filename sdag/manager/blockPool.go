@@ -186,6 +186,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
 
+	log.Debug("begin addIsolatedBlock", "hash", block.GetHash().String())
 	isolated := block.GetHash()
 	if _, ok := p.IsolatedBlockMap[isolated]; ok {
 		//log.Warn("the Isolated block already exists")
@@ -227,10 +228,11 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
 
+	log.Debug("begin deleteIsolatedBlock", "hash", block.GetHash().String())
 	blockHash := block.GetHash()
 	v, ok := p.lackBlockMap[blockHash]
 	if ok {
-		log.Trace("Delete block from orphan graph", "block", blockHash.String())
+		log.Debug("Delete block from orphan graph", "hash", blockHash.String())
 
 		delete(p.lackBlockMap, blockHash)
 		//save blcok
@@ -289,15 +291,16 @@ func (p *BlockPool) SyncAddBlock(block types.Block) error {
 }
 
 func (p *BlockPool) AddBlock(block types.Block) error {
+	log.Debug("begin AddBlock", "hash", block.GetHash().String(), "block", block)
 	err := block.Validation()
 	if err != nil {
-		log.Error("the block Validation fail")
+		log.Error("the block Validation fail", "hash", block.GetHash().String())
 		return fmt.Errorf("the block Validation fail")
 	}
 
 	ok := storage.HasBlock(p.db, block.GetHash())
 	if ok {
-		log.Error("the block has been added")
+		log.Error("the block has been added", "hash", block.GetHash().String())
 		return fmt.Errorf("the block has been added")
 	} else {
 		//log.Trace("Non-repeating block")
@@ -317,6 +320,8 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 	//deleteIsolatedBlock(block)
 	//go pm.RelayBlock(block.GetRlp())
 
+	log.Debug("addBlock finish", "hash", block.GetHash().String())
+
 	p.statisticsObj.Statistics()
 	return err
 }
@@ -331,12 +336,12 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		if linkBlockEI != nil {
 			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
 				if linkBlockI.GetTime() > block.GetTime() {
-					log.Error("links time error")
+					log.Error("links time error", "block time", block.GetTime(), "link time", linkBlockI.GetTime())
 					return fmt.Errorf("links time error")
 				} else {
 					info, err := storage.ReadBlockMutableInfo(p.db, hash)
 					if err != nil {
-						log.Error("ReadBlockMutableInfo error")
+						log.Error("ReadBlockMutableInfo error", "hash", hash)
 						return fmt.Errorf("ReadBlockMutableInfo error")
 					}
 					linkBlockI.SetMutableInfo(info)
@@ -344,7 +349,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 					//log.Trace("links time legal")
 				}
 			} else {
-				log.Error("linkBlockEI assertion failure")
+				log.Error("linkBlockEI assertion failure", "hash", hash)
 				return fmt.Errorf("linkBlockEI assertion failure")
 			}
 		} else {
@@ -354,7 +359,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	}
 
 	if isIsolated {
-		log.Warn(block.GetHash().String() + "is a Isolated block")
+		log.Warn("is a Isolated block", "hash", block.GetHash().String())
 		p.addIsolatedBlock(block, linksLackBlock)
 		/* for _, linkBlock := range linksLackBlock {
 			//p.pm.GetBlock(linkBlock)
@@ -367,14 +372,17 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	} else {
 		//log.Trace("Verification passed")
 		p.verifyAncestors(linkBlockIs)
+		log.Debug("verifyAncestors finish", "hash", block.GetHash().String())
 		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
 		if err != nil {
 			return err
 		}
+		log.Debug("ComputeCumulativeDiff finish", "hash", block.GetHash().String())
 		p.saveBlock(block)
 		if hasUpdateCumulativeDiff {
 			p.mainChainI.UpdateTail(block)
 		}
+		log.Debug("saveBlock finish", "hash", block.GetHash().String())
 		p.deleteIsolatedBlock(block)
 
 		log.Debug("Relay block", "hash", block.GetHash().String())
@@ -382,6 +390,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		event.Blocks = append(event.Blocks, block)
 		p.blockEvent.Post(event)
 	}
+
 	return nil
 }
 

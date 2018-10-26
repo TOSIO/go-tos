@@ -114,6 +114,7 @@ func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Debug("mainChain initTail finish", "Tail", mainChain.Tail, "PervTail", mainChain.PervTail, "MainTail", mainChain.MainTail)
 
 	go func() {
 		currentTime := time.Now().Unix()
@@ -158,6 +159,7 @@ func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
 func (mainChain *MainChain) UpdateTail(block types.Block) {
 	mainChain.tailRWLock.RLock()
 	if mainChain.Tail.CumulativeDiff.Cmp(block.GetCumulativeDiff()) < 0 {
+		log.Debug("update tail", "hash", block.GetHash().String(), "block", block)
 		mainChain.tailRWLock.RUnlock()
 		mainChain.tailRWLock.Lock()
 		if !IsTheSameTimeSlice(mainChain.Tail.Time, block.GetTime()) {
@@ -171,6 +173,7 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 		if err != nil {
 			log.Error(err.Error())
 		}
+		log.Debug("update tail finished", "hash", block.GetHash().String(), "mainChain.Tail", mainChain.Tail, "mainChain.PervTail", mainChain.PervTail)
 		mainChain.tailRWLock.Unlock()
 	} else {
 		mainChain.tailRWLock.RUnlock()
@@ -234,6 +237,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 	toBeAddedBlock.SetCumulativeDiff(CumulativeDiff)
 	toBeAddedBlock.SetMaxLinks(uint8(index))
 	if linksIsUpdateDiff[index] {
+		log.Debug("update  CumulativeDiff", "hash", toBeAddedBlock.GetHash().String())
 		toBeAddedBlock.SetStatus(toBeAddedBlock.GetStatus() | types.BlockTmpMaxDiff)
 		hasUpdateCumulativeDiff = true
 	}
@@ -254,7 +258,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 	for {
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
-			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found")
+			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
 		}
 
 		if !canConfirm && TimeSliceDifference(now, block.GetTime()) > params.ConfirmBlock {
@@ -282,6 +286,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 					listBlock = append([]types.Block{block}, listBlock...)
 					currentTimeSliceAdded = true
 					number--
+					log.Debug("findTheMainBlockThatCanConfirmOtherBlocks", "hash", block.GetHash().String(), "block", block)
 				}
 			}
 		}
@@ -315,6 +320,7 @@ func (mainChain *MainChain) Confirm() error {
 	}
 
 	for _, block := range listMainBlock {
+		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block)
 		mainTimeSlice := utils.GetMainTime(block.GetTime())
 		confirmReward, err := mainChain.singleBlockConfirm(block, mainTimeSlice, state)
 		if err != nil {
@@ -327,14 +333,20 @@ func (mainChain *MainChain) Confirm() error {
 			return err
 		}
 
-		CalculatingAccounts(block, ComputeMainConfirmReward(confirmReward), state)
+		log.Debug("the main block confirm finished", "confirmReward.userReward", confirmReward.userReward, "confirmReward.minerReward", confirmReward.minerReward)
+		if _, err := CalculatingAccounts(block, ComputeMainConfirmReward(confirmReward), state); err != nil {
+			log.Error(err.Error())
+		}
 
-		CalculatingMinerReward(block, blockNumber, state)
+		if err := CalculatingMinerReward(block, blockNumber, state); err != nil {
+			log.Error(err.Error())
+		}
 
 		root, err := state.Commit(false)
 		if err != nil {
 			return err
 		}
+		log.Debug("Commit finished", "root", root.String(), "hash", block.GetHash().String())
 		err = state.Database().TrieDB().Commit(root, true)
 		if err != nil {
 			return err
@@ -345,10 +357,12 @@ func (mainChain *MainChain) Confirm() error {
 		}
 		if block == listMainBlock[len(listMainBlock)-1] {
 			mainChain.mainTailRWLock.Lock()
+			log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
 			mainChain.MainTail.Hash = block.GetHash()
 			mainChain.MainTail.Time = block.GetTime()
 			mainChain.MainTail.Number = blockNumber
 			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
+			log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
 			mainChain.mainTailRWLock.Unlock()
 		}
 		blockNumber++
@@ -357,6 +371,7 @@ func (mainChain *MainChain) Confirm() error {
 }
 
 func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
+	log.Debug("RollBackStatus main block", "hash", hash)
 	block := storage.ReadBlock(mainChain.db, hash)
 	if block == nil {
 		return fmt.Errorf("RollBackStatus ReadBlock Not found")
@@ -365,6 +380,8 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 	if err != nil {
 		return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 	}
+	log.Debug("RollBackStatus main block", "block", block, "mutableInfo", mutableInfo)
+
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -388,6 +405,7 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 }
 
 func (mainChain *MainChain) singleRollBackStatus(block types.Block) error {
+	log.Debug("singleRollBackStatus", "hash", block.GetHash().String(), "block", block)
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -418,6 +436,7 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, MainTimeSlice 
 		confirmRewardInfo  ConfirmRewardInfo
 	)
 	confirmRewardInfo.Init()
+	log.Debug("begin singleBlockConfirm", "block", block.GetHash())
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -435,11 +454,14 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, MainTimeSlice 
 		if err != nil {
 			log.Error(err.Error())
 		}
+		log.Debug("singleBlockConfirm ancestors finished", "hash", block.GetHash().String(), "linksReward.userReward", linksReward.userReward, "linksReward.minerReward", linksReward.minerReward)
 		if linksReward != nil {
 			confirmRewardInfo.userReward.Add(confirmRewardInfo.userReward, linksReward.userReward)
 			confirmRewardInfo.minerReward.Add(confirmRewardInfo.minerReward, linksReward.minerReward)
 		}
 	}
+	log.Debug("singleBlockConfirm self", "hash", block.GetHash().String(),
+		"block", block, "confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String())
 	var err error
 	confirmRewardInfo.userReward, err = CalculatingAccounts(block, confirmRewardInfo.userReward, state)
 	if err == nil {
