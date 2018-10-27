@@ -102,7 +102,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	info.Difficulty = genesisBlock.GetDiff()
 	info.CumulativeDiff = genesisBlock.GetDiff()
 	info.ConfirmItsTimeSlice = utils.GetMainTime(genesis.Time)
-	info.Status = types.BlockMain
+	info.Status = types.BlockMain | types.BlockTmpMaxDiff
 	genesisBlock.SetMutableInfo(info)
 
 	storage.WriteBlock(genesis.db, genesisBlock)

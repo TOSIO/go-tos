@@ -187,8 +187,12 @@ func (tx *TxBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 	tx.mutableInfo = *mutableInfo
 }
 
-func (tx *TxBlock) SetMaxLinks(MaxLink uint8) {
-	tx.mutableInfo.MaxLink = MaxLink
+func (tx *TxBlock) GetMaxLink() common.Hash {
+	return tx.mutableInfo.MaxLinkHash
+}
+
+func (tx *TxBlock) SetMaxLink(MaxLink common.Hash) {
+	tx.mutableInfo.MaxLinkHash = MaxLink
 }
 
 func (tx *TxBlock) GetType() BlockType {
