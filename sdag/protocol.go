@@ -43,6 +43,33 @@ const (
 	ReceiptsMsg    = 0x10
 )
 
+var msgcodeToString = map[int]string{
+	StatusMsg:         "STATUS",
+	NewBlockMsg:       "NEW-BLOCK",
+	NewBlockHashMsg:   "NEW-BLOCK-HASH",
+	GetBlockByHashMsg: "GET-BLOCK-BY-HASH",
+
+	GetLastMainTimeSlice:   "GET-LAST-MAINBLOCK-TIMESLICE",
+	LastMainTimeSlice:      "LAST-MAINBLOCK-TIMESLICE",
+	GetBlockHashBySliceMsg: "GET-BLOCKHASH-BY-TIMESLICE",
+	BlockHashBySliceMsg:    "BLOCKHASH-BY-TIMESLICE",
+	GetBlocksBySliceMsg:    "GET-BLOCKS-BY-TIMESLICE",
+	BlocksBySliceMsg:       "BLOCKS-BY-TIMESLICE",
+
+	// Protocol messages belonging to tos/63
+	GetNodeDataMsg: "GET-NODEDATA",
+	NodeDataMsg:    "NODEDATA",
+	GetReceiptsMsg: "GET-RECEIPTS",
+	ReceiptsMsg:    "RECEIPTS",
+}
+
+func MsgCodeToString(code int) string {
+	return msgcodeToString[code]
+}
+
+type GetLastMainBlockTSReq struct {
+}
+
 type GetBlockHashBySliceResp struct {
 	Timeslice uint64
 	Hashes    []common.Hash

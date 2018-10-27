@@ -22,17 +22,22 @@ func (reward *ConfirmRewardInfo) Init() {
 }
 
 func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state.StateDB) (*big.Int, error) {
+	log.Debug("begin CalculatingAccounts", "hash", block.GetHash().String())
 	cost, IsGasCostOverrun, _ := ComputeCost(block)
+	log.Debug("ComputeCost", "block", block.GetHash().String(), "cost", cost.String(), "IsGasCostOverrun", IsGasCostOverrun)
 	address, err := block.GetSender()
 	if err != nil {
 		log.Error(err.Error())
 		return big.NewInt(0), err
 	}
+	log.Debug("Add confirmReward", "address", address, "confirmReward", confirmReward.String())
 
 	state.AddBalance(address, confirmReward)
 	balance := state.GetBalance(address)
+	log.Debug("Calculate the balance after confirming the reward", "address", address, "balance", balance.String())
 
 	actualCostDeduction := deductCost(address, balance, cost, state)
+	log.Debug("deduct cost", "address", address, "actualCostDeduction", actualCostDeduction.String(), "balance", balance.String())
 	if block.GetType() == types.BlockTypeTx {
 		if !IsGasCostOverrun {
 			txBlock, ok := block.(*types.TxBlock)
@@ -49,8 +54,10 @@ func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state
 			}
 
 			for _, out := range txBlock.Outs {
+				log.Debug("calculate transaction", "address", address, "out", out)
 				state.SubBalance(address, out.Amount)
 				state.AddBalance(out.Receiver, out.Amount)
+				log.Debug("after calculate transaction", "address", address, "balance", balance.String())
 			}
 		}
 	}
@@ -143,6 +150,7 @@ func CalculatingMinerReward(block types.Block, blockNumber uint64, state *state.
 	}
 	RewardMiner := RewardMiner(blockNumber)
 	state.AddBalance(address, RewardMiner)
+	log.Debug("CalculatingMinerReward", "RewardMiner", RewardMiner.String(), "address", address, "hash", block.GetHash().String())
 
 	return nil
 }
