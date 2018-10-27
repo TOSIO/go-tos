@@ -89,7 +89,8 @@ type Block interface {
 
 	Validation() error // (check data,校验解签名)
 
-	SetMaxLinks(MaxLink uint8) //设置最大连接
+	GetMaxLink() common.Hash        //设置最大连接
+	SetMaxLink(MaxLink common.Hash) //设置最大连接
 }
 
 type BlockHeader struct {
@@ -104,7 +105,8 @@ type MutableInfo struct {
 	ConfirmItsTimeSlice uint64      //Confirm its time slice
 	Difficulty          *big.Int    //self difficulty
 	CumulativeDiff      *big.Int    //cumulative difficulty
-	MaxLink             uint8
+	//MaxLink             uint8
+	MaxLinkHash common.Hash
 }
 
 //数据解析
@@ -112,9 +114,9 @@ func BlockDecode(rlpData []byte) (Block, error) {
 
 	var ty BlockType
 
-	if isList, lenNum := RLPList(rlpData[0]); isList && lenNum  < len(rlpData) {
-		if isList, lenNum1 := RLPList(rlpData[lenNum + 1]); isList && lenNum + 1 + lenNum1 < len(rlpData) {
-			ty = BlockType(rlpData[lenNum + 1 + lenNum1 + 1])
+	if isList, lenNum := RLPList(rlpData[0]); isList && lenNum < len(rlpData) {
+		if isList, lenNum1 := RLPList(rlpData[lenNum+1]); isList && lenNum+1+lenNum1 < len(rlpData) {
+			ty = BlockType(rlpData[lenNum+1+lenNum1+1])
 		} else {
 			return nil, errors.New("rlpData is err")
 		}

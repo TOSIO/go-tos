@@ -112,8 +112,12 @@ func (gb *GenesisBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 }
 
 // block interface
-func (gb *GenesisBlock) SetMaxLinks(MaxLink uint8) {
-	gb.mutableInfo.MaxLink = MaxLink
+func (gb *GenesisBlock) SetMaxLink(MaxLink common.Hash) {
+	gb.mutableInfo.MaxLinkHash = MaxLink
+}
+
+func (gb *GenesisBlock) GetMaxLink() common.Hash {
+	return gb.mutableInfo.MaxLinkHash
 }
 
 func (gb *GenesisBlock) GetType() BlockType {

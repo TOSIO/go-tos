@@ -1,28 +1,25 @@
 package manager
 
 import (
-	"github.com/TOSIO/go-tos/sdag/core/storage"
-	"github.com/TOSIO/go-tos/sdag/core/types"
+	"encoding/json"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
-	"encoding/json"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"math/big"
 )
 
-type QueryBlockInfoInterface struct{
-
+type QueryBlockInfoInterface struct {
 }
 
-
-
 type MutableInfo struct {
-	Status string
-	ConfirmItsTimeSlice uint64      //Confirm its time slice
-	Difficulty          *big.Int    //self difficulty
-	CumulativeDiff      *big.Int    //cumulative difficulty
-	MaxLink             uint8
+	Status              string
+	ConfirmItsTimeSlice uint64   //Confirm its time slice
+	Difficulty          *big.Int //self difficulty
+	CumulativeDiff      *big.Int //cumulative difficulty
+	MaxLinkHash         common.Hash
 }
 
 func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
@@ -41,18 +38,18 @@ func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash comm
 	return blockStatus
 }
 
-func  (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) string {
+func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) string {
 
 	//commonHash := common.HexToHash(hash)
 
 	mutableInfo, _ := storage.ReadBlockMutableInfo(h, hash)
 	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
-		Status: blockStatus,
+		Status:              blockStatus,
 		ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
-		Difficulty: mutableInfo.Difficulty,
-		CumulativeDiff: mutableInfo.CumulativeDiff,
-		MaxLink: mutableInfo.MaxLink,
+		Difficulty:          mutableInfo.Difficulty,
+		CumulativeDiff:      mutableInfo.CumulativeDiff,
+		MaxLinkHash:         mutableInfo.MaxLinkHash,
 	}
 
 	jsonData, err := json.Marshal(Data0)
@@ -63,27 +60,27 @@ func  (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Ha
 	return string(jsonData)
 }
 
-func  (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
+func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
 
 	mainInfo, err := storage.ReadMainBlock(h, slice)
 	if err != nil {
 		return ""
 	}
 
-	 mainHash := mainInfo.Hash
+	mainHash := mainInfo.Hash
 
-	 MainBlockInfo := q.GetBlockInfo(h, mainHash)
+	MainBlockInfo := q.GetBlockInfo(h, mainHash)
 
-	 return MainBlockInfo
+	return MainBlockInfo
 }
 
-func  (q *QueryBlockInfoInterface) GetFinalMainBlockInfo (h tosdb.Database) string {
+func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string {
 
 	var mianBlock *mainchain.MainChain
 	finalMainBlockSlice := mianBlock.GetMainTail()
 
 	mainInfo, err := storage.ReadMainBlock(h, finalMainBlockSlice.Time)
-	if err != nil{
+	if err != nil {
 		return ""
 	}
 
@@ -94,4 +91,3 @@ func  (q *QueryBlockInfoInterface) GetFinalMainBlockInfo (h tosdb.Database) stri
 	return MainBlockInfo
 
 }
-

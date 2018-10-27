@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -10,7 +11,6 @@ import (
 	"github.com/TOSIO/go-tos/params"
 	"math/big"
 	"sync/atomic"
-	"encoding/binary"
 )
 
 type BlockNonce [8]byte
@@ -173,8 +173,12 @@ func (mb *MinerBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 }
 
 // block interface
-func (mb *MinerBlock) SetMaxLinks(MaxLink uint8) {
-	mb.mutableInfo.MaxLink = MaxLink
+func (mb *MinerBlock) SetMaxLink(MaxLink common.Hash) {
+	mb.mutableInfo.MaxLinkHash = MaxLink
+}
+
+func (mb *MinerBlock) GetMaxLink() common.Hash {
+	return mb.mutableInfo.MaxLinkHash
 }
 
 func (mb *MinerBlock) GetType() BlockType {
@@ -189,11 +193,9 @@ func (mb *MinerBlock) GetGasLimit() uint64 {
 	return mb.Header.GasLimit
 }
 
-
 // EncodeNonce converts the given integer to a block nonce.
 func EncodeNonce(i uint64) BlockNonce {
 	var n BlockNonce
 	binary.BigEndian.PutUint64(n[:], i)
 	return n
 }
-
