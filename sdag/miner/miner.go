@@ -90,7 +90,6 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 
 //listen chanel mod
 func (m *Miner) listen() {
-	return
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
