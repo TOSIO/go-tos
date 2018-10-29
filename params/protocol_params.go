@@ -1,5 +1,7 @@
 package params
 
+import "math/big"
+
 const (
 	TimePeriod   = 10000 // 60000 毫秒
 	MaxLinksNum  = 4     //最大链接次数
@@ -17,3 +19,5 @@ const (
 	ConfirmUserRewardRate      = 20                          //Need to divide by 100
 	ConfirmMinerRewardRate     = 100 - ConfirmUserRewardRate //Need to divide by 100
 )
+
+var GlobalTosTotal, _ = big.NewInt(0).SetString("1000000000000000000000000000", 10)

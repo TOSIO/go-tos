@@ -56,11 +56,9 @@ const (
 	BlockTypeGenesis BlockType = 3
 )
 
-const (
-	GenesisTime uint64 = 1538309988 //1546272000000
+var (
+	GenesisTime uint64 //1546272000000
 )
-
-var GlobalTosTotal, _ = big.NewInt(0).SetString("1000000000000000000000000000", 10)
 
 //挖矿不包括签名，hash
 //**************************

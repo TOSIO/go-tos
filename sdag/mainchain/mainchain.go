@@ -19,6 +19,7 @@ import (
 type MainChain struct {
 	db             tosdb.Database
 	stateDb        state.Database
+	genesis        *core.Genesis
 	Tail           types.TailMainBlockInfo
 	PervTail       types.TailMainBlockInfo
 	MainTail       types.TailMainBlockInfo
@@ -27,11 +28,15 @@ type MainChain struct {
 }
 
 func (mainChain *MainChain) initTail() error {
+	var err error
+	mainChain.genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "")
+	if err != nil {
+		return err
+	}
 	tailMainBlockInfo, err := storage.ReadTailMainBlockInfo(mainChain.db)
 	if err != nil {
 		log.Info("generate genesis")
-		genesis := core.NewGenesis(mainChain.db, mainChain.stateDb, "")
-		genesisBlock, err := genesis.Genesis()
+		genesisBlock, err := mainChain.genesis.Genesis()
 		if err != nil {
 			return err
 		}
@@ -40,6 +45,7 @@ func (mainChain *MainChain) initTail() error {
 		mainChain.MainTail = *genesisBlock
 		return nil
 	}
+	mainChain.genesis.GetGenesisHash()
 	mainChain.Tail = *tailMainBlockInfo
 	err = mainChain.setPerv()
 	return err
@@ -149,6 +155,10 @@ func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
 	tail := mainChain.MainTail
 	mainChain.mainTailRWLock.RUnlock()
 	return &tail
+}
+
+func (mainChain *MainChain) GetGenesisHash() (common.Hash, error) {
+	return mainChain.genesis.GetGenesisHash()
 }
 
 func (mainChain *MainChain) UpdateTail(block types.Block) {

@@ -14,4 +14,5 @@ type MainChainI interface {
 	GetMainTail() *types.TailMainBlockInfo
 	ComputeCumulativeDiff(toBeAddedBlock types.Block) (bool, error)
 	UpdateTail(block types.Block)
+	GetGenesisHash() (common.Hash, error)
 }

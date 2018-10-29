@@ -161,7 +161,7 @@ func (tx *TxBlock) Validation() error {
 		amount.Add(amount, out.Amount)
 	}
 
-	if !(amount.Cmp(GlobalTosTotal) < 0) {
+	if !(amount.Cmp(params.GlobalTosTotal) < 0) {
 		return fmt.Errorf("the amount is not less than the GlobalTosTotal")
 	}
 
