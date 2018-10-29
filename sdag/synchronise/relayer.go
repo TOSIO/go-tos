@@ -52,7 +52,7 @@ func (r *Relayer) findExceptTarget(hash common.Hash) []core.Peer {
 	all := r.peerset.Peers()
 	except := r.fetcher.whoAnnounced(hash)
 	for id, peer := range all {
-		if !except.Contains(id) {
+		if except == nil || !except.Contains(id) {
 			result = append(result, peer)
 		}
 	}
