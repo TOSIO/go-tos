@@ -161,6 +161,32 @@ func (mainChain *MainChain) GetGenesisHash() (common.Hash, error) {
 	return mainChain.genesis.GetGenesisHash()
 }
 
+func (mainChain *MainChain) GetNextMain(hash common.Hash) (common.Hash, *types.MutableInfo, error) {
+	tail := mainChain.GetTail()
+	var (
+		err         error
+		mutableInfo *types.MutableInfo
+		returnHash  = tail.Hash
+		count       int64
+	)
+
+	for {
+		mutableInfo, err = storage.ReadBlockMutableInfo(mainChain.db, returnHash)
+		count++
+		if err != nil {
+			log.Info("GetNextMain loop", "count", count)
+			return common.Hash{}, nil, err
+		}
+		if mutableInfo.MaxLinkHash == hash {
+			log.Info("GetNextMain loop", "count", count)
+			return returnHash, mutableInfo, nil
+		}
+		returnHash = mutableInfo.MaxLinkHash
+	}
+	log.Info("GetNextMain not found hash, loop", "count", count)
+	return common.Hash{}, nil, fmt.Errorf("not found hash")
+}
+
 func (mainChain *MainChain) UpdateTail(block types.Block) {
 	mainChain.tailRWLock.RLock()
 	if mainChain.Tail.CumulativeDiff.Cmp(block.GetCumulativeDiff()) < 0 {
