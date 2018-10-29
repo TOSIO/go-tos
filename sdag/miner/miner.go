@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
+	"time"
 
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -117,8 +118,9 @@ func (m *Miner) listen() {
 				return
 			}
 		default:
-			log.Debug("miner is wait")
+			//log.Debug("miner is wait")
 		}
+		time.Sleep(5*time.Second)
 	}
 }
 
