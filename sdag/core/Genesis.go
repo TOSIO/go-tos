@@ -47,7 +47,8 @@ type Genesis struct {
 func (genesis *Genesis) ReadGenesisConfiguration() error {
 	jsonString, err := ioutil.ReadFile(genesis.InitialFilePath)
 	if err != nil {
-		return fmt.Errorf("open file fail fileName %s", genesis.InitialFilePath)
+		jsonString = []byte(genesisDefault)
+		//return fmt.Errorf("open file fail fileName %s", genesis.InitialFilePath)
 	}
 
 	if err := json.Unmarshal(jsonString, &genesis.InitialGenesisBlockInfo); err != nil {
