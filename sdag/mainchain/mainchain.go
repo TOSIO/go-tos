@@ -31,12 +31,13 @@ func (mainChain *MainChain) initTail() error {
 	if err != nil {
 		log.Info("generate genesis")
 		genesis := core.NewGenesis(mainChain.db, mainChain.stateDb, "")
-		tail, err := genesis.Genesis()
+		genesisBlock, err := genesis.Genesis()
 		if err != nil {
 			return err
 		}
-		mainChain.Tail = *tail
-		mainChain.PervTail = *tail
+		mainChain.Tail = *genesisBlock
+		mainChain.PervTail = *genesisBlock
+		mainChain.MainTail = *genesisBlock
 		return nil
 	}
 	mainChain.Tail = *tailMainBlockInfo
@@ -47,51 +48,45 @@ func (mainChain *MainChain) initTail() error {
 func (mainChain *MainChain) setPerv() error {
 	hash := mainChain.Tail.Hash
 	notSelf := false
+	PervTailIsFilled := false
 	Number := mainChain.Tail.Number
-	currentTimeSliceTraversed := true
-	currentTimeSlice := utils.GetMainTime(mainChain.Tail.Time)
 	count := 0
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
 			return err
 		}
-		block := storage.ReadBlock(mainChain.db, hash)
-		if block == nil {
-			return fmt.Errorf("ReadBlock err")
-		}
-		block.SetMutableInfo(mutableInfo)
 
 		if notSelf {
-			if currentTimeSlice != utils.GetMainTime(block.GetTime()) {
-				currentTimeSliceTraversed = false
-				currentTimeSlice = utils.GetMainTime(block.GetTime())
-			}
-			if !currentTimeSliceTraversed {
-				if (block.GetStatus() & types.BlockTmpMaxDiff) != 0 {
-					Number--
-					currentTimeSliceTraversed = true
-					if mainChain.PervTail.Hash == (common.Hash{}) {
-						mainChain.PervTail.Hash = hash
-						mainChain.PervTail.Time = block.GetTime()
-						mainChain.PervTail.Number = Number
-						mainChain.PervTail.CumulativeDiff = block.GetCumulativeDiff()
-					}
+			Number--
+			if !PervTailIsFilled {
+				block := storage.ReadBlock(mainChain.db, hash)
+				if block == nil {
+					return fmt.Errorf("ReadBlock err")
 				}
+				block.SetMutableInfo(mutableInfo)
+
+				mainChain.PervTail.Hash = hash
+				mainChain.PervTail.Time = block.GetTime()
+				mainChain.PervTail.Number = Number
+				mainChain.PervTail.CumulativeDiff = block.GetCumulativeDiff()
+				PervTailIsFilled = true
 			}
 		}
-		if (block.GetStatus() & types.BlockMain) != 0 {
+		if (mutableInfo.Status & types.BlockMain) != 0 {
+			block := storage.ReadBlock(mainChain.db, hash)
+			if block == nil {
+				return fmt.Errorf("ReadBlock err")
+			}
+			block.SetMutableInfo(mutableInfo)
+
 			mainChain.MainTail.Hash = hash
 			mainChain.MainTail.Time = block.GetTime()
 			mainChain.MainTail.Number = Number
 			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
 			break
 		}
-		if len(block.GetLinks()) == 0 {
-			log.Trace("len(block.GetLinks()) == 0", "blockType", block.GetType())
-			break
-		}
-		hash = block.GetLinks()[block.GetMutableInfo().MaxLink]
+		hash = mutableInfo.MaxLinkHash
 		notSelf = true
 		count++
 	}
@@ -181,8 +176,6 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 }
 
 func (mainChain *MainChain) GetLastTempMainBlkSlice() uint64 {
-	mainChain.mainTailRWLock.RLock()
-	defer mainChain.mainTailRWLock.RUnlock()
 	return utils.GetMainTime(mainChain.GetTail().Time)
 }
 
@@ -195,53 +188,82 @@ func TimeSliceDifference(t1, t2 uint64) uint64 {
 }
 
 func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (bool, error) {
-	CumulativeDiff := big.NewInt(0)
-	var hasUpdateCumulativeDiff bool
-	var index int
-	linksIsUpdateDiff := make(map[int]bool)
-	for i, hash := range toBeAddedBlock.GetLinks() {
-		SingleChainCumulativeDiff := big.NewInt(0)
-		for {
-			mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
-			if err != nil {
-				return hasUpdateCumulativeDiff, err
-			}
-			block := storage.ReadBlock(mainChain.db, hash)
-			if block == nil {
-				return hasUpdateCumulativeDiff, fmt.Errorf("ComputeCumulativeDiff ReadBlock Not found")
-			}
-			block.SetMutableInfo(mutableInfo)
+	type SingleChainLinkInfo struct {
+		isUpdateDiff              bool
+		maxLinkHash               common.Hash
+		SingleChainCumulativeDiff *big.Int
+	}
 
-			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
-				linksIsUpdateDiff[i] = true
-				break
-			}
-			if (mutableInfo.Status & types.BlockTmpMaxDiff) != 0 {
-				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					SingleChainCumulativeDiff.Add(SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
-					linksIsUpdateDiff[i] = true
-				} else {
-					SingleChainCumulativeDiff = block.GetCumulativeDiff()
-				}
-				break
-			}
-			hash = block.GetLinks()[mutableInfo.MaxLink]
+	var (
+		chainLinkInfo SingleChainLinkInfo
+	)
+	chainLinkInfo.SingleChainCumulativeDiff = big.NewInt(0)
+
+	for _, hash := range toBeAddedBlock.GetLinks() {
+		var singleChainLinkInfo SingleChainLinkInfo
+		singleChainLinkInfo.SingleChainCumulativeDiff = big.NewInt(0)
+
+		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
+		if err != nil {
+			return false, err
 		}
-		if CumulativeDiff.Cmp(SingleChainCumulativeDiff) < 0 {
-			CumulativeDiff = SingleChainCumulativeDiff
-			index = i
+		block := storage.ReadBlock(mainChain.db, hash)
+		if block == nil {
+			return false, fmt.Errorf("ComputeCumulativeDiff ReadBlock Not found")
+		}
+		block.SetMutableInfo(mutableInfo)
+
+		if (block.GetStatus() & types.BlockTmpMaxDiff) != 0 {
+			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
+				singleChainLinkInfo.SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
+				singleChainLinkInfo.isUpdateDiff = true
+				singleChainLinkInfo.maxLinkHash = hash
+			} else {
+				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
+					singleChainLinkInfo.SingleChainCumulativeDiff.Add(singleChainLinkInfo.SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
+					singleChainLinkInfo.isUpdateDiff = true
+					singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+				} else {
+					singleChainLinkInfo.SingleChainCumulativeDiff = block.GetCumulativeDiff()
+					singleChainLinkInfo.isUpdateDiff = false
+					singleChainLinkInfo.maxLinkHash = hash
+				}
+			}
+		} else {
+			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
+				singleChainLinkInfo.SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
+				singleChainLinkInfo.isUpdateDiff = true
+				singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+			} else {
+				DiffBefore := utils.CalculateWork(block.GetMaxLink())
+				if DiffBefore.Cmp(toBeAddedBlock.GetDiff()) < 0 {
+					singleChainLinkInfo.SingleChainCumulativeDiff.Add(singleChainLinkInfo.SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), DiffBefore), toBeAddedBlock.GetDiff())
+					mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, block.GetMaxLink())
+					if err != nil {
+						return false, err
+					}
+					singleChainLinkInfo.isUpdateDiff = true
+					singleChainLinkInfo.maxLinkHash = mutableInfo.MaxLinkHash
+				} else {
+					singleChainLinkInfo.SingleChainCumulativeDiff = block.GetCumulativeDiff()
+					singleChainLinkInfo.isUpdateDiff = false
+					singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+				}
+			}
+		}
+
+		if chainLinkInfo.SingleChainCumulativeDiff.Cmp(singleChainLinkInfo.SingleChainCumulativeDiff) < 0 {
+			chainLinkInfo = singleChainLinkInfo
 		}
 	}
 
-	toBeAddedBlock.SetCumulativeDiff(CumulativeDiff)
-	toBeAddedBlock.SetMaxLinks(uint8(index))
-	if linksIsUpdateDiff[index] {
+	toBeAddedBlock.SetCumulativeDiff(chainLinkInfo.SingleChainCumulativeDiff)
+	toBeAddedBlock.SetMaxLink(chainLinkInfo.maxLinkHash)
+	if chainLinkInfo.isUpdateDiff {
 		log.Debug("update  CumulativeDiff", "hash", toBeAddedBlock.GetHash().String())
 		toBeAddedBlock.SetStatus(toBeAddedBlock.GetStatus() | types.BlockTmpMaxDiff)
-		hasUpdateCumulativeDiff = true
 	}
-	return hasUpdateCumulativeDiff, nil
+	return chainLinkInfo.isUpdateDiff, nil
 }
 
 //Find the main block that can confirm other blocks
@@ -250,49 +272,43 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 	number := tail.Number
 	hash := tail.Hash
 	now := utils.GetTimeStamp()
-	var canConfirm bool
-	var currentTimeSliceAdded bool
-	currentTimeSlice := utils.GetMainTime(tail.Time)
-	var listBlock []types.Block
-	var lastMainTimeSlice uint64
+	var (
+		canConfirm        bool
+		notSelf           bool
+		listBlock         []types.Block
+		lastMainTimeSlice uint64
+	)
 	for {
+		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
+		if err != nil {
+			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlockMutableInfo Not found. hash=%s", hash.String())
+		}
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
 			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
 		}
+		block.SetMutableInfo(mutableInfo)
 
 		if !canConfirm && TimeSliceDifference(now, block.GetTime()) > params.ConfirmBlock {
 			canConfirm = true
 		}
 
-		if currentTimeSlice != utils.GetMainTime(block.GetTime()) {
+		if notSelf {
 			number--
-			currentTimeSliceAdded = false
-			currentTimeSlice = utils.GetMainTime(block.GetTime())
 		}
 
 		if canConfirm {
-			if !currentTimeSliceAdded {
-				mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
-				if err != nil {
-					return nil, 0, 0, err
-				}
-				if (mutableInfo.Status & types.BlockMain) != 0 {
-					lastMainTimeSlice = currentTimeSlice
-					break
-				}
-				if (mutableInfo.Status & types.BlockTmpMaxDiff) != 0 {
-					block.SetMutableInfo(mutableInfo)
-					listBlock = append([]types.Block{block}, listBlock...)
-					currentTimeSliceAdded = true
-					number--
-					log.Debug("findTheMainBlockThatCanConfirmOtherBlocks", "hash", block.GetHash().String(), "block", block)
-				}
+			if (block.GetStatus() & types.BlockMain) != 0 {
+				lastMainTimeSlice = utils.GetMainTime(block.GetTime())
+				break
 			}
+			listBlock = append([]types.Block{block}, listBlock...)
+			log.Debug("findTheMainBlockThatCanConfirmOtherBlocks", "hash", block.GetHash().String(), "block", block)
 		}
-		hash = block.GetLinks()[block.GetMutableInfo().MaxLink]
+		hash = block.GetMutableInfo().MaxLinkHash
+		notSelf = true
 	}
-	return listBlock, lastMainTimeSlice, number, nil
+	return listBlock, lastMainTimeSlice, number + 1, nil
 }
 
 func (mainChain *MainChain) Confirm() error {
@@ -335,7 +351,7 @@ func (mainChain *MainChain) Confirm() error {
 
 		log.Debug("the main block confirm finished", "confirmReward.userReward", confirmReward.userReward, "confirmReward.minerReward", confirmReward.minerReward)
 		if _, err := CalculatingAccounts(block, ComputeMainConfirmReward(confirmReward), state); err != nil {
-			log.Error(err.Error())
+			log.Info(err.Error())
 		}
 
 		if err := CalculatingMinerReward(block, blockNumber, state); err != nil {
