@@ -19,6 +19,9 @@ package node
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -379,7 +382,7 @@ func (c *Config) parsePersistentNodes(path string) []*discover.Node {
 }
 
 // AccountConfig determines the settings for scrypt and keydirectory
-/* func (c *Config) AccountConfig() (int, int, string, error) {
+ func (c *Config) AccountConfig() (int, int, string, error) {
 	scryptN := keystore.StandardScryptN
 	scryptP := keystore.StandardScryptP
 	if c.UseLightweightKDF {
@@ -405,13 +408,13 @@ func (c *Config) parsePersistentNodes(path string) []*discover.Node {
 	}
 	return scryptN, scryptP, keydir, err
 }
-*/
-/* func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
+
+ func makeAccountManager(conf *Config) (*accounts.Manager, string, error) {
 	scryptN, scryptP, keydir, err := conf.AccountConfig()
 	var ephemeral string
 	if keydir == "" {
 		// There is no datadir.
-		keydir, err = ioutil.TempDir("", "go-ethereum-keystore")
+		keydir, err = ioutil.TempDir("", "go-tos-keystore")
 		ephemeral = keydir
 	}
 
@@ -425,20 +428,20 @@ func (c *Config) parsePersistentNodes(path string) []*discover.Node {
 	backends := []accounts.Backend{
 		keystore.NewKeyStore(keydir, scryptN, scryptP),
 	}
-	if !conf.NoUSB {
-		// Start a USB hub for Ledger hardware wallets
-		if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
-		} else {
-			backends = append(backends, ledgerhub)
-		}
-		// Start a USB hub for Trezor hardware wallets
-		if trezorhub, err := usbwallet.NewTrezorHub(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start Trezor hub, disabling: %v", err))
-		} else {
-			backends = append(backends, trezorhub)
-		}
-	}
+	//if !conf.NoUSB {
+	//	// Start a USB hub for Ledger hardware wallets
+	//	if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
+	//		log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
+	//	} else {
+	//		backends = append(backends, ledgerhub)
+	//	}
+	//	// Start a USB hub for Trezor hardware wallets
+	//	if trezorhub, err := usbwallet.NewTrezorHub(); err != nil {
+	//		log.Warn(fmt.Sprintf("Failed to start Trezor hub, disabling: %v", err))
+	//	} else {
+	//		backends = append(backends, trezorhub)
+	//	}
+	//}
 	return accounts.NewManager(backends...), ephemeral, nil
 }
-*/
+

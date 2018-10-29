@@ -2,6 +2,9 @@ package sdag
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/services/accounts"
 	"sync"
 
 	"github.com/TOSIO/go-tos/sdag/core"
@@ -58,7 +61,8 @@ type Sdag struct {
 	stateDb state.Database //mpt trie
 
 	eventMux       *interface{}
-	accountManager *interface{}
+	accountManager *accounts.Manager
+	tosbase 		common.Address
 
 	networkID uint64
 
@@ -104,7 +108,9 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
+		accountManager: ctx.AccountManager,
 		miner:           miner.New(pool, &minerParam, chain, netFeed),
+		tosbase:      	config.Tosbase,
 		blockPool:       pool,
 		blockPoolEvent:  event,
 	}
@@ -158,7 +164,13 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	// Start the RPC service
 	//s.mempool.Start()
 	s.protocolManager.Start(100)
-	s.miner.Start()
+	// Configure the local mining address
+	eb, err := s.Tosbase()
+	if err != nil {
+		log.Error("Cannot start mining without tosbase", "err", err)
+		return fmt.Errorf("tosbase missing: %v", err)
+	}
+	s.miner.Start(eb)
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 	return nil
 }
@@ -172,6 +184,7 @@ func (s *Sdag) Stop() error {
 
 func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
 func (s *Sdag) NetVersion() uint64 { return s.networkID }
+func (s *Sdag) AccountManager() *accounts.Manager  { return s.accountManager }
 
 func (s *Sdag) BlockPool() core.BlockPoolI {
 	return s.blockPool
@@ -207,3 +220,29 @@ func (s *Sdag) SdagNodeIDMessage() []string {
 	NodeIdMessage = s.protocolManager.RealNodeIdMessage()
 	return NodeIdMessage
 }
+
+func (s *Sdag) Tosbase() (eb common.Address, err error) {
+	s.lock.RLock()
+	tosbase := s.tosbase
+	s.lock.RUnlock()
+
+	if tosbase != (common.Address{}) {
+		return tosbase, nil
+	}
+	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
+		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+			tosbase := accounts[0].Address
+
+			s.lock.Lock()
+			s.tosbase = tosbase
+			s.lock.Unlock()
+
+			log.Info("Tosbase automatically configured", "address", tosbase)
+			return tosbase, nil
+		}
+	}
+	return common.Address{}, fmt.Errorf("tosbase must be explicitly specified")
+}
+
+
+

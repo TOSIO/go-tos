@@ -19,6 +19,7 @@ package node
 import (
 	"errors"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts"
 	"net"
 	"os"
 	"path/filepath"
@@ -37,7 +38,7 @@ import (
 type Node struct {
 	//eventmux *event.TypeMux // Event multiplexer used between the services of a stack
 	config *Config
-	//accman   *accounts.Manager
+	accman   *accounts.Manager
 
 	serverConfig p2p.Config
 	server       *p2p.Server // Currently running P2P networking layer
@@ -122,10 +123,10 @@ func New(conf *Config) (*Node, error) {
 	}
 	// Ensure that the AccountManager method works before the node has started.
 	// We rely on this in cmd/geth.
-	/* am, ephemeralKeystore, err := makeAccountManager(conf)
+	am, ephemeralKeystore, err := makeAccountManager(conf)
 	if err != nil {
 		return nil, err
-	} */
+	}
 	if conf.Logger == nil {
 		conf.Logger = log.New()
 	}
@@ -133,6 +134,8 @@ func New(conf *Config) (*Node, error) {
 	// in the data directory or instance directory is delayed until Start.
 	return &Node{
 		config:       conf,
+		accman:            am,
+		ephemeralKeystore: ephemeralKeystore,
 		serviceFuncs: []ServiceConstructor{},
 		ipcEndpoint:  conf.IPCEndpoint(),
 		httpEndpoint: conf.HTTPEndpoint(),
@@ -193,7 +196,7 @@ func (n *Node) Start() error {
 			config:   n.config,
 			services: make(map[reflect.Type]Service),
 			//EventMux:       n.eventmux,
-			//AccountManager: n.accman,
+			AccountManager: n.accman,
 		}
 		for kind, s := range services { // copy needed for threaded access
 			ctx.services[kind] = s
@@ -416,6 +419,12 @@ func (n *Node) stopWS() {
 		n.wsHandler.Stop()
 		n.wsHandler = nil
 	}
+}
+
+
+// AccountManager retrieves the account manager used by the protocol stack.
+func (n *Node) AccountManager() *accounts.Manager {
+	return n.accman
 }
 
 // Stop terminates a running node along with all it's services. In the node was

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts"
 	"math"
 	"runtime"
 	godebug "runtime/debug"
@@ -17,7 +18,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/metrics"
 	"github.com/TOSIO/go-tos/internal/debug"
 	"github.com/TOSIO/go-tos/node"
-	cli "gopkg.in/urfave/cli.v1"
+	"gopkg.in/urfave/cli.v1"
 )
 
 func defaultNodeConfig() node.Config {
@@ -113,6 +114,57 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 //启动账户相关服务
 func activeAccount(ctx *cli.Context, stack *node.Node) {
 	log.Info("Starting account service")
+	// Unlock any account specifically requested
+	//ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+
+	//passwords := utils.MakePasswordList(ctx)
+	//unlocks := strings.Split(ctx.GlobalString(utils.UnlockedAccountFlag.Name), ",")
+	//for i, account := range unlocks {
+	//	if trimmed := strings.TrimSpace(account); trimmed != "" {
+	//		unlockAccount(ctx, ks, trimmed, i, passwords)
+	//	}
+	//}
+	// Register wallet event handlers to open and auto-derive wallets
+	events := make(chan accounts.WalletEvent, 16)
+	stack.AccountManager().Subscribe(events)
+
+	go func() {
+		// Create a chain state reader for self-derivation
+		//rpcClient, err := stack.Attach()
+		//if err != nil {
+		//	utils.Fatalf("Failed to attach to self: %v", err)
+		//}
+		//stateReader := ethclient.NewClient(rpcClient)
+
+		// Open any wallets already attached
+		for _, wallet := range stack.AccountManager().Wallets() {
+			if err := wallet.Open(""); err != nil {
+				log.Warn("Failed to open wallet", "url", wallet.URL(), "err", err)
+			}
+		}
+		// Listen for wallet event till termination
+		for event := range events {
+			switch event.Kind {
+			case accounts.WalletArrived:
+				if err := event.Wallet.Open(""); err != nil {
+					log.Warn("New wallet appeared, failed to open", "url", event.Wallet.URL(), "err", err)
+				}
+			case accounts.WalletOpened:
+				status, _ := event.Wallet.Status()
+				log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
+
+				//derivationPath := accounts.DefaultBaseDerivationPath
+				if event.Wallet.URL().Scheme == "ledger" {
+					//derivationPath = accounts.DefaultLedgerBaseDerivationPath
+				}
+				//event.Wallet.SelfDerive(derivationPath, stateReader)
+
+			case accounts.WalletDropped:
+				log.Info("Old wallet dropped", "url", event.Wallet.URL())
+				event.Wallet.Close()
+			}
+		}
+	}()
 }
 
 //启动辅助服务

@@ -41,10 +41,6 @@ const (
 	defaultGasLimit = 1 << 32
 )
 
-var (
-	ismining   = make(chan bool)
-	mineBlockI types.Block
-)
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
@@ -53,6 +49,10 @@ type Miner struct {
 	mainchin  mainchain.MainChainI
 	blockPool core.BlockPoolI
 	feed      *event.Feed
+	ismining  chan bool
+	mineBlockI types.Block
+	coinbase  common.Address
+
 }
 
 type MinerInfo struct {
@@ -79,16 +79,18 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		netstatus: make(chan int, 2),
 		mainchin:  mc,
 		feed:      feed,
+		ismining:  make(chan bool),
 	}
 
 	go mine.listen()
-	ismining <- true
+	mine.ismining <- true
 	return mine
 
 }
 
 //listen chanel mod
 func (m *Miner) listen() {
+	return
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
@@ -103,27 +105,28 @@ func (m *Miner) listen() {
 			switch ev {
 
 			case core.NETWORK_CONNECTED: //net ok
-				ismining <- true
+				m.ismining <- true
 			case core.NETWORK_CLOSED: //net closed
-				ismining <- false
+				m.ismining <- false
 			}
-		case mining, _ := <-ismining:
+		case mining, _ := <-m.ismining:
 			if mining {
 				log.Trace("start miner", mining)
-				m.Start()
+				m.Start(m.coinbase)
 			} else {
 				log.Trace("stop miner", mining)
 				m.Stop()
+				return
 			}
 		}
 	}
 }
 
 //start miner work
-func (m *Miner) Start() {
-	return
+func (m *Miner) Start(coinbase common.Address) {
+	m.SetTosCoinbase(coinbase)
 	go work(m)
-	ismining <- true
+	m.ismining <- true
 }
 
 //miner work
@@ -151,11 +154,6 @@ func work(m *Miner) {
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
 	for {
-		select {
-		case mining, _ := <-ismining:
-			if !mining {
-				break
-			}
 			nonce++
 			count++
 			//每循环1024次检测主链是否更新
@@ -178,8 +176,9 @@ func work(m *Miner) {
 
 				//send block
 				m.sender(mineBlock)
+				break
 			}
-		}
+
 
 	}
 
@@ -188,17 +187,22 @@ func work(m *Miner) {
 //stop miner work
 func (m *Miner) Stop() {
 	go work(m)
-	ismining <- false
+	m.ismining <- false
 }
 
 //send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
-	mineBlockI = mineblock
-	mineBlockI.Sign(m.mineinfo.PrivateKey)
+	m.mineBlockI = mineblock
+	m.mineBlockI.Sign(m.mineinfo.PrivateKey)
 	m.blockPool.EnQueue(mineblock)
 }
 
 //get random nonce
 func (m *Miner) getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
+}
+
+func (m *Miner) SetTosCoinbase(coinbase common.Address)  {
+	m.coinbase = coinbase
+	
 }
