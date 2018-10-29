@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/TOSIO/go-tos/services/accounts"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"math"
 	"runtime"
 	godebug "runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/TOSIO/go-tos/sdag"
@@ -115,15 +117,15 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 func activeAccount(ctx *cli.Context, stack *node.Node) {
 	log.Info("Starting account service")
 	// Unlock any account specifically requested
-	//ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
 
-	//passwords := utils.MakePasswordList(ctx)
-	//unlocks := strings.Split(ctx.GlobalString(utils.UnlockedAccountFlag.Name), ",")
-	//for i, account := range unlocks {
-	//	if trimmed := strings.TrimSpace(account); trimmed != "" {
-	//		unlockAccount(ctx, ks, trimmed, i, passwords)
-	//	}
-	//}
+	passwords := utils.MakePasswordList(ctx)
+	unlocks := strings.Split(ctx.GlobalString(utils.UnlockedAccountFlag.Name), ",")
+	for i, account := range unlocks {
+		if trimmed := strings.TrimSpace(account); trimmed != "" {
+			unlockAccount(ctx, ks, trimmed, i, passwords)
+		}
+	}
 	// Register wallet event handlers to open and auto-derive wallets
 	events := make(chan accounts.WalletEvent, 16)
 	stack.AccountManager().Subscribe(events)

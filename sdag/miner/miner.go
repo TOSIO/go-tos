@@ -83,7 +83,6 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	}
 
 	go mine.listen()
-	mine.ismining <- true
 	return mine
 
 }
@@ -110,13 +109,15 @@ func (m *Miner) listen() {
 			}
 		case mining, _ := <-m.ismining:
 			if mining {
-				log.Trace("start miner", mining)
-				m.Start(m.coinbase)
+				log.Debug("start miner", mining)
+				go work(m)
 			} else {
 				log.Trace("stop miner", mining)
 				m.Stop()
 				return
 			}
+		default:
+			log.Debug("miner is wait")
 		}
 	}
 }
@@ -124,7 +125,6 @@ func (m *Miner) listen() {
 //start miner work
 func (m *Miner) Start(coinbase common.Address) {
 	m.SetTosCoinbase(coinbase)
-	go work(m)
 	m.ismining <- true
 }
 
@@ -185,7 +185,6 @@ func work(m *Miner) {
 
 //stop miner work
 func (m *Miner) Stop() {
-	go work(m)
 	m.ismining <- false
 }
 
