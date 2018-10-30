@@ -1,6 +1,7 @@
 package core
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -10,24 +11,28 @@ import (
 const (
 	NETWORK_CONNECTED = iota
 	NETWORK_CLOSED
+	SDAGSYNC_SYNCING
+	SDAGSYNC_COMPLETED
 )
 
+type SYNCProgress int
+
 const (
-	SYNC_READY = iota
+	SYNC_READY SYNCProgress = iota
 	SYNC_SYNCING
 	SYNC_ERROR
 	SYNC_END
 )
 
-var syncStrDICT = map[int]string{
+var syncStrDICT = map[SYNCProgress]string{
 	SYNC_READY:   "SYNC-READY",
 	SYNC_SYNCING: "SYNC-SYNCING",
 	SYNC_ERROR:   "SYNC-ERROR",
 	SYNC_END:     "SYNC-END",
 }
 
-func SyncCodeToString(code int) string {
-	return syncStrDICT[code]
+func (s *SYNCProgress) String() string {
+	return syncStrDICT[SYNCProgress(*s)]
 }
 
 type NewBlocksEvent struct {
@@ -42,8 +47,16 @@ type GetBlocksEvent struct {
 	Hashes []common.Hash
 }
 
+type NewSYNCTask struct {
+	NodeID              string
+	FirstMBTimeslice    uint64
+	LastTempMBTimeslice uint64
+	LastMainBlockNum    uint64
+	LastCumulatedDiff   big.Int
+}
+
 type SYNCStatusEvent struct {
-	Progress int
+	Progress SYNCProgress
 	BeginTS  uint64
 	EndTS    uint64
 	CurTS    uint64
@@ -53,9 +66,9 @@ type SYNCStatusEvent struct {
 	BeginTime time.Time
 	EndTime   time.Time
 
-	TriedOrigin []string
-	CurOrigin   string
-	Err         error
+	//TriedOrigin []string
+	CurOrigin string
+	Err       error
 }
 
 type GetUnverifyBlocksEvent struct {

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/event"
@@ -42,18 +43,16 @@ const (
 	defaultGasLimit = 1 << 32
 )
 
-
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mineinfo  *MinerInfo
-	netstatus chan int
-	mainchin  mainchain.MainChainI
-	blockPool core.BlockPoolI
-	feed      *event.Feed
-	ismining  chan bool
+	mineinfo   *MinerInfo
+	netstatus  chan int
+	mainchin   mainchain.MainChainI
+	blockPool  core.BlockPoolI
+	feed       *event.Feed
+	ismining   chan bool
 	mineBlockI types.Block
-	coinbase  common.Address
-
+	coinbase   common.Address
 }
 
 type MinerInfo struct {
@@ -107,6 +106,10 @@ func (m *Miner) listen() {
 				m.ismining <- true
 			case core.NETWORK_CLOSED: //net closed
 				m.ismining <- false
+			case core.SDAGSYNC_SYNCING:
+				m.ismining <- false
+			case core.SDAGSYNC_COMPLETED:
+				m.ismining <- true
 			}
 		case mining, _ := <-m.ismining:
 			if mining {
@@ -120,7 +123,7 @@ func (m *Miner) listen() {
 		default:
 			//log.Debug("miner is wait")
 		}
-		time.Sleep(5*time.Second)
+		time.Sleep(5 * time.Second)
 	}
 }
 
@@ -155,31 +158,30 @@ func work(m *Miner) {
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
 	for {
-			nonce++
-			count++
-			//每循环1024次检测主链是否更新
-			if count == 1024 {
-				hash, diff := m.mainchin.GetPervTail()
-				//compare diff value
-				if diff.Cmp(fDiff) > 0 {
-					mineBlock.Links[0] = hash
-				}
-				count = 0
-				continue
+		nonce++
+		count++
+		//每循环1024次检测主链是否更新
+		if count == 1024 {
+			hash, diff := m.mainchin.GetPervTail()
+			//compare diff value
+			if diff.Cmp(fDiff) > 0 {
+				mineBlock.Links[0] = hash
 			}
+			count = 0
+			continue
+		}
 
-			//compare time
-			if mineBlock.Header.Time > utils.GetTimeStamp() {
-				//add block
-				mineBlock.Nonce = types.EncodeNonce(nonce)
+		//compare time
+		if mineBlock.Header.Time > utils.GetTimeStamp() {
+			//add block
+			mineBlock.Nonce = types.EncodeNonce(nonce)
 
-				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+			mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
-				//send block
-				m.sender(mineBlock)
-				break
-			}
-
+			//send block
+			m.sender(mineBlock)
+			break
+		}
 
 	}
 
@@ -202,7 +204,7 @@ func (m *Miner) getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
 
-func (m *Miner) SetTosCoinbase(coinbase common.Address)  {
+func (m *Miner) SetTosCoinbase(coinbase common.Address) {
 	m.coinbase = coinbase
-	
+
 }

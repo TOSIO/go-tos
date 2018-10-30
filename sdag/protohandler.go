@@ -9,6 +9,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core"
 
 	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/devbase/utils"
 
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
@@ -170,7 +171,7 @@ func (pm *ProtocolManager) loop() {
 			}
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
-			log.Debug("Receive a new peer,", "peer.id", peer.NodeID())
+			log.Debug("Accept a new peer,", "peer.id", peer.NodeID())
 		case <-pm.noMorePeers:
 			return
 		case ev := <-pm.syncstatSub.Chan():
@@ -178,13 +179,13 @@ func (pm *ProtocolManager) loop() {
 				if event.Progress == core.SYNC_END && event.Err == nil {
 					pm.stat.progress = STAT_WORKING
 				}
-				log.Debug("Synchronizing", "progress", core.SyncCodeToString(event.Progress), "curorigin", event.CurOrigin, "curTS", event.CurTS,
+				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
 					"startTS", event.BeginTS,
 					"endTS", event.EndTS,
 					"beginTime", event.BeginTime,
 					"endTime", event.EndTime,
 					"accumlatedNum", event.AccumulateSYNCNum,
-					"tiredOrigins", event.TriedOrigin,
+					//"tiredOrigins", event.TriedOrigin,
 					"err", event.Err)
 
 			}
@@ -312,10 +313,24 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the TOS handshake
 
-	/* if err := p.Handshake(pm.networkID); err != nil {
+	genesis, err := pm.mainChain.GetGenesisHash()
+	if err != nil {
+		return err
+	}
+	first, _, err := pm.mainChain.GetNextMain(genesis)
+	if err != nil {
+		return err
+	}
+	firstMBlock := pm.blkstorage.GetBlock(first)
+	if firstMBlock == nil {
+		return fmt.Errorf("get first main block falied")
+	}
+	firstMBTimeslice := utils.GetMainTime(firstMBlock.GetTime())
+	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, pm.mainChain.GetLastTempMainBlkSlice(),
+		pm.mainChain.GetMainTail().Number, pm.mainChain.GetMainTail().CumulativeDiff); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)
 		return err
-	} */
+	}
 	/* if rw, ok := p.rw.(*meteredMsgReadWriter); ok {
 		rw.Init(p.version)
 	} */
@@ -330,6 +345,16 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	}
 	defer pm.removePeer(p.id)
 
+	if p.lastTempMBTimeslice > pm.mainChain.GetLastTempMainBlkSlice() && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
+		pm.syncEvent.Post(&core.NewSYNCTask{
+			NodeID:              p.NodeID(),
+			LastCumulatedDiff:   *p.lastCumulatedDiff,
+			LastMainBlockNum:    p.lastMainBlockNum,
+			FirstMBTimeslice:    p.firstMBTimeslice,
+			LastTempMBTimeslice: p.lastTempMBTimeslice,
+		})
+		p.Log().Debug("Post SYNCTask", "lastCumulatedDiff", p.lastCumulatedDiff, "lastMainBlockNum", p.lastMainBlockNum, "lastTS", p.lastTempMBTimeslice)
+	}
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {

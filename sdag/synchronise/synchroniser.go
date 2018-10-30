@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/devbase/utils"
 
 	"github.com/TOSIO/go-tos/sdag/core"
 
@@ -46,6 +47,8 @@ type Synchroniser struct {
 	blockhashesCh chan core.Response
 	blocksCh      chan core.Response
 
+	newTask chan core.NewSYNCTask
+
 	blockReqCh chan struct{}
 
 	netStatus int
@@ -53,10 +56,13 @@ type Synchroniser struct {
 	   	blockUnfinishQueue map[common.Hash]string
 	   	blockQueueLock     sync.RWMutex // Lock to protect the cancel channel and peer in delivers
 	*/
+	done     chan struct{}
 	cancelCh chan struct{} // Channel to cancel mid-flight syncs
 	quitCh   chan struct{} // Channel to cancel mid-flight syncs
 
 	//syncResultCh chan error
+	genesisTimeslice uint64
+	genesis          common.Hash
 
 	cancelLock sync.RWMutex   // Lock to protect the cancel channel and peer in delivers
 	wg         sync.WaitGroup // for shutdown sync
@@ -77,6 +83,7 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
 
+	syncer.done = make(chan struct{})
 	syncer.cancelCh = make(chan struct{})
 	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
@@ -86,10 +93,17 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 
 	syncer.netCh = make(chan int)
 	syncer.netSub = syncer.netFeed.Subscribe(syncer.netCh)
+
 	return syncer, nil
 }
 
 func (s *Synchroniser) Start() error {
+	if genesis, err := s.mainChain.GetGenesisHash(); err != nil {
+		s.genesis = genesis
+		if genesisBlock := s.blkstorage.GetBlock(genesis); genesisBlock != nil {
+			s.genesisTimeslice = utils.GetMainTime(genesisBlock.GetTime())
+		}
+	}
 	go s.fetcher.loop()
 	go s.relayer.loop()
 	go s.loop()
@@ -104,28 +118,125 @@ func (s *Synchroniser) Stop() {
 	s.wg.Wait()
 }
 
+func (s *Synchroniser) schedule(tasks map[string]core.NewSYNCTask) {
+	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
+	if s.mainChain.GetLastTempMainBlkSlice() >= nowTimeslice {
+		s.netFeed.Send(core.SDAGSYNC_COMPLETED)
+		log.Info("Synchronise is completed", "lastTS", s.mainChain.GetLastTempMainBlkSlice(), "nowTS", nowTimeslice)
+		return
+	}
+
+	if atomic.LoadInt32(&s.syncing) != 0 {
+		log.Debug("Synchroniser is in synchronizing")
+		return
+	}
+
+	target := ""
+	var peer core.Peer
+	for peer == nil && len(tasks) > 0 {
+		maxMainBlockNum := uint64(0)
+		for i, task := range tasks {
+			if task.LastMainBlockNum > maxMainBlockNum {
+				maxMainBlockNum = task.LastMainBlockNum
+				target = i
+			}
+		}
+		delete(tasks, target)
+		peer = s.peerset.FindPeer(tasks[target].NodeID)
+	}
+
+	if target != "" && tasks[target].LastMainBlockNum > s.mainChain.GetMainTail().Number &&
+		tasks[target].LastTempMBTimeslice > s.mainChain.GetLastTempMainBlkSlice()+3 {
+		beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
+		if beginTimeslice < 0 || beginTimeslice < s.genesisTimeslice {
+			beginTimeslice = tasks[target].FirstMBTimeslice
+			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
+		}
+		s.netFeed.Send(core.SDAGSYNC_SYNCING)
+		go s.synchroinise(peer, beginTimeslice, tasks[target].LastTempMBTimeslice, tasks[target].LastMainBlockNum)
+	} else {
+		for key, _ := range tasks {
+			delete(tasks, key)
+		}
+	}
+}
+
 func (s *Synchroniser) loop() {
-	var lastNetUnavilableTime time.Time
+	//var lastNetUnavilableTime time.Time
 	s.wg.Add(1)
 	defer s.wg.Done()
-	for {
-		select {
-		case netStat := <-s.netCh:
-			if netStat == core.NETWORK_CONNECTED {
-				if lastNetUnavilableTime.IsZero() || time.Since(lastNetUnavilableTime) >= 5*time.Minute && atomic.LoadInt32(&s.syncing) == 0 {
-					atomic.StoreInt32(&s.syncing, 1)
-					go s.SyncHeavy()
-				}
-			} else {
-				lastNetUnavilableTime = time.Now()
-			}
-		case <-s.quitCh:
 
+	queuedTask := make(map[string]core.NewSYNCTask)
+
+	for {
+		s.schedule(queuedTask)
+		select {
+		case task := <-s.newTask:
+			queuedTask[task.NodeID] = task
+		case <-s.done:
+			continue
+		case <-s.quitCh:
 			return
 		}
 	}
 }
 
+func (s *Synchroniser) synchroinise(peer core.Peer, beginTimeslice uint64, endTimeslice uint64, blockNum uint64) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
+	atomic.StoreInt32(&s.syncing, 1)
+	stat := core.SYNCStatusEvent{
+		Progress:          core.SYNC_READY,
+		BeginTS:           beginTimeslice,
+		EndTS:             endTimeslice,
+		CurTS:             0,
+		AccumulateSYNCNum: 0,
+		BeginTime:         time.Now(),
+		CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
+		//TriedOrigin:       make([]string, 0)
+	}
+
+	s.syncEvent.Post(stat)
+
+	var err error
+
+loop:
+	for i := beginTimeslice; i <= endTimeslice; i++ {
+		stat.CurTS = i
+		stat.Err = nil
+		stat.Progress = core.SYNC_SYNCING
+		s.syncEvent.Post(stat)
+		try := 3
+		for {
+			if try <= 0 {
+				break loop
+			}
+
+			if err = s.syncTimeslice(peer, &stat, i); err != nil {
+				stat.Err = err
+				stat.EndTime = time.Now()
+				stat.Progress = core.SYNC_ERROR
+				s.syncEvent.Post(stat)
+				try--
+				if try > 0 {
+					log.Debug("Retry synchronize timeslice", "curErr", err)
+				}
+			}
+		}
+
+	}
+	if err != nil {
+		stat.Err = nil
+		stat.EndTime = time.Now()
+		stat.Progress = core.SYNC_END
+		s.syncEvent.Post(stat)
+	}
+	s.done <- struct{}{}
+	atomic.StoreInt32(&s.syncing, 0)
+}
+
+/*
 func (s *Synchroniser) SyncHeavy() error {
 	s.wg.Add(1)
 	defer s.wg.Done()
@@ -237,12 +348,11 @@ loop:
 	atomic.StoreInt32(&s.syncing, 0)
 	return nil
 }
-
-func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts uint64, errCh chan error) {
+*/
+func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts uint64) error {
 	err := p.RequestBlockHashBySlice(ts)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 	timeout := time.After(s.requestTTL())
 
@@ -255,19 +365,16 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 			var diff []common.Hash
 			diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
 			if err != nil {
-				errCh <- errInternal
-				return
+				return err
 			}
 			if len(diff) <= 0 {
 				break
 			}
 			if err = p.RequestBlocksBySlice(all.timeslice, diff); err != nil {
-				errCh <- err
-				return
+				return err
 			}
 		} else {
-			errCh <- errInternal
-			return
+			return errInternal
 		}
 	case response := <-s.blocksCh:
 		if blks, ok := response.(*TSBlocksPacket); ok {
@@ -284,10 +391,14 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 			}
 		}
 	case <-timeout:
-		errCh <- errSendMsgTimeout
-		return
+		log.Debug("Wait response timeout")
+		return errSendMsgTimeout
+	case <-s.cancelCh:
+		stat.Err = fmt.Errorf("canceled")
+
+		return stat.Err
 	}
-	s.oneSliceSyncDone <- ts
+	return nil
 }
 
 func (s *Synchroniser) RequestBlock(hash common.Hash) error {
