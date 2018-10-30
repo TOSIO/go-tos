@@ -1,6 +1,8 @@
 package sdag
 
 import (
+	"math/big"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 )
 
@@ -65,6 +67,20 @@ var msgcodeToString = map[int]string{
 
 func MsgCodeToString(code int) string {
 	return msgcodeToString[code]
+}
+
+// statusData is the network packet for the status message.
+type statusData struct {
+	ProtocolVersion uint32
+	NetworkId       uint64
+	TD              *big.Int
+	//CurrentBlock    common.Hash
+
+	CurMainBlockNum uint64
+	CurFistMBTS     uint64
+	CurLastTempMBTS uint64
+	CumulateDiff    *big.Int
+	GenesisBlock    common.Hash
 }
 
 type GetLastMainBlockTSReq struct {

@@ -13,9 +13,10 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"io/ioutil"
 	"math/big"
+	"time"
 )
 
-func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string) *Genesis {
+func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string) (*Genesis, error) {
 	var genesis Genesis
 	genesis.db = db
 	genesis.stateDb = stateDb
@@ -24,7 +25,13 @@ func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath strin
 	} else {
 		genesis.InitialFilePath = InitialFilePath
 	}
-	return &genesis
+	err := genesis.ReadGenesisConfiguration()
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	types.GenesisTime = genesis.InitialGenesisBlockInfo.Time
+	return &genesis, err
 }
 
 type InitialAccount struct {
@@ -42,6 +49,7 @@ type Genesis struct {
 	stateDb         state.Database
 	InitialFilePath string
 	InitialGenesisBlockInfo
+	genesisHash common.Hash
 }
 
 func (genesis *Genesis) ReadGenesisConfiguration() error {
@@ -59,10 +67,13 @@ func (genesis *Genesis) ReadGenesisConfiguration() error {
 }
 
 func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
-	err := genesis.ReadGenesisConfiguration()
-	if err != nil {
-		log.Error(err.Error())
-		return nil, err
+	for {
+		nowTime := utils.GetTimeStamp()
+		if genesis.Time+params.TimePeriod < nowTime {
+			break
+		}
+		log.Warn("wait genesis", "wait time(ms)", genesis.Time+params.TimePeriod-nowTime)
+		time.Sleep(time.Second)
 	}
 
 	genesisBlock := new(types.GenesisBlock)
@@ -127,5 +138,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	if err != nil {
 		log.Error(err.Error())
 	}
+
+	genesis.genesisHash = genesisBlock.GetHash()
 	return &tailMainBlockInfo, nil
 }

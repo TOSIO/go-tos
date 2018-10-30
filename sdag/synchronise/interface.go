@@ -2,6 +2,7 @@ package synchronise
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
 type SyncMode int
@@ -24,13 +25,15 @@ type BlockStorageI interface {
 	// 根据指定的hash集合返回对应的区块（RLP流）
 	GetBlocks(hashes []common.Hash) ([][]byte, error)
 
+	GetBlock(hash common.Hash) types.Block
+
 	GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error)
 }
 
 type SynchroniserI interface {
 	Start() error
 	Stop()
-	SyncHeavy() error
+	//SyncHeavy() error
 	//SyncLight() error
 	//SendBlock(blk interface{}) error
 

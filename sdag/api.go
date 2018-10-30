@@ -113,7 +113,11 @@ func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 	return tempQueryMainBlockInfo
 }
 
-func (api *PublicSdagAPI) GetFinalMainBlockInfo() string {
+func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
+
+	if jsonString != "ok" {
+		fmt.Printf("accept params error")
+	}
 
 	mainBlockInfo := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
 

@@ -89,7 +89,10 @@ class Main extends Component<Props> {
 		let children = null;
 		switch (active) {
 		case MENU.get('messeges').id:
-            children = <div>{this.props.content.nodeMsg.nodeId}</div>;
+            children = <div>
+
+				连接的其他节点：{this.props.content.nodeMsg.nodeId}
+            </div>;
                 break;
 		case MENU.get('home').id:
 		case MENU.get('chain').id:

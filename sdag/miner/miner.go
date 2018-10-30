@@ -21,9 +21,9 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
-	"time"
 
 	"fmt"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/event"
@@ -42,18 +42,16 @@ const (
 	defaultGasLimit = 1 << 32
 )
 
-
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mineinfo  *MinerInfo
-	netstatus chan int
-	mainchin  mainchain.MainChainI
-	blockPool core.BlockPoolI
-	feed      *event.Feed
-	ismining  chan bool
+	mineinfo   *MinerInfo
+	netstatus  chan int
+	mainchin   mainchain.MainChainI
+	blockPool  core.BlockPoolI
+	feed       *event.Feed
+	ismining   chan bool
 	mineBlockI types.Block
-	coinbase  common.Address
-
+	coinbase   common.Address
 }
 
 type MinerInfo struct {
@@ -77,7 +75,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	mine := &Miner{
 		blockPool: pool,
 		mineinfo:  minerinfo,
-		netstatus: make(chan int, 2),
+		netstatus: make(chan int),
 		mainchin:  mc,
 		feed:      feed,
 		ismining:  make(chan bool),
@@ -94,33 +92,45 @@ func (m *Miner) listen() {
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
 
+	schedule := func(miner *Miner, mining bool) {
+		if mining {
+			log.Debug("start miner", mining)
+			go work(miner)
+		} else {
+			log.Trace("stop miner", mining)
+			miner.Stop()
+		}
+	}
 	for {
 		select {
 		//Subscribe  external netstatus
-		case ev, ok := <-m.netstatus:
-			if !ok {
+		case ev := <-m.netstatus:
+			/* if !ok {
 				return
-			}
+			} */
 			switch ev {
 
 			case core.NETWORK_CONNECTED: //net ok
-				m.ismining <- true
+				schedule(m, true)
 			case core.NETWORK_CLOSED: //net closed
-				m.ismining <- false
+				//m.ismining <- false
+				schedule(m, false)
+			case core.SDAGSYNC_SYNCING:
+				//m.ismining <- false
+				schedule(m, false)
+			case core.SDAGSYNC_COMPLETED:
+				//m.ismining <- true
+				schedule(m, true)
 			}
 		case mining, _ := <-m.ismining:
-			if mining {
-				log.Debug("start miner", mining)
-				go work(m)
-			} else {
-				log.Trace("stop miner", mining)
-				m.Stop()
+			schedule(m, mining)
+			if !mining {
 				return
 			}
-		default:
+			//default:
 			//log.Debug("miner is wait")
 		}
-		time.Sleep(5*time.Second)
+		//time.Sleep(5 * time.Second)
 	}
 }
 
@@ -155,31 +165,30 @@ func work(m *Miner) {
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
 	for {
-			nonce++
-			count++
-			//每循环1024次检测主链是否更新
-			if count == 1024 {
-				hash, diff := m.mainchin.GetPervTail()
-				//compare diff value
-				if diff.Cmp(fDiff) > 0 {
-					mineBlock.Links[0] = hash
-				}
-				count = 0
-				continue
+		nonce++
+		count++
+		//每循环1024次检测主链是否更新
+		if count == 1024 {
+			hash, diff := m.mainchin.GetPervTail()
+			//compare diff value
+			if diff.Cmp(fDiff) > 0 {
+				mineBlock.Links[0] = hash
 			}
+			count = 0
+			continue
+		}
 
-			//compare time
-			if mineBlock.Header.Time > utils.GetTimeStamp() {
-				//add block
-				mineBlock.Nonce = types.EncodeNonce(nonce)
+		//compare time
+		if mineBlock.Header.Time > utils.GetTimeStamp() {
+			//add block
+			mineBlock.Nonce = types.EncodeNonce(nonce)
 
-				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+			mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
-				//send block
-				m.sender(mineBlock)
-				break
-			}
-
+			//send block
+			m.sender(mineBlock)
+			break
+		}
 
 	}
 
@@ -202,7 +211,7 @@ func (m *Miner) getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
 
-func (m *Miner) SetTosCoinbase(coinbase common.Address)  {
+func (m *Miner) SetTosCoinbase(coinbase common.Address) {
 	m.coinbase = coinbase
-	
+
 }

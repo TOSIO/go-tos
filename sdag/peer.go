@@ -37,8 +37,13 @@ type peer struct {
 
 	//knownBlocks mapset.Set
 
-	head common.Hash
-	td   *big.Int
+	//head common.Hash
+	//td   *big.Int
+	firstMBTimeslice    uint64
+	lastTempMBTimeslice uint64
+	lastMainBlockNum    uint64
+	lastCumulatedDiff   *big.Int
+
 	lock sync.RWMutex
 
 	term chan struct{} // Termination channel to stop the broadcaster
@@ -77,18 +82,24 @@ func (p *peer) broadcast() {
 	}
 }
 
-func (p *peer) Handshake(network uint64) error {
+func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, ts uint64, num uint64, diff *big.Int) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
-	data := "hello"
+	var status statusData
 
 	go func() {
-		errc <- p2p.Send(p.rw, StatusMsg, &data) //p.rw == protoRW
+		errc <- p2p.Send(p.rw, StatusMsg, &statusData{
+			ProtocolVersion: uint32(p.version),
+			NetworkId:       network,
+			CurFistMBTS:     firstMBTS,
+			CurLastTempMBTS: ts,
+			CurMainBlockNum: num,
+			CumulateDiff:    diff,
+			GenesisBlock:    genesis,
+		}) //p.rw == protoRW
 	}()
 	go func() {
-		msg, err := p.rw.ReadMsg()
-		p.Log().Info("recv message : ", msg)
-		errc <- err
+		errc <- p.readStatus(network, &status, genesis)
 	}()
 	timeout := time.NewTimer(handshakeTimeout)
 	defer timeout.Stop()
@@ -101,6 +112,38 @@ func (p *peer) Handshake(network uint64) error {
 		case <-timeout.C:
 			return p2p.DiscReadTimeout
 		}
+	}
+	p.firstMBTimeslice = status.CurFistMBTS
+	p.lastTempMBTimeslice = status.CurLastTempMBTS
+	p.lastMainBlockNum = status.CurMainBlockNum
+	p.lastCumulatedDiff = status.CumulateDiff
+
+	return nil
+}
+
+func (p *peer) readStatus(network uint64, status *statusData, genesis common.Hash) (err error) {
+	msg, err := p.rw.ReadMsg()
+	if err != nil {
+		return err
+	}
+	if msg.Code != StatusMsg {
+		return errResp(ErrNoStatusMsg, "first msg has code %x (!= %x)", msg.Code, StatusMsg)
+	}
+	if msg.Size > ProtocolMaxMsgSize {
+		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+	}
+	// Decode the handshake and make sure everything matches
+	if err := msg.Decode(&status); err != nil {
+		return errResp(ErrDecode, "msg %v: %v", msg, err)
+	}
+	if status.GenesisBlock != genesis {
+		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock[:8], genesis[:8])
+	}
+	if status.NetworkId != network {
+		return errResp(ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)
+	}
+	if int(status.ProtocolVersion) != p.version {
+		return errResp(ErrProtocolVersionMismatch, "%d (!= %d)", status.ProtocolVersion, p.version)
 	}
 	return nil
 }

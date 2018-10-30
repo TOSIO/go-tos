@@ -9,6 +9,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core"
 
 	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/devbase/utils"
 
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
@@ -74,11 +75,17 @@ type ProtocolManager struct {
 }
 
 func (pm *ProtocolManager) RealNodeIdMessage() []string {
-	var peerId []string
+
+	var peerId = make([]string, 0)
+
 	peerSetMessage := pm.peers
 	peerMessage := peerSetMessage.peers
 	for _, peerIdMessage := range peerMessage {
-		peerId = append(peerId, peerIdMessage.id)
+		fmt.Println("ip:", peerIdMessage.id, peerIdMessage.RemoteAddr().String())
+		//tempPeerId["ID"] = peerIdMessage.id
+		//tempPeerId["IP"] = peerIdMessage.RemoteAddr().String()
+		//tempPeerIp = append(tempPeerIp, peerIdMessage.RemoteAddr().String())
+		peerId = append(peerId, "ID:"+peerIdMessage.id, "IP:"+peerIdMessage.RemoteAddr().String()+"----------")
 	}
 	return peerId
 
@@ -163,7 +170,7 @@ func (pm *ProtocolManager) loop() {
 			}
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
-			log.Debug("Receive a new peer,", "peer.id", peer.NodeID())
+			log.Debug("Accept a new peer,", "peer.id", peer.NodeID())
 		case <-pm.noMorePeers:
 			return
 		case ev := <-pm.syncstatSub.Chan():
@@ -171,13 +178,13 @@ func (pm *ProtocolManager) loop() {
 				if event.Progress == core.SYNC_END && event.Err == nil {
 					pm.stat.progress = STAT_WORKING
 				}
-				log.Debug("Synchronizing", "progress", core.SyncCodeToString(event.Progress), "curorigin", event.CurOrigin, "curTS", event.CurTS,
+				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
 					"startTS", event.BeginTS,
 					"endTS", event.EndTS,
 					"beginTime", event.BeginTime,
 					"endTime", event.EndTime,
 					"accumlatedNum", event.AccumulateSYNCNum,
-					"tiredOrigins", event.TriedOrigin,
+					//"tiredOrigins", event.TriedOrigin,
 					"err", event.Err)
 
 			}
@@ -305,10 +312,35 @@ func (pm *ProtocolManager) handle(p *peer) error {
 
 	// Execute the TOS handshake
 
-	/* if err := p.Handshake(pm.networkID); err != nil {
+	genesis, err := pm.mainChain.GetGenesisHash()
+	if err != nil {
+		return err
+	}
+	firstMBTimeslice := uint64(0)
+	first, _, err := pm.mainChain.GetNextMain(genesis)
+	if err == nil {
+		//return err
+		firstMBlock := pm.blkstorage.GetBlock(first)
+		if firstMBlock != nil {
+			firstMBTimeslice = utils.GetMainTime(firstMBlock.GetTime())
+		} else {
+			p.Log().Debug("Failed to get the first main-block")
+		}
+	} else {
+		genesisBlock := pm.blkstorage.GetBlock(genesis)
+		if genesisBlock != nil {
+			firstMBTimeslice = utils.GetMainTime(genesisBlock.GetTime())
+		} else {
+			p.Log().Debug("Failed to get the genesis-block")
+		}
+	}
+
+	lastTmpMBTimeslice := pm.mainChain.GetLastTempMainBlkSlice()
+	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, lastTmpMBTimeslice,
+		pm.mainChain.GetMainTail().Number, pm.mainChain.GetMainTail().CumulativeDiff); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)
 		return err
-	} */
+	}
 	/* if rw, ok := p.rw.(*meteredMsgReadWriter); ok {
 		rw.Init(p.version)
 	} */
@@ -320,9 +352,23 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if !pm.feeded {
 		pm.networkFeed.Send(core.NETWORK_CONNECTED)
 		pm.feeded = true
+		p.Log().Debug("Post event to miner")
 	}
 	defer pm.removePeer(p.id)
 
+	p.Log().Debug("TOS handshake is done", "Node.LastTempMBTS", p.lastTempMBTimeslice, "local.LastTempMBTS", lastTmpMBTimeslice,
+		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number)
+
+	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
+		pm.syncEvent.Post(&core.NewSYNCTask{
+			NodeID:              p.NodeID(),
+			LastCumulatedDiff:   *p.lastCumulatedDiff,
+			LastMainBlockNum:    p.lastMainBlockNum,
+			FirstMBTimeslice:    p.firstMBTimeslice,
+			LastTempMBTimeslice: p.lastTempMBTimeslice,
+		})
+		p.Log().Debug("Post SYNCTask", "lastCumulatedDiff", p.lastCumulatedDiff, "lastMainBlockNum", p.lastMainBlockNum, "lastTS", p.lastTempMBTimeslice)
+	}
 	// main loop. handle incoming messages.
 	for {
 		if err := pm.handleMsg(p); err != nil {

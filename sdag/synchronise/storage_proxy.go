@@ -6,6 +6,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
 type StorageProxy struct {
@@ -41,4 +42,8 @@ func (s *StorageProxy) GetBlocks(hashes []common.Hash) ([][]byte, error) {
 func (s *StorageProxy) GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error) {
 	local, err := storage.ReadBlocksHashByTmSlice(s.db, timeslice)
 	return local, err
+}
+
+func (s *StorageProxy) GetBlock(hash common.Hash) types.Block {
+	return storage.ReadBlock(s.db, hash)
 }
