@@ -78,7 +78,6 @@ func (pm *ProtocolManager) RealNodeIdMessage() []string {
 
 	var peerId = make([]string, 0)
 
-
 	peerSetMessage := pm.peers
 	peerMessage := peerSetMessage.peers
 	for _, peerIdMessage := range peerMessage {
@@ -317,15 +316,25 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if err != nil {
 		return err
 	}
+	firstMBTimeslice := uint64(0)
 	first, _, err := pm.mainChain.GetNextMain(genesis)
-	if err != nil {
-		return err
+	if err == nil {
+		//return err
+		firstMBlock := pm.blkstorage.GetBlock(first)
+		if firstMBlock != nil {
+			firstMBTimeslice = utils.GetMainTime(firstMBlock.GetTime())
+		} else {
+			p.Log().Debug("Failed to get the first main-block")
+		}
+	} else {
+		genesisBlock := pm.blkstorage.GetBlock(genesis)
+		if genesisBlock != nil {
+			firstMBTimeslice = utils.GetMainTime(genesisBlock.GetTime())
+		} else {
+			p.Log().Debug("Failed to get the genesis-block")
+		}
 	}
-	firstMBlock := pm.blkstorage.GetBlock(first)
-	if firstMBlock == nil {
-		return fmt.Errorf("get first main block falied")
-	}
-	firstMBTimeslice := utils.GetMainTime(firstMBlock.GetTime())
+
 	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, pm.mainChain.GetLastTempMainBlkSlice(),
 		pm.mainChain.GetMainTail().Number, pm.mainChain.GetMainTail().CumulativeDiff); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)

@@ -120,7 +120,8 @@ func (s *Synchroniser) Stop() {
 
 func (s *Synchroniser) schedule(tasks map[string]core.NewSYNCTask) {
 	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
-	if s.mainChain.GetLastTempMainBlkSlice() >= nowTimeslice {
+	lastTempMBTimeslice := s.mainChain.GetLastTempMainBlkSlice()
+	if lastTempMBTimeslice >= nowTimeslice {
 		s.netFeed.Send(core.SDAGSYNC_COMPLETED)
 		log.Info("Synchronise is completed", "lastTS", s.mainChain.GetLastTempMainBlkSlice(), "nowTS", nowTimeslice)
 		return
@@ -148,7 +149,7 @@ func (s *Synchroniser) schedule(tasks map[string]core.NewSYNCTask) {
 	if target != "" && tasks[target].LastMainBlockNum > s.mainChain.GetMainTail().Number &&
 		tasks[target].LastTempMBTimeslice > s.mainChain.GetLastTempMainBlkSlice()+3 {
 		beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
-		if beginTimeslice < 0 || beginTimeslice < s.genesisTimeslice {
+		if beginTimeslice < 0 || beginTimeslice <= s.genesisTimeslice {
 			beginTimeslice = tasks[target].FirstMBTimeslice
 			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
 		}
