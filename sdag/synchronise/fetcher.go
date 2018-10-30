@@ -15,6 +15,7 @@ import (
 type fetchTask struct {
 	beginTime time.Time
 	nodes     []string
+	launch    int
 }
 
 type Fetcher struct {
@@ -89,9 +90,14 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	}
 
 	var task fetchTask
+	task.launch = 0
 	task.nodes = make([]string, 0)
 	task.beginTime = time.Now()
 
+	if len(origins) <= 0 {
+		log.Warn("Not found data source")
+		return
+	}
 	for _, peer := range origins {
 		peer.RequestBlock(hash)
 		task.nodes = append(task.nodes, peer.NodeID())
@@ -121,11 +127,14 @@ func (f *Fetcher) selectOrigins(hash common.Hash) []core.Peer {
 	//var err error
 	result := make([]core.Peer, 0)
 	announcers := f.whoAnnounced(hash)
-	itr := announcers.Iterator()
-	for e := range itr.C {
-		peer := f.peerset.FindPeer(e.(string))
-		if peer != nil {
-			result = append(result, peer)
+	if announcers != nil {
+		itr := announcers.Iterator()
+		for e := range itr.C {
+			nodeID := e.(string)
+			peer := f.peerset.FindPeer(nodeID)
+			if peer != nil {
+				result = append(result, peer)
+			}
 		}
 	}
 	return result
@@ -136,16 +145,35 @@ func (f *Fetcher) MarkAnnounced(hash common.Hash, nodeId string) {
 	defer f.announceLock.Unlock()
 
 	if v, ok := f.announced[hash]; ok {
-		v.Add(hash)
+		v.Add(nodeId)
 	} else {
 		nodes := make([]string, 0)
 		nodes = append(nodes, nodeId)
 		f.announced[hash] = mapset.NewSet()
-		f.announced[hash].Add(hash)
+		f.announced[hash].Add(nodeId)
 		f.announceCount[nodeId]++
 	}
 }
 
+func (f *Fetcher) MarkFlighting(hashes []common.Hash, nodeID string) {
+	f.flightLock.Lock()
+	for _, hash := range hashes {
+		var task fetchTask
+		task.launch = 0
+		task.nodes = make([]string, 0)
+		task.beginTime = time.Now()
+		task.nodes = append(task.nodes, nodeID)
+		f.flighting[hash] = &task
+	}
+	f.flightLock.Unlock()
+}
+func (f *Fetcher) UnMarkFlighting(hashes []common.Hash) {
+	f.flightLock.Lock()
+	for _, hash := range hashes {
+		f.remove(hash)
+	}
+	f.flightLock.Unlock()
+}
 func (f *Fetcher) remove(hash common.Hash) {
 	delete(f.flighting, hash)
 }
