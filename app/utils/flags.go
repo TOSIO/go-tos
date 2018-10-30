@@ -20,14 +20,15 @@ package utils
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/services/accounts"
-	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/services/accounts"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
 
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
@@ -321,7 +322,7 @@ var (
 	ListenPortFlag = cli.IntFlag{
 		Name:  "port",
 		Usage: "Network listening port",
-		Value: 30303,
+		Value: 40404,
 	}
 
 	BootnodesFlag = cli.StringFlag{
@@ -799,5 +800,3 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	}
 	return accs[index], nil
 }
-
-
