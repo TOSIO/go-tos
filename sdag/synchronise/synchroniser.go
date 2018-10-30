@@ -89,7 +89,7 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
 
-	syncer.fetcher = NewFetcher(ps)
+	syncer.fetcher = NewFetcher(ps, poolEvent)
 	syncer.relayer = NewRelayer(syncer.fetcher, ps)
 
 	syncer.netCh = make(chan int)
@@ -273,18 +273,19 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 				break
 			}
 			//log.Debug("process request 1")
-			//s.fetcher.MarkFlighting(diff, p.NodeID())
+			s.fetcher.MarkFlighting(diff, p.NodeID())
+			//log.Debug("process request 2")
 			if err = p.RequestBlocksBySlice(all.timeslice, diff); err != nil {
-				log.Debug("process response 3")
+				log.Debug("process request 3")
 				return err
 			}
-			//log.Debug("process response 2")
+
 		} else {
 			return errInternal
 		}
 	case response := <-s.blocksCh:
 		if blks, ok := response.(*TSBlocksPacket); ok {
-			//log.Debug("process response 1")
+
 			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
 			hashes := make([]common.Hash, 0)
 			for _, blk := range blks.blocks {
@@ -294,12 +295,14 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 					hashes = append(hashes, block.GetHash())
 				}
 			}
-			//s.fetcher.UnMarkFlighting(hashes)
+			//log.Debug("process response 1")
+			s.fetcher.UnMarkFlighting(hashes)
+			//log.Debug("process response 2")
 			stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
 			if len(newblockEvent.Blocks) > 0 {
 				s.blockPoolEvent.Post(newblockEvent)
 			}
-			//log.Debug("process response 1")
+
 		}
 		return nil
 	case <-timeout:

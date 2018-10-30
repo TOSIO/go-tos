@@ -40,16 +40,17 @@ type Fetcher struct {
 	wg sync.WaitGroup
 }
 
-func NewFetcher(peers core.PeerSet) *Fetcher {
+func NewFetcher(peers core.PeerSet, poolEvent *event.TypeMux) *Fetcher {
 	fetcher := &Fetcher{
 		reqCh: make(chan common.Hash, 8),
 		resCh: make(chan core.Response, 8),
 
-		flighting:     make(map[common.Hash]*fetchTask),
-		announced:     make(map[common.Hash]mapset.Set),
-		announceCount: make(map[string]int),
-		quit:          make(chan struct{}),
-		peerset:       peers,
+		flighting:      make(map[common.Hash]*fetchTask),
+		announced:      make(map[common.Hash]mapset.Set),
+		announceCount:  make(map[string]int),
+		quit:           make(chan struct{}),
+		peerset:        peers,
+		blockPoolEvent: poolEvent,
 	}
 	return fetcher
 }
@@ -167,6 +168,7 @@ func (f *Fetcher) MarkFlighting(hashes []common.Hash, nodeID string) {
 	}
 	f.flightLock.Unlock()
 }
+
 func (f *Fetcher) UnMarkFlighting(hashes []common.Hash) {
 	f.flightLock.Lock()
 	for _, hash := range hashes {
@@ -187,20 +189,23 @@ func (f *Fetcher) processResponse(response core.Response) {
 	/* s.blockQueueLock.Lock()
 	defer s.blockQueueLock.Unlock() */
 
-	f.flightLock.Lock()
-	defer f.flightLock.Lock()
+	/* f.flightLock.Lock()
+	defer f.flightLock.Lock() */
+	delHashes := make([]common.Hash, 0)
 	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
 	if packet, ok := response.(*NewBlockPacket); ok {
 		for _, item := range packet.blocks {
 			if block, err := types.BlockDecode(item); err == nil {
 				newblockEvent.Blocks = append(newblockEvent.Blocks, block)
-				f.remove(block.GetHash())
+				//f.remove(block.GetHash())
+				delHashes = append(delHashes, block.GetHash())
 				log.Debug("Add block to mempool", "hash", block.GetHash().String())
 			} else {
 				log.Error("Error Add block to mempool", "err", err, "packet", item)
 			}
 		}
 	}
+	f.UnMarkFlighting(delHashes)
 	if len(newblockEvent.Blocks) > 0 {
 		f.blockPoolEvent.Post(newblockEvent)
 	}
