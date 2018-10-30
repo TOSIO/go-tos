@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
+	"time"
 
 	"fmt"
 
@@ -121,11 +122,6 @@ func (m *Miner) listen() {
 			case core.SDAGSYNC_COMPLETED:
 				schedule(m, true)
 			}
-		case mining, _ := <-m.ismining:
-			schedule(m, mining)
-			if !mining {
-				return
-			}
 		}
 	}
 }
@@ -163,30 +159,39 @@ func work(m *Miner) {
 	//select params.MaxLinksNum-1 unverifiedblock to links
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
+	loop:
 	for {
-		nonce++
-		count++
-		//每循环1024次检测主链是否更新
-		if count == 1024 {
-			hash, diff := m.mainchin.GetPervTail()
-			//compare diff value
-			if diff.Cmp(fDiff) > 0 {
-				mineBlock.Links[0] = hash
-			}
-			count = 0
-			continue
-		}
 
-		//compare time
-		if mineBlock.Header.Time > utils.GetTimeStamp() {
-			//add block
-			mineBlock.Nonce = types.EncodeNonce(nonce)
-			//创币地址即挖矿者本身设置的地址
-			mineBlock.Miner = m.coinbase
+		select {
+			case ismining, _ := <-m.ismining:
+				if !ismining{
+					break loop
+				}
+				nonce++
+				count++
+				//每循环1024次检测主链是否更新
+				if count == 1024 {
+					hash, diff := m.mainchin.GetPervTail()
+					//compare diff value
+					if diff.Cmp(fDiff) > 0 {
+						mineBlock.Links[0] = hash
+					}
+					count = 0
+					continue
+				}
 
-			//send block
-			m.sender(mineBlock)
-			break
+				//compare time
+				if mineBlock.Header.Time > utils.GetTimeStamp() {
+					//add block
+					mineBlock.Nonce = types.EncodeNonce(nonce)
+					//创币地址即挖矿者本身设置的地址
+					mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+
+					//send block
+					m.sender(mineBlock)
+					//break
+				}
+				time.Sleep(time.Second)
 		}
 
 	}
