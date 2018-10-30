@@ -70,7 +70,8 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		fmt.Errorf("PrivateKey err")
 		return nil
 	}
-	fmt.Println("miner new ..................................")
+	//fmt.Println("miner new ..................................")
+	log.Debug("miner","new",minerinfo.GasLimit)
 	minerinfo.PrivateKey = PrivateKey
 	//init end
 	mine := &Miner{
@@ -89,7 +90,8 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 
 //listen chanel mod
 func (m *Miner) listen() {
-	fmt.Println("miner listen ..................................")
+	//fmt.Println("miner listen ..................................")
+	log.Debug("miner","listen")
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
@@ -130,14 +132,16 @@ func (m *Miner) listen() {
 
 //start miner work
 func (m *Miner) Start(coinbase common.Address) {
-	fmt.Println("miner start ..................................")
+	//fmt.Println("miner start ..................................")
+	log.Debug("miner","Start",coinbase)
 	m.SetTosCoinbase(coinbase)
 	m.ismining <- true
 }
 
 //miner work
 func work(m *Miner) {
-	fmt.Println("miner work ..................................")
+	//fmt.Println("miner work ..................................")
+	log.Debug("miner","work")
 	//get random nonce
 	nonce := m.getNonceSeed()
 
@@ -191,13 +195,15 @@ func work(m *Miner) {
 
 //stop miner work
 func (m *Miner) Stop() {
-	fmt.Println("miner stop ..................................")
+	//fmt.Println("miner stop ..................................")
+	log.Debug("miner","Stop")
 	m.ismining <- false
 }
 
 //send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
-	fmt.Println("miner sender ..................................",fmt.Sprintln(mineblock))
+	//fmt.Println("miner sender ..................................",fmt.Sprintln(mineblock))
+	log.Debug("miner","sender")
 	m.mineBlockI = mineblock
 	m.mineBlockI.Sign(m.mineinfo.PrivateKey)
 	m.blockPool.EnQueue(mineblock)
