@@ -92,7 +92,7 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.relayer = NewRelayer(syncer.fetcher, ps)
 
 	syncer.netCh = make(chan int)
-	syncer.netSub = syncer.netFeed.Subscribe(syncer.netCh)
+	//syncer.netSub = syncer.netFeed.Subscribe(syncer.netCh)
 
 	return syncer, nil
 }

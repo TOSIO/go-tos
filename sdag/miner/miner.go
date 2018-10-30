@@ -21,7 +21,6 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
-	"time"
 
 	"fmt"
 
@@ -76,7 +75,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	mine := &Miner{
 		blockPool: pool,
 		mineinfo:  minerinfo,
-		netstatus: make(chan int, 2),
+		netstatus: make(chan int),
 		mainchin:  mc,
 		feed:      feed,
 		ismining:  make(chan bool),
@@ -93,37 +92,45 @@ func (m *Miner) listen() {
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
 
+	schedule := func(miner *Miner, mining bool) {
+		if mining {
+			log.Debug("start miner", mining)
+			go work(miner)
+		} else {
+			log.Trace("stop miner", mining)
+			miner.Stop()
+		}
+	}
 	for {
 		select {
 		//Subscribe  external netstatus
-		case ev, ok := <-m.netstatus:
-			if !ok {
+		case ev := <-m.netstatus:
+			/* if !ok {
 				return
-			}
+			} */
 			switch ev {
 
 			case core.NETWORK_CONNECTED: //net ok
-				m.ismining <- true
+				schedule(m, true)
 			case core.NETWORK_CLOSED: //net closed
-				m.ismining <- false
+				//m.ismining <- false
+				schedule(m, false)
 			case core.SDAGSYNC_SYNCING:
-				m.ismining <- false
+				//m.ismining <- false
+				schedule(m, false)
 			case core.SDAGSYNC_COMPLETED:
-				m.ismining <- true
+				//m.ismining <- true
+				schedule(m, true)
 			}
 		case mining, _ := <-m.ismining:
-			if mining {
-				log.Debug("start miner", mining)
-				go work(m)
-			} else {
-				log.Trace("stop miner", mining)
-				m.Stop()
+			schedule(m, mining)
+			if !mining {
 				return
 			}
-		default:
+			//default:
 			//log.Debug("miner is wait")
 		}
-		time.Sleep(5 * time.Second)
+		//time.Sleep(5 * time.Second)
 	}
 }
 

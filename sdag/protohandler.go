@@ -335,7 +335,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		}
 	}
 
-	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, pm.mainChain.GetLastTempMainBlkSlice(),
+	lastTmpMBTimeslice := pm.mainChain.GetLastTempMainBlkSlice()
+	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, lastTmpMBTimeslice,
 		pm.mainChain.GetMainTail().Number, pm.mainChain.GetMainTail().CumulativeDiff); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)
 		return err
@@ -351,10 +352,14 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if !pm.feeded {
 		pm.networkFeed.Send(core.NETWORK_CONNECTED)
 		pm.feeded = true
+		p.Log().Debug("Post event to miner")
 	}
 	defer pm.removePeer(p.id)
 
-	if p.lastTempMBTimeslice > pm.mainChain.GetLastTempMainBlkSlice() && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
+	p.Log().Debug("TOS handshake is done", "Node.LastTempMBTS", p.lastTempMBTimeslice, "local.LastTempMBTS", lastTmpMBTimeslice,
+		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number)
+
+	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
 		pm.syncEvent.Post(&core.NewSYNCTask{
 			NodeID:              p.NodeID(),
 			LastCumulatedDiff:   *p.lastCumulatedDiff,
