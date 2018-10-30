@@ -3,6 +3,8 @@ package synchronise
 import (
 	"errors"
 
+	"github.com/deckarep/golang-set"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
@@ -40,8 +42,20 @@ func (s *StorageProxy) GetBlocks(hashes []common.Hash) ([][]byte, error) {
 }
 
 func (s *StorageProxy) GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error) {
-	local, err := storage.ReadBlocksHashByTmSlice(s.db, timeslice)
-	return local, err
+	hashes, err := storage.ReadBlocksHashByTmSlice(s.db, timeslice)
+	if len(hashes) <= 0 || err != nil {
+		return all, nil
+	}
+	//diff := make([]common.Hash,0)
+	in := mapset.NewSet(all)
+	local := mapset.NewSet(hashes)
+	diff := in.Difference(local)
+	itr := diff.Iterator()
+	result := make([]common.Hash, 0)
+	for e := range itr.C {
+		result = append(result, e.(common.Hash))
+	}
+	return result, err
 }
 
 func (s *StorageProxy) GetBlock(hash common.Hash) types.Block {
