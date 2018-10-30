@@ -91,7 +91,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 //listen chanel mod
 func (m *Miner) listen() {
 	//fmt.Println("miner listen ..................................")
-	log.Debug("miner","listen")
+	log.Debug("miner listen")
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
@@ -141,7 +141,7 @@ func (m *Miner) Start(coinbase common.Address) {
 //miner work
 func work(m *Miner) {
 	//fmt.Println("miner work ..................................")
-	log.Debug("miner","work")
+	log.Debug("miner work")
 	//get random nonce
 	nonce := m.getNonceSeed()
 
@@ -196,14 +196,14 @@ func work(m *Miner) {
 //stop miner work
 func (m *Miner) Stop() {
 	//fmt.Println("miner stop ..................................")
-	log.Debug("miner","Stop")
+	log.Debug("miner Stop")
 	m.ismining <- false
 }
 
 //send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
 	//fmt.Println("miner sender ..................................",fmt.Sprintln(mineblock))
-	log.Debug("miner","sender")
+	log.Debug("miner sender")
 	m.mineBlockI = mineblock
 	m.mineBlockI.Sign(m.mineinfo.PrivateKey)
 	m.blockPool.EnQueue(mineblock)
