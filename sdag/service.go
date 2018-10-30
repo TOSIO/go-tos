@@ -62,11 +62,13 @@ type Sdag struct {
 
 	eventMux       *interface{}
 	accountManager *accounts.Manager
-	tosbase 		common.Address
+	tosbase        common.Address
 
 	networkID uint64
 
-	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+	lock           sync.RWMutex
+	sct *node.ServiceContext
+	// Protects the variadic fields (e.g. gas price and etherbase)
 }
 
 // New creates a new Ethereum object (including the
@@ -94,7 +96,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
-
 	pool := manager.New(chain, chainDB, event)
 	minerParam := miner.MinerInfo{}
 
@@ -108,11 +109,12 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
-		accountManager: ctx.AccountManager,
 		miner:           miner.New(pool, &minerParam, chain, netFeed),
+		accountManager: ctx.AccountManager,
 		tosbase:      	config.Tosbase,
 		blockPool:       pool,
 		blockPoolEvent:  event,
+		sct:         ctx,
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
@@ -226,7 +228,6 @@ func (s *Sdag) Tosbase() (eb common.Address, err error) {
 	s.lock.RLock()
 	tosbase := s.tosbase
 	s.lock.RUnlock()
-
 	if tosbase != (common.Address{}) {
 		return tosbase, nil
 	}
@@ -244,6 +245,7 @@ func (s *Sdag) Tosbase() (eb common.Address, err error) {
 	}
 	return common.Address{}, fmt.Errorf("tosbase must be explicitly specified")
 }
+
 
 
 

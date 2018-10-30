@@ -20,6 +20,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
+	"github.com/pborman/uuid"
+	"io/ioutil"
 	"math/big"
 	"strings"
 
@@ -181,6 +184,42 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 	}
 	return string(nodeIdMsg)
 
+}
+
+//keystore 生成
+func (api *PublicSdagAPI) GeneraterKeyStore(password  string) string {
+
+	log.Debug("RPC GeneraterKeyStore", "receives password", password)
+	privateKey, err := crypto.GenerateKey()
+	if err != nil {
+		fmt.Println("GenerateKey fail")
+		return err.Error()
+	}
+
+	// Create the keyfile object with a random UUID.
+	id := uuid.NewRandom()
+	key := &keystore.Key{
+		Id:         id,
+		Address:    crypto.PubkeyToAddress(privateKey.PublicKey),
+		PrivateKey: privateKey,
+	}
+
+	// Encrypt key with passphrase.
+	passphrase := password
+	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
+	if err != nil {
+		fmt.Printf("Error encrypting key: %v\n", err)
+		return err.Error()
+	}
+
+	//Write to File
+	keyFilePath := api.s.sct.ResolvePath("")+"\\keystore"
+	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
+		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
+		return err.Error()
+	}
+
+	return "ok"
 }
 
 func hexString2Address(in string, out *common.Address) error {
