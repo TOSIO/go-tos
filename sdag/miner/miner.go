@@ -98,10 +98,10 @@ func (m *Miner) listen() {
 
 	schedule := func(miner *Miner, mining bool) {
 		if mining {
-			log.Debug("start miner", mining)
+			log.Debug("start miner","ismining", mining)
 			go work(miner)
 		} else {
-			log.Debug("stop miner", mining)
+			log.Debug("stop miner", "ismining", mining)
 			miner.Stop()
 		}
 	}
