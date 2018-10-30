@@ -74,11 +74,18 @@ type ProtocolManager struct {
 }
 
 func (pm *ProtocolManager) RealNodeIdMessage() []string {
-	var peerId []string
+
+	var peerId = make([]string, 0)
+
+
 	peerSetMessage := pm.peers
 	peerMessage := peerSetMessage.peers
 	for _, peerIdMessage := range peerMessage {
-		peerId = append(peerId, peerIdMessage.id)
+		fmt.Println("ip:", peerIdMessage.id, peerIdMessage.RemoteAddr().String())
+		//tempPeerId["ID"] = peerIdMessage.id
+		//tempPeerId["IP"] = peerIdMessage.RemoteAddr().String()
+		//tempPeerIp = append(tempPeerIp, peerIdMessage.RemoteAddr().String())
+		peerId = append(peerId, "ID:"+peerIdMessage.id, "IP:"+peerIdMessage.RemoteAddr().String()+"----------")
 	}
 	return peerId
 

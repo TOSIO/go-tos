@@ -150,6 +150,7 @@ func (db *Dashboard) Start(server *p2p.Server) error {
 	http.HandleFunc("/", db.webHandler)
 	http.Handle("/api", websocket.Handler(db.apiHandler))
 
+	fmt.Println("dashboard: ", fmt.Sprintf("%s:%d", db.config.Host, db.config.Port) )
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", db.config.Host, db.config.Port))
 	if err != nil {
 		return err

@@ -107,7 +107,7 @@ const defaultContent: () => Content = () => ({
 		bottomChanged: 0,
 	},
 	nodeMsg:{
-			NodeId:"",
+			nodeId:"",
 		},
 });
 
