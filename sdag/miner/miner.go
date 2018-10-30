@@ -70,6 +70,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		fmt.Errorf("PrivateKey err")
 		return nil
 	}
+	fmt.Println("miner new ..................................")
 	minerinfo.PrivateKey = PrivateKey
 	//init end
 	mine := &Miner{
@@ -88,6 +89,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 
 //listen chanel mod
 func (m *Miner) listen() {
+	fmt.Println("miner listen ..................................")
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
 	defer sub.Unsubscribe()
@@ -97,7 +99,7 @@ func (m *Miner) listen() {
 			log.Debug("start miner", mining)
 			go work(miner)
 		} else {
-			log.Trace("stop miner", mining)
+			log.Debug("stop miner", mining)
 			miner.Stop()
 		}
 	}
@@ -105,21 +107,16 @@ func (m *Miner) listen() {
 		select {
 		//Subscribe  external netstatus
 		case ev := <-m.netstatus:
-			/* if !ok {
-				return
-			} */
+
 			switch ev {
 
 			case core.NETWORK_CONNECTED: //net ok
 				schedule(m, true)
 			case core.NETWORK_CLOSED: //net closed
-				//m.ismining <- false
 				schedule(m, false)
 			case core.SDAGSYNC_SYNCING:
-				//m.ismining <- false
 				schedule(m, false)
 			case core.SDAGSYNC_COMPLETED:
-				//m.ismining <- true
 				schedule(m, true)
 			}
 		case mining, _ := <-m.ismining:
@@ -127,22 +124,20 @@ func (m *Miner) listen() {
 			if !mining {
 				return
 			}
-			//default:
-			//log.Debug("miner is wait")
 		}
-		//time.Sleep(5 * time.Second)
 	}
 }
 
 //start miner work
 func (m *Miner) Start(coinbase common.Address) {
+	fmt.Println("miner start ..................................")
 	m.SetTosCoinbase(coinbase)
 	m.ismining <- true
 }
 
 //miner work
 func work(m *Miner) {
-
+	fmt.Println("miner work ..................................")
 	//get random nonce
 	nonce := m.getNonceSeed()
 
@@ -182,8 +177,8 @@ func work(m *Miner) {
 		if mineBlock.Header.Time > utils.GetTimeStamp() {
 			//add block
 			mineBlock.Nonce = types.EncodeNonce(nonce)
-
-			mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+			//创币地址即挖矿者本身设置的地址
+			mineBlock.Miner = m.coinbase
 
 			//send block
 			m.sender(mineBlock)
@@ -196,11 +191,13 @@ func work(m *Miner) {
 
 //stop miner work
 func (m *Miner) Stop() {
+	fmt.Println("miner stop ..................................")
 	m.ismining <- false
 }
 
 //send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
+	fmt.Println("miner sender ..................................",fmt.Sprintln(mineblock))
 	m.mineBlockI = mineblock
 	m.mineBlockI.Sign(m.mineinfo.PrivateKey)
 	m.blockPool.EnQueue(mineblock)
