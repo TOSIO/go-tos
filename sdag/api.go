@@ -24,6 +24,7 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
+	"math/rand"
 	"strings"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
@@ -217,7 +218,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password  string) string {
 	}
 
 	//Write to File
-	keyFilePath := api.s.sct.ResolvePath("")+"\\keystore"
+	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d",rand.Intn(20))
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
