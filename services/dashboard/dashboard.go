@@ -150,7 +150,6 @@ func (db *Dashboard) Start(server *p2p.Server) error {
 	http.HandleFunc("/", db.webHandler)
 	http.Handle("/api", websocket.Handler(db.apiHandler))
 
-	fmt.Println("dashboard: ", fmt.Sprintf("%s:%d", db.config.Host, db.config.Port) )
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", db.config.Host, db.config.Port))
 	if err != nil {
 		return err
@@ -317,6 +316,8 @@ func (db *Dashboard) collectData() {
 		case <-time.After(db.config.Refresh):
 			systemCPUUsage.Get()
 			nodeId := NodeMessagefun()
+			localnodeId := LocalNodeMessagefun()
+			connectnumber := GetConnectNumber()
 			var (
 				curNetworkIngress = collectNetworkIngress()
 				curNetworkEgress  = collectNetworkEgress()
@@ -399,6 +400,8 @@ func (db *Dashboard) collectData() {
 				},
 				Msg: &NodeMessage{
 					nodeId,
+					localnodeId,
+					connectnumber,
 				},
 			})
 
@@ -462,5 +465,97 @@ func NodeMessagefun() string {
 		nodeIdstring = "connection is none"
 	}
 	return nodeIdstring
+
+}
+
+func LocalNodeMessagefun() string {
+	var (
+		localnodeIdstring     string
+		urlString        = "http://localhost:8545"
+		jsonStringFormat = `
+{
+"jsonrpc":"2.0",
+"method":"sdag_getLocalNodeID",
+"params":["ok"],
+"id":1
+}`
+	)
+	type resultInfo struct {
+		Jsonrpc string
+		Id      uint64
+		//	Error   resultError
+		Result string
+	}
+	/*	type resultNodeId struct {
+			Realid string
+		}
+	*/
+	jsonString := fmt.Sprintf(jsonStringFormat)
+	NodeIdMsg, err := httpSend.SendHttp(urlString, jsonString)
+	if err != nil {
+		fmt.Printf("SendHttp error")
+	}
+
+	var result resultInfo
+	err = json.Unmarshal(NodeIdMsg, &result)
+	if err != nil {
+		fmt.Println("Unmarshal error:", err)
+	}
+	//var resultNode resultNodeId
+	/*	err = json.Unmarshal(NodeIdMsg.Result, &resultNode)
+		if err != nil {
+			fmt.Println("Unmarshal error:", err)
+		}*/
+	localnodeIdstring = result.Result
+	if localnodeIdstring == "" {
+		localnodeIdstring = "connection is none"
+	}
+	return localnodeIdstring
+
+}
+
+func GetConnectNumber() string {
+	var (
+		localnodeIdstring     string
+		urlString        = "http://localhost:8545"
+		jsonStringFormat = `
+{
+"jsonrpc":"2.0",
+"method":"sdag_getConnectNumber",
+"params":["ok"],
+"id":1
+}`
+	)
+	type resultInfo struct {
+		Jsonrpc string
+		Id      uint64
+		//	Error   resultError
+		Result string
+	}
+	/*	type resultNodeId struct {
+			Realid string
+		}
+	*/
+	jsonString := fmt.Sprintf(jsonStringFormat)
+	NodeIdMsg, err := httpSend.SendHttp(urlString, jsonString)
+	if err != nil {
+		fmt.Printf("SendHttp error")
+	}
+
+	var result resultInfo
+	err = json.Unmarshal(NodeIdMsg, &result)
+	if err != nil {
+		fmt.Println("Unmarshal error:", err)
+	}
+	//var resultNode resultNodeId
+	/*	err = json.Unmarshal(NodeIdMsg.Result, &resultNode)
+		if err != nil {
+			fmt.Println("Unmarshal error:", err)
+		}*/
+	localnodeIdstring = result.Result
+	if localnodeIdstring == "" {
+		localnodeIdstring = "connection is none"
+	}
+	return localnodeIdstring
 
 }

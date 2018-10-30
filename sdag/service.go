@@ -218,10 +218,11 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (tosdb.Data
 	}
 	return db, nil
 }
-func (s *Sdag) SdagNodeIDMessage() []string {
+func (s *Sdag) SdagNodeIDMessage() ([]string, int) {
 	var NodeIdMessage []string
-	NodeIdMessage = s.protocolManager.RealNodeIdMessage()
-	return NodeIdMessage
+	var ConnectNumber int
+	NodeIdMessage, ConnectNumber = s.protocolManager.RealNodeIdMessage()
+	return NodeIdMessage, ConnectNumber
 }
 
 func (s *Sdag) Tosbase() (eb common.Address, err error) {

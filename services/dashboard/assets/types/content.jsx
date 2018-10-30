@@ -41,6 +41,8 @@ export type General = {
 
 export type NodeMsg = {
 	nodeId: ?string,
+    localnodeId: ?string,
+    connectnumber: ?string
 }
 
 export type Home = {

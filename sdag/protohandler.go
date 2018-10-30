@@ -23,6 +23,8 @@ import (
 
 var errIncompatibleConfig = errors.New("incompatible configuration")
 
+
+
 const (
 	STAT_NONE = iota
 	STAT_SYNCING
@@ -74,20 +76,18 @@ type ProtocolManager struct {
 	wg sync.WaitGroup
 }
 
-func (pm *ProtocolManager) RealNodeIdMessage() []string {
+func (pm *ProtocolManager) RealNodeIdMessage() ([]string, int) {
 
 	var peerId = make([]string, 0)
-
+	var ConnectNumber = 0
 	peerSetMessage := pm.peers
 	peerMessage := peerSetMessage.peers
 	for _, peerIdMessage := range peerMessage {
-		fmt.Println("ip:", peerIdMessage.id, peerIdMessage.RemoteAddr().String())
-		//tempPeerId["ID"] = peerIdMessage.id
-		//tempPeerId["IP"] = peerIdMessage.RemoteAddr().String()
-		//tempPeerIp = append(tempPeerIp, peerIdMessage.RemoteAddr().String())
-		peerId = append(peerId, "ID:"+peerIdMessage.id, "IP:"+peerIdMessage.RemoteAddr().String()+"----------")
+		ConnectNumber = ConnectNumber + 1
+		peerId = append(peerId, "ID:"+peerIdMessage.id+"  and  "+"IP:"+peerIdMessage.RemoteAddr().String()+"-------")
 	}
-	return peerId
+
+	return peerId, ConnectNumber
 
 }
 
