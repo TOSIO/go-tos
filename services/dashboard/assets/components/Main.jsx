@@ -35,6 +35,7 @@ const styles = {
 	content: {
 		flex:      1,
 		overflow: 'auto',
+		color: 'white',
 	},
 };
 
@@ -90,9 +91,10 @@ class Main extends Component<Props> {
 		switch (active) {
 		case MENU.get('messeges').id:
             children = <div>
-
-				连接的其他节点：{this.props.content.nodeMsg.nodeId}
-            </div>;
+				<h2>本节点的ID：{this.props.content.nodeMsg.localnodeId}</h2>
+				<h2>连接个数：{this.props.content.nodeMsg.connectnumber}</h2>
+				<h2>连接到的节点ID和IP：{this.props.content.nodeMsg.nodeId}</h2>
+            </div>
                 break;
 		case MENU.get('home').id:
 		case MENU.get('chain').id:

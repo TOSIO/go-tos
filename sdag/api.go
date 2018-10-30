@@ -182,7 +182,7 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 	if accept != "ok" {
 		fmt.Printf("accept params error")
 	}
-	nodeIdMessage := api.s.SdagNodeIDMessage()
+	nodeIdMessage, _ := api.s.SdagNodeIDMessage()
 	nodeIdMsg, err := json.Marshal(nodeIdMessage)
 	if err != nil {
 		fmt.Println("error:", err)
@@ -190,6 +190,7 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 	return string(nodeIdMsg)
 
 }
+
 
 //keystore 生成
 func (api *PublicSdagAPI) GeneraterKeyStore(password  string) string {
@@ -218,13 +219,41 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password  string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d",rand.Intn(20))
+	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", rand.Intn(20))
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
 	}
 
 	return "ok"
+
+}
+
+func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
+	if jsonstring != "ok" {
+		fmt.Printf("accept params error")
+	}
+	nodeIdMessage := api.s.networkID
+	nodeIdMsg, err := json.Marshal(nodeIdMessage)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(nodeIdMsg)
+}
+
+func (api *PublicSdagAPI) GetConnectNumber(jsonstring string) string {
+	if jsonstring != "ok" {
+		fmt.Printf("accept params error")
+	}
+
+	_, number := api.s.SdagNodeIDMessage()
+	nodeIdMsg, err := json.Marshal(number)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(nodeIdMsg)
+
+
 }
 
 func hexString2Address(in string, out *common.Address) error {

@@ -108,6 +108,8 @@ const defaultContent: () => Content = () => ({
 	},
 	nodeMsg:{
 			nodeId:"",
+            localnodeId:"",
+			connectnumber:"",
 		},
 });
 
@@ -136,8 +138,11 @@ const updaters = {
 	logs: logInserter(5),
 	nodeMsg:{                           //跟dashboard传过来的数据json内容对应
             nodeId:replacer,
+            localnodeId:replacer,
+			connectnumber:replacer,
         },
-};
+
+		};
 
 // styles contains the constant styles of the component.
 const styles = {
