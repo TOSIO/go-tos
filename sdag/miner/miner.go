@@ -170,10 +170,12 @@ func work(m *Miner) {
 		select {
 			case ismining, _ := <-m.ismining:
 				if !ismining{
+					log.Debug("miner","work break loop",ismining)
 					break loop
 				}
 				nonce++
 				count++
+				log.Debug("miner","work count",count)
 				//每循环1024次检测主链是否更新
 				if count == 1024 {
 					hash, diff := m.mainchin.GetPervTail()
