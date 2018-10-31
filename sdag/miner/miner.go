@@ -173,63 +173,66 @@ func work(m *Miner) {
 
 	log.Debug("miner work")
 	//get random nonce
-	nonce := m.getNonceSeed()
 
-	//Cumulative count of cycles
-	var count uint64
-
-	//creat heander
-	mineBlock := new(types.MinerBlock)
-	mineBlock.Header = types.BlockHeader{
-		Type:     MinerBlockType,
-		Time:     (utils.GetMainTime(utils.GetTimeStamp())+1)*params.TimePeriod - 1,
-		GasPrice: m.mineinfo.GasPrice,
-		GasLimit: m.mineinfo.GasLimit,
-	}
-	//first get prevtail hash  and diff
-	fhash, fDiff := m.mainchin.GetPervTail()
-	//set PervTailhash  to be best diff
-	mineBlock.Links = append(mineBlock.Links, fhash)
-	//select params.MaxLinksNum-1 unverifiedblock to links
-	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
-	// search nonce
-
+newMinerTash:
 	for {
-		select {
-		case <-m.stopMiningCh:
-			log.Debug("Stop mining work")
-			return
-		default:
-			nonce++
-			count++
-			//每循环1024次检测主链是否更新
-			if count == 1024 {
-				hash, diff := m.mainchin.GetPervTail()
-				//compare diff value
-				if diff.Cmp(fDiff) > 0 {
-					mineBlock.Links[0] = hash
-				}
-				count = 0
-				continue
-			}
-			log.Debug("miner", "work", count)
-			//compare time
-			if mineBlock.Header.Time > utils.GetTimeStamp() {
-				log.Debug("miner sender start")
-				//add block
-				mineBlock.Nonce = types.EncodeNonce(nonce)
-				//创币地址即挖矿者本身设置的地址
-				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+		nonce := m.getNonceSeed()
 
-				//send block
-				m.sender(mineBlock)
-				//break
-			}
+		//Cumulative count of cycles
+		var count uint64
 
+		//creat heander
+		mineBlock := new(types.MinerBlock)
+		mineBlock.Header = types.BlockHeader{
+			Type:     MinerBlockType,
+			Time:     (utils.GetMainTime(utils.GetTimeStamp())+1)*params.TimePeriod - 1,
+			GasPrice: m.mineinfo.GasPrice,
+			GasLimit: m.mineinfo.GasLimit,
 		}
-		time.Sleep(time.Second)
-	}
+		//first get prevtail hash  and diff
+		fhash, fDiff := m.mainchin.GetPervTail()
+		//set PervTailhash  to be best diff
+		mineBlock.Links = append(mineBlock.Links, fhash)
+		//select params.MaxLinksNum-1 unverifiedblock to links
+		mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
+		// search nonce
 
+		for {
+			select {
+			case <-m.stopMiningCh:
+				log.Debug("Stop mining work")
+				return
+			default:
+				nonce++
+				count++
+				//每循环1024次检测主链是否更新
+				if count == 1024 {
+					log.Debug("miner", "work", count)
+					//compare time
+					if mineBlock.Header.Time > utils.GetTimeStamp() {
+						log.Debug("miner sender start")
+						//add block
+						mineBlock.Nonce = types.EncodeNonce(nonce)
+						//创币地址即挖矿者本身设置的地址
+						mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+
+						//send block
+						m.sender(mineBlock)
+						//break
+						time.Sleep(time.Second)
+						break newMinerTash
+					}
+
+					hash, diff := m.mainchin.GetPervTail()
+					//compare diff value
+					if diff.Cmp(fDiff) > 0 {
+						mineBlock.Links[0] = hash
+					}
+					count = 0
+				}
+			}
+		}
+	}
 }
 
 //stop miner work

@@ -255,23 +255,22 @@ func (api *PublicSdagAPI) GetConnectNumber(jsonstring string) string {
 		fmt.Println("error:", err)
 	}
 	return string(nodeIdMsg)
-
-
 }
-	//stop minner
-	func (api *PublicSdagAPI) StopMiner() string {
-		api.s.config.Mining = false
-		api.s.miner.PostStop()
-		return "PostStop ok"
-	}
 
-	//start miner
-	func (api *PublicSdagAPI) StartMiner(address string) string {
-		coinbase := common.BytesToAddress(common.FromHex(address))
-		api.s.config.Mining = true
-		api.s.miner.Start(coinbase,true)
-		return "start ok"
-	}
+//stop minner
+func (api *PublicSdagAPI) StopMiner() string {
+	api.s.config.Mining = false
+	api.s.miner.PostStop()
+	return "PostStop ok"
+}
+
+//start miner
+func (api *PublicSdagAPI) StartMiner(address string) string {
+	coinbase := common.BytesToAddress(common.FromHex(address))
+	api.s.config.Mining = true
+	api.s.miner.Start(coinbase,true)
+	return "start ok"
+}
 
 func hexString2Address(in string, out *common.Address) error {
 	if len(in) >= 2 && in[0] == '0' && (in[1] == 'x' || in[1] == 'X') {
