@@ -28,7 +28,7 @@ func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash comm
 
 	if err != nil {
 		log.Error("Read block stauts fail")
-		return ""
+		return "Query is not possible"
 	}
 
 	tempBlockStatus := mutableInfo.Status
@@ -46,7 +46,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		return ""
+		return "Query is not possible"
 	}
 	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
@@ -89,7 +89,7 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	mainInfo, err := storage.ReadMainBlock(h, Time)
 
 	if err != nil {
-		return ""
+		return "Query is not possible"
 	}
 
 	mainHash := mainInfo.Hash
@@ -100,18 +100,4 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 
 }
 
-//func (q *QueryBlockInfoInterface) GetBlockTxInfo(h tosdb.Database, hash common.Hash) string {
-//
-//	 var TxBlockInfo  *types.TxBlock
-//	 var tempTxBlockInfo []string
-//
-//	temp := storage.ReadBlock(h, hash)
-//	tempTxBlockInfo = append(tempTxBlockInfo, "Header:"+fmt.Sprint(temp.))
-//	tempTxBlockInfo = append(tempTxBlockInfo, "AccountNonce:"+fmt.Sprint(TxBlockInfo.AccountNonce))
-//	tempTxBlockInfo = append(tempTxBlockInfo, "Links:"+fmt.Sprint(TxBlockInfo.Links))
-//	tempTxBlockInfo = append(tempTxBlockInfo, "Outs:"+fmt.Sprint(TxBlockInfo.Outs))
-//	tempTxBlockInfo = append(tempTxBlockInfo, "Payload:"+fmt.Sprint(TxBlockInfo.Payload))
-//
-//	return fmt.Sprintln(tempTxBlockInfo)
-//
-//}
+
