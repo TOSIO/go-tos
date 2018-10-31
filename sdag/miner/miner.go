@@ -19,11 +19,12 @@ package miner
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"math/rand"
+	"sync"
+	"sync/atomic"
 	"time"
-
-	"fmt"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
@@ -45,12 +46,18 @@ const (
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mineinfo   *MinerInfo
-	netstatus  chan int
-	mainchin   mainchain.MainChainI
-	blockPool  core.BlockPoolI
-	feed       *event.Feed
-	ismining   chan bool
+	mineinfo  *MinerInfo
+	netstatus chan int
+	mainchin  mainchain.MainChainI
+	blockPool core.BlockPoolI
+	feed      *event.Feed
+
+	mining       int32
+	miningCh     chan bool
+	quitCh       chan struct{}
+	stopMiningCh chan struct{}
+	wg           sync.WaitGroup
+
 	mineBlockI types.Block
 	coinbase   common.Address
 }
@@ -72,25 +79,29 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		return nil
 	}
 	//fmt.Println("miner new ..................................")
-	log.Debug("miner","new",minerinfo.GasLimit)
+	log.Debug("miner", "new", minerinfo.GasLimit)
 	minerinfo.PrivateKey = PrivateKey
 	//init end
 	mine := &Miner{
-		blockPool: pool,
-		mineinfo:  minerinfo,
-		netstatus: make(chan int),
-		mainchin:  mc,
-		feed:      feed,
-		ismining:  make(chan bool),
+		blockPool:    pool,
+		mineinfo:     minerinfo,
+		netstatus:    make(chan int),
+		mainchin:     mc,
+		feed:         feed,
+		mining:       0,
+		miningCh:     make(chan bool),
+		quitCh:       make(chan struct{}),
+		stopMiningCh: make(chan struct{}),
 	}
 
-	go mine.listen()
 	return mine
 
 }
 
 //listen chanel mod
 func (m *Miner) listen() {
+	m.wg.Add(1)
+	defer m.wg.Done()
 	//fmt.Println("miner listen ..................................")
 	log.Debug("miner listen")
 	//listen subscribe event
@@ -98,21 +109,24 @@ func (m *Miner) listen() {
 	defer sub.Unsubscribe()
 
 	schedule := func(miner *Miner, mining bool) {
+		ismining := atomic.LoadInt32(&m.mining)
 		if mining {
-			log.Debug("start miner","ismining", mining)
-			go work(miner)
+			if ismining == 0 {
+				log.Debug("start miner", "ismining", mining)
+				go work(miner)
+			}
 		} else {
-			log.Debug("stop miner", "ismining", mining)
-			miner.Stop()
+			if ismining == 1 {
+				miner.stopMiningCh <- struct{}{}
+				log.Debug("Post stop event to miner", "ismining", mining)
+			}
 		}
 	}
 	for {
 		select {
 		//Subscribe  external netstatus
 		case ev := <-m.netstatus:
-
 			switch ev {
-
 			case core.NETWORK_CONNECTED: //net ok
 				schedule(m, true)
 			case core.NETWORK_CLOSED: //net closed
@@ -121,12 +135,13 @@ func (m *Miner) listen() {
 				schedule(m, false)
 			case core.SDAGSYNC_COMPLETED:
 				schedule(m, true)
-
 			}
-		case ismining,ok := <-m.ismining:
-			if ok{
+		case ismining, ok := <-m.miningCh:
+			if ok {
 				schedule(m, ismining)
 			}
+		case <-m.quitCh:
+			return
 		}
 	}
 }
@@ -134,14 +149,25 @@ func (m *Miner) listen() {
 //start miner work
 func (m *Miner) Start(coinbase common.Address) {
 	//fmt.Println("miner start ..................................")
-	log.Debug("miner","Start",coinbase)
+	log.Debug("miner", "Start", coinbase)
 	m.SetTosCoinbase(coinbase)
-	m.ismining <- true
+	go m.listen()
+	m.miningCh <- true
 }
 
 //miner work
 func work(m *Miner) {
+
 	//fmt.Println("miner work ..................................")
+	m.wg.Add(1)
+	atomic.StoreInt32(&m.mining, 1)
+
+	clean := func() {
+		atomic.StoreInt32(&m.mining, 0)
+		m.wg.Done()
+	}
+	defer clean()
+
 	log.Debug("miner work")
 	//get random nonce
 	nonce := m.getNonceSeed()
@@ -164,41 +190,41 @@ func work(m *Miner) {
 	//select params.MaxLinksNum-1 unverifiedblock to links
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
-	loop:
+loop:
 	for {
-
 		select {
-			case ismining, _ := <-m.ismining:
-				if !ismining{
-					break loop
+		case <-m.stopMiningCh:
+			log.Debug("Stop mining work")
+			break loop
+		default:
+			nonce++
+			count++
+			//每循环1024次检测主链是否更新
+			if count == 1024 {
+				hash, diff := m.mainchin.GetPervTail()
+				//compare diff value
+				if diff.Cmp(fDiff) > 0 {
+					mineBlock.Links[0] = hash
 				}
-				nonce++
-				count++
-				//每循环1024次检测主链是否更新
-				if count == 1024 {
-					hash, diff := m.mainchin.GetPervTail()
-					//compare diff value
-					if diff.Cmp(fDiff) > 0 {
-						mineBlock.Links[0] = hash
-					}
-					count = 0
-					continue
-				}
+				count = 0
+				continue
+			}
 
-				//compare time
-				if mineBlock.Header.Time > utils.GetTimeStamp() {
-					//add block
-					mineBlock.Nonce = types.EncodeNonce(nonce)
-					//创币地址即挖矿者本身设置的地址
-					mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
+			//compare time
+			if mineBlock.Header.Time > utils.GetTimeStamp() {
+				log.Debug("miner sender start")
+				//add block
+				mineBlock.Nonce = types.EncodeNonce(nonce)
+				//创币地址即挖矿者本身设置的地址
+				mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
-					//send block
-					m.sender(mineBlock)
-					//break
-				}
-				time.Sleep(time.Second)
+				//send block
+				m.sender(mineBlock)
+				//break
+			}
+
 		}
-
+		time.Sleep(time.Second)
 	}
 
 }
@@ -206,8 +232,10 @@ func work(m *Miner) {
 //stop miner work
 func (m *Miner) Stop() {
 	//fmt.Println("miner stop ..................................")
-	log.Debug("miner Stop")
-	m.ismining <- false
+	log.Debug("miner stopped")
+	close(m.stopMiningCh)
+	m.quitCh <- struct{}{}
+	m.wg.Wait()
 }
 
 //send miner result

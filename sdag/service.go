@@ -3,9 +3,10 @@ package sdag
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/services/accounts"
-	"sync"
 
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/manager"
@@ -66,8 +67,8 @@ type Sdag struct {
 
 	networkID uint64
 
-	lock           sync.RWMutex
-	sct *node.ServiceContext
+	lock sync.RWMutex
+	sct  *node.ServiceContext
 	// Protects the variadic fields (e.g. gas price and etherbase)
 }
 
@@ -110,11 +111,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		blockchain:      chain,
 		networkFeed:     netFeed,
 		miner:           miner.New(pool, &minerParam, chain, netFeed),
-		accountManager: ctx.AccountManager,
-		tosbase:      	config.Tosbase,
+		accountManager:  ctx.AccountManager,
+		tosbase:         config.Tosbase,
 		blockPool:       pool,
 		blockPoolEvent:  event,
-		sct:         ctx,
+		sct:             ctx,
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
@@ -171,7 +172,7 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 	if err != nil {
 		log.Debug("Cannot start mining without tosbase", "err", err)
 		//return fmt.Errorf("tosbase missing: %v", err)
-	}else{
+	} else {
 		s.miner.Start(eb)
 	}
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
@@ -182,12 +183,13 @@ func (s *Sdag) Stop() error {
 	log.Debug("Sdag.Stop() called.")
 	s.protocolManager.Stop()
 	s.miner.Stop()
+	log.Debug("SDAG was stopped")
 	return nil
 }
 
-func (s *Sdag) SdagVersion() int   { return int(s.protocolManager.SubProtocols[0].Version) }
-func (s *Sdag) NetVersion() uint64 { return s.networkID }
-func (s *Sdag) AccountManager() *accounts.Manager  { return s.accountManager }
+func (s *Sdag) SdagVersion() int                  { return int(s.protocolManager.SubProtocols[0].Version) }
+func (s *Sdag) NetVersion() uint64                { return s.networkID }
+func (s *Sdag) AccountManager() *accounts.Manager { return s.accountManager }
 
 func (s *Sdag) BlockPool() core.BlockPoolI {
 	return s.blockPool
@@ -246,7 +248,3 @@ func (s *Sdag) Tosbase() (eb common.Address, err error) {
 	}
 	return common.Address{}, fmt.Errorf("tosbase must be explicitly specified")
 }
-
-
-
-

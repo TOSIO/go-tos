@@ -366,6 +366,12 @@ var (
 		Usage: "Restricts network communication to the given IP networks (CIDR masks)",
 	}
 
+	// miner
+	MiningFlag = cli.BoolFlag{
+		Name:  "mining",
+		Usage: "Disable mining(0-disable,1-enable)",
+	}
+
 	// ATM the url is left to the user and deployment to
 
 	// Gas price oracle settings
@@ -421,6 +427,9 @@ func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
 
 	if ctx.GlobalIsSet(CacheFlag.Name) || ctx.GlobalIsSet(CacheDatabaseFlag.Name) {
 		cfg.DatabaseCache = ctx.GlobalInt(CacheFlag.Name) * ctx.GlobalInt(CacheDatabaseFlag.Name) / 100
+	}
+	if ctx.GlobalIsSet(MiningFlag.Name) {
+		cfg.Mining = ctx.GlobalBool(MiningFlag.Name)
 	}
 
 	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {

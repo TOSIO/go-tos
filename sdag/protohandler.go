@@ -23,8 +23,6 @@ import (
 
 var errIncompatibleConfig = errors.New("incompatible configuration")
 
-
-
 const (
 	STAT_NONE = iota
 	STAT_SYNCING
@@ -249,7 +247,9 @@ func (pm *ProtocolManager) removePeer(id string) {
 	}
 
 	if pm.peers.Len() <= 0 {
+		log.Debug("Post connection close event")
 		pm.networkFeed.Send(core.NETWORK_CLOSED)
+		log.Debug("Post connection close event completed")
 		pm.feeded = false
 		pm.stat.progress = STAT_NET_UNVAILABLE
 	}
@@ -376,6 +376,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 			return err
 		}
 	}
+	//p.Log().Debug("TOS message handling exit")
 }
 func errResp(code errCode, format string, v ...interface{}) error {
 	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
@@ -387,8 +388,11 @@ func (pm *ProtocolManager) GetStatus() status {
 
 func (pm *ProtocolManager) handleMsg(p *peer) error {
 	//p.Log().Info("Starting handle message")
+	//p.Log().Debug("handleMsg 1")
+	//defer p.Log().Debug("handleMsg 2")
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
+		log.Debug("Error handle message", "err", err)
 		return err
 	}
 	if msg.Size > ProtocolMaxMsgSize {

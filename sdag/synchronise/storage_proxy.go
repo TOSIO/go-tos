@@ -47,8 +47,14 @@ func (s *StorageProxy) GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]
 		return all, nil
 	}
 	//diff := make([]common.Hash,0)
-	in := mapset.NewSet(all)
-	local := mapset.NewSet(hashes)
+	in := mapset.NewSet()
+	local := mapset.NewSet()
+	for _, hash := range all {
+		in.Add(hash)
+	}
+	for _, hash := range hashes {
+		local.Add(hash)
+	}
 	diff := in.Difference(local)
 	itr := diff.Iterator()
 	result := make([]common.Hash, 0)

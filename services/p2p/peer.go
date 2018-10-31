@@ -220,6 +220,7 @@ loop:
 			} else {
 				reason = DiscNetworkError
 			}
+			p.Log().Debug("Connection read error", "err", err)
 			break loop
 		case err = <-p.protoErr:
 			reason = discReasonForError(err)
@@ -230,6 +231,7 @@ loop:
 		}
 	}
 
+	p.Log().Debug("Connection was closed")
 	close(p.closed)
 	p.rw.close(reason)
 	p.wg.Wait()
@@ -244,11 +246,13 @@ func (p *Peer) pingLoop() {
 		select {
 		case <-ping.C:
 			if err := SendItems(p.rw, pingMsg); err != nil {
+				p.Log().Debug("Stop ping", "err", err)
 				p.protoErr <- err
 				return
 			}
 			ping.Reset(pingInterval)
 		case <-p.closed:
+			p.Log().Debug("Stop ping")
 			return
 		}
 	}
@@ -259,7 +263,9 @@ func (p *Peer) readLoop(errc chan<- error) {
 	for {
 		msg, err := p.rw.ReadMsg()
 		if err != nil {
+			//p.Log().Debug("Stop readLoop 1")
 			errc <- err
+			//p.Log().Debug("Stop readLoop")
 			return
 		}
 		msg.ReceivedAt = time.Now()
@@ -353,12 +359,14 @@ func (p *Peer) startProtocols(writeStart <-chan struct{}, writeErr chan<- error)
 		go func() {
 			err := proto.Run(p, rw)
 			if err == nil {
-				p.log.Trace(fmt.Sprintf("Protocol %s/%d returned", proto.Name, proto.Version))
+				p.log.Debug(fmt.Sprintf("Protocol %s/%d returned", proto.Name, proto.Version))
 				err = errProtocolReturned
 			} else if err != io.EOF {
-				p.log.Trace(fmt.Sprintf("Protocol %s/%d failed", proto.Name, proto.Version), "err", err)
+				p.log.Debug(fmt.Sprintf("Protocol %s/%d failed", proto.Name, proto.Version), "err", err)
 			}
+			//p.Log().Debug("Stop runing protocol 1")
 			p.protoErr <- err
+			p.Log().Debug("Stop runing protocol")
 			p.wg.Done()
 		}()
 	}

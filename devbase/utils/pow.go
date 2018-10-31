@@ -9,16 +9,18 @@ import (
 
 func CalculateWork(hash common.Hash) *big.Int {
 	// 参考6.1 区块难度计算
-	//(2^128-1)/(hash_little / 2^160), hash_little长度为256 bits(32 bytes)
-	//1.little hash
-	little_hash := new(big.Int).SetBytes(hash[:])
+	//(2^128-1)/hash[16:28], hash_little长度为96 bits(12 bytes)
+	//1.big int hash
+	littleHash := new(big.Int).SetBytes(hash[16:28])
+	if littleHash.Cmp(big.NewInt(0)) == 0 {
+		littleHash.SetUint64(1)
+	}
 
 	//2.根据公式计算
 	//分母 (2^128-1)
 	den := new(big.Int).Sub(math.BigPow(2, 128), big.NewInt(1))
-	//分子 (hash_little / 2^160)
-	num := new(big.Int).Div(little_hash, math.BigPow(2, 160))
-	hd := new(big.Int).Div(den, num)
+	//end value
+	hd := new(big.Int).Div(den, littleHash)
 
 	return hd
 }
