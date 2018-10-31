@@ -19,11 +19,10 @@ package miner
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
-
-	"fmt"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
@@ -189,6 +188,7 @@ func work(m *Miner) {
 
 				//compare time
 				if mineBlock.Header.Time > utils.GetTimeStamp() {
+					log.Debug("miner sender start")
 					//add block
 					mineBlock.Nonce = types.EncodeNonce(nonce)
 					//创币地址即挖矿者本身设置的地址
@@ -198,9 +198,9 @@ func work(m *Miner) {
 					m.sender(mineBlock)
 					//break
 				}
-				time.Sleep(time.Second)
-		}
 
+		}
+		time.Sleep(time.Second)
 	}
 
 }
