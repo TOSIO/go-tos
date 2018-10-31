@@ -165,11 +165,18 @@ func UnMutableRlp(mutableRLP []byte) (*MutableInfo, error) {
 
 func GetBlockStatus(blockStatusInfo BlockStatus) string {
 
+	isApply := blockStatusInfo&(BlockApply|BlockConfirm) == (BlockApply | BlockConfirm)
+	isReject := blockStatusInfo&BlockConfirm == BlockConfirm
+
 	if blockStatusInfo&BlockMain == BlockMain {
-		return "Main"
-	} else if blockStatusInfo&(BlockApply|BlockConfirm) == (BlockApply | BlockConfirm) {
+		if isApply {
+			return "Main|Accepted"
+		} else if isReject {
+			return "Main|Rejected"
+		}
+	} else if isApply {
 		return "Accepted"
-	} else if blockStatusInfo&BlockConfirm == BlockConfirm {
+	} else if isReject {
 		return "Rejected"
 	}
 	return "Pending"

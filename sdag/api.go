@@ -75,7 +75,7 @@ type TransactionInfo struct {
 }
 
 type MainBlockInfo struct {
-	Slice uint64
+	Time uint64
 }
 
 type BlockHash struct {
@@ -92,22 +92,25 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
+	var blockInfo []string
+	blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash))
+	//blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockTxInfo())
+    tempBlockInfo, _ := json.Marshal(blockInfo)
 
-	blockInfo := api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash)
-
-	return blockInfo
+	return string(tempBlockInfo)
 }
 
 func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
-	jsonString = strings.Replace(jsonString, `\`, "", -1)
+
+	//jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var RPCmainBlockInfo MainBlockInfo
 	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
+		log.Error("JSON unmarshaling failed", "error",err)
 		return err.Error()
 	}
 
-	maintime := RPCmainBlockInfo.Slice
-	Time := utils.GetMainTime(maintime)
+
+	Time := utils.GetMainTime(RPCmainBlockInfo.Time)
 
 	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, Time)
 

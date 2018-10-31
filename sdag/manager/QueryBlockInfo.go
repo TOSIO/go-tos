@@ -7,8 +7,8 @@ import (
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"math/big"
+	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 type QueryBlockInfoInterface struct {
@@ -28,7 +28,7 @@ func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash comm
 
 	if err != nil {
 		log.Error("Read block stauts fail")
-		return ""
+		return "Query is not possible"
 	}
 
 	tempBlockStatus := mutableInfo.Status
@@ -42,7 +42,12 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	//commonHash := common.HexToHash(hash)
 
-	mutableInfo, _ := storage.ReadBlockMutableInfo(h, hash)
+	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
+
+	if err != nil {
+		log.Error("Read Txblock Info fail")
+		return "Query is not possible"
+	}
 	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
 		Status:              blockStatus,
@@ -62,11 +67,11 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
 
+
 	mainInfo, err := storage.ReadMainBlock(h, slice)
 	if err != nil {
 		return ""
 	}
-
 	mainHash := mainInfo.Hash
 
 	MainBlockInfo := q.GetBlockInfo(h, mainHash)
@@ -76,12 +81,15 @@ func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint6
 
 func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string {
 
-	var mianBlock *mainchain.MainChain
-	finalMainBlockSlice := mianBlock.GetMainTail()
 
-	mainInfo, err := storage.ReadMainBlock(h, finalMainBlockSlice.Time)
+
+	finalMainBlockSlice, _ := storage.ReadTailMainBlockInfo(h)
+	Time := utils.GetMainTime(finalMainBlockSlice.Time)
+
+	mainInfo, err := storage.ReadMainBlock(h, Time)
+
 	if err != nil {
-		return ""
+		return "Query is not possible"
 	}
 
 	mainHash := mainInfo.Hash
@@ -91,3 +99,5 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	return MainBlockInfo
 
 }
+
+
