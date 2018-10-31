@@ -147,12 +147,15 @@ func (m *Miner) listen() {
 }
 
 //start miner work
-func (m *Miner) Start(coinbase common.Address) {
+func (m *Miner) Start(coinbase common.Address,cofigMing bool) {
 	//fmt.Println("miner start ..................................")
 	log.Debug("miner", "Start", coinbase)
 	m.SetTosCoinbase(coinbase)
 	go m.listen()
-	m.miningCh <- true
+	if cofigMing {
+		m.miningCh <- true
+	}
+
 }
 
 //miner work
@@ -190,12 +193,12 @@ func work(m *Miner) {
 	//select params.MaxLinksNum-1 unverifiedblock to links
 	mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
 	// search nonce
-loop:
+
 	for {
 		select {
 		case <-m.stopMiningCh:
 			log.Debug("Stop mining work")
-			break loop
+			return
 		default:
 			nonce++
 			count++
@@ -209,7 +212,7 @@ loop:
 				count = 0
 				continue
 			}
-
+			log.Debug("miner", "work", count)
 			//compare time
 			if mineBlock.Header.Time > utils.GetTimeStamp() {
 				log.Debug("miner sender start")
@@ -236,6 +239,14 @@ func (m *Miner) Stop() {
 	close(m.stopMiningCh)
 	m.quitCh <- struct{}{}
 	m.wg.Wait()
+}
+
+func (m *Miner) PostStop() {
+	//fmt.Println("miner stop ..................................")
+	log.Debug("miner PostStop")
+	close(m.stopMiningCh)
+	//m.quitCh <- struct{}{}
+	//m.wg.Wait()
 }
 
 //send miner result

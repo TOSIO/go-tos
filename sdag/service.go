@@ -173,7 +173,7 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 		log.Debug("Cannot start mining without tosbase", "err", err)
 		//return fmt.Errorf("tosbase missing: %v", err)
 	} else {
-		s.miner.Start(eb)
+		s.miner.Start(eb,s.config.Mining)
 	}
 	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
 	return nil
