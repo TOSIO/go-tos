@@ -209,32 +209,18 @@ func (s *Synchroniser) synchroinise(peer core.Peer, beginTimeslice uint64, endTi
 	var err error
 	i := beginTimeslice
 
-loop:
 	for ; i <= endTimeslice; i++ {
 		stat.CurTS = i
 		stat.Err = nil
 		stat.Progress = core.SYNC_SYNCING
 		s.syncEvent.Post(stat)
-		try := 3
-	tryloop:
-		for {
-			if try <= 0 {
-				break loop
-			}
-
-			if err = s.syncTimeslice(peer, &stat, i); err != nil {
-				stat.Err = err
-				stat.EndTime = time.Now()
-				stat.Progress = core.SYNC_ERROR
-				s.syncEvent.Post(stat)
-				try--
-				if try > 0 {
-					log.Debug("Retry synchronize timeslice", "curErr", err)
-				}
-			} else {
-				err = nil
-				break tryloop
-			}
+		//try := 3
+		if err = s.syncTimeslice(peer, &stat, i); err != nil {
+			stat.Err = err
+			stat.EndTime = time.Now()
+			stat.Progress = core.SYNC_ERROR
+			s.syncEvent.Post(stat)
+			break
 		}
 
 	}
@@ -249,71 +235,108 @@ loop:
 }
 
 func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts uint64) error {
-	err := p.RequestBlockHashBySlice(ts)
+	var err error
+	/* sendloop:
+	for {
+		select {
+		case <-s.cancelCh:
+			stat.Err = fmt.Errorf("canceled")
+			return stat.Err
+		default:
+			err = p.RequestBlockHashBySlice(ts)
+			if err == nil {
+				log.Debug("Error send request-message", "err", err)
+				break sendloop
+			} else {
+				time.Sleep(1 * time.Second)
+			}
+		}
+	} */
+	err = p.RequestBlockHashBySlice(ts)
 	if err != nil {
+		log.Debug("Error send request-message", "err", err)
 		return err
+	} else {
+		log.Debug("Send request-message OK", "timeslice", ts)
 	}
 	timeout := time.After(s.requestTTL())
 
-	select {
-	case response := <-s.blockhashesCh:
-		if all, ok := response.(*TSHashesPacket); ok {
-			if len(all.hashes) <= 0 {
-				break
-			}
-			for _, hash := range all.hashes {
-				s.fetcher.MarkAnnounced(hash, p.NodeID())
-			}
-			var diff []common.Hash
-			diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
-			if err != nil {
-				return err
-			}
-			if len(diff) <= 0 {
-				break
-			}
-			//log.Debug("process request 1")
-			s.fetcher.MarkFlighting(diff, p.NodeID())
-			//log.Debug("process request 2")
-			if err = p.RequestBlocksBySlice(all.timeslice, diff); err != nil {
-				log.Debug("process request 3")
-				return err
-			}
+	//loop:
+	for {
 
-		} else {
-			return errInternal
-		}
-	case response := <-s.blocksCh:
-		if blks, ok := response.(*TSBlocksPacket); ok {
+		select {
+		case response := <-s.blockhashesCh:
+			if all, ok := response.(*TSHashesPacket); ok {
+				if all.timeslice != ts {
+					continue
+				}
+				if len(all.hashes) <= 0 {
+					return nil
+				}
+				for _, hash := range all.hashes {
+					s.fetcher.MarkAnnounced(hash, p.NodeID())
+				}
+				var diff []common.Hash
+				diff, err = s.blkstorage.GetBlocksDiffSet(ts, all.hashes)
+				if err != nil {
+					return err
+				}
+				if len(diff) <= 0 {
+					return nil
+				}
+				//log.Debug("process request 1")
+				s.fetcher.MarkFlighting(diff, p.NodeID())
+				//log.Debug("process request 2")
+				if err = p.RequestBlocksBySlice(all.timeslice, diff); err != nil {
+					//log.Debug("process request 3")
+					return err
+				}
 
-			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
-			hashes := make([]common.Hash, 0)
-			for _, blk := range blks.blocks {
-				//s.mempool.EnQueue(blk)
-				if block, err := types.BlockDecode(blk); err == nil {
-					newblockEvent.Blocks = append(newblockEvent.Blocks, block)
-					hashes = append(hashes, block.GetHash())
+			} else {
+				return errInternal
+			}
+		case response := <-s.blocksCh:
+			if blks, ok := response.(*TSBlocksPacket); ok {
+				if blks.timeslice != ts {
+					continue
+				}
+				newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+				hashes := make([]common.Hash, 0)
+				for _, blk := range blks.blocks {
+					//s.mempool.EnQueue(blk)
+					if block, err := types.BlockDecode(blk); err == nil {
+						newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+						hashes = append(hashes, block.GetHash())
+					}
+				}
+				//log.Debug("process response 1")
+				s.fetcher.UnMarkFlighting(hashes)
+				//log.Debug("process response 2")
+				stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
+				if len(newblockEvent.Blocks) > 0 {
+					s.blockPoolEvent.Post(newblockEvent)
 				}
 			}
-			//log.Debug("process response 1")
-			s.fetcher.UnMarkFlighting(hashes)
-			//log.Debug("process response 2")
-			stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
-			if len(newblockEvent.Blocks) > 0 {
-				s.blockPoolEvent.Post(newblockEvent)
+			log.Debug("timeslice done", "timeslice", ts)
+			return nil
+		case <-timeout:
+			log.Debug("Wait response timeout", "timeslice", ts)
+			stat.Err = errSendMsgTimeout
+			err = p.RequestBlockHashBySlice(ts)
+			if err != nil {
+				log.Debug("Error send request-message", "err", err)
+				return err
+			} else {
+				log.Debug("Send request-message OK", "timeslice", ts)
 			}
-
+			timeout = time.After(s.requestTTL())
+		case <-s.cancelCh:
+			stat.Err = fmt.Errorf("canceled")
+			return stat.Err
 		}
-		return nil
-	case <-timeout:
-		log.Debug("Wait response timeout")
-		return errSendMsgTimeout
-	case <-s.cancelCh:
-		stat.Err = fmt.Errorf("canceled")
-
-		return stat.Err
 	}
-	return nil
+
+	//return nil
 }
 
 func (s *Synchroniser) RequestBlock(hash common.Hash) error {
@@ -329,7 +352,7 @@ func (s *Synchroniser) MarkAnnounced(hash common.Hash, nodeID string) {
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
-	return time.Duration(3 * time.Second)
+	return time.Duration(10 * time.Second)
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
