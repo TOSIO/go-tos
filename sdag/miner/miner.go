@@ -176,6 +176,7 @@ func work(m *Miner) {
 
 newMinerTash:
 	for {
+		log.Debug("start new mining work")
 		nonce := m.getNonceSeed()
 
 		//Cumulative count of cycles
@@ -207,10 +208,10 @@ newMinerTash:
 				count++
 				//每循环1024次检测主链是否更新
 				if count == 1024 {
-					log.Debug("miner", "work", count)
+					//log.Debug("miner", "work", count)
 					//compare time
-					if mineBlock.Header.Time > utils.GetTimeStamp() {
-						log.Debug("miner sender start")
+					if mineBlock.Header.Time < utils.GetTimeStamp() {
+						log.Debug("miner sender start","time",mineBlock.Header.Time)
 						//add block
 						mineBlock.Nonce = types.EncodeNonce(nonce)
 						//创币地址即挖矿者本身设置的地址
@@ -220,7 +221,7 @@ newMinerTash:
 						m.sender(mineBlock)
 						//break
 						time.Sleep(time.Second)
-						break newMinerTash
+						continue newMinerTash
 					}
 
 					hash, diff := m.mainchin.GetPervTail()
@@ -233,6 +234,8 @@ newMinerTash:
 			}
 		}
 	}
+
+	log.Debug("Stopp mining work")
 }
 
 //stop miner work
