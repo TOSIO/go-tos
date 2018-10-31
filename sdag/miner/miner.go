@@ -121,6 +121,11 @@ func (m *Miner) listen() {
 				schedule(m, false)
 			case core.SDAGSYNC_COMPLETED:
 				schedule(m, true)
+
+			}
+		case ismining,ok := <-m.ismining:
+			if ok{
+				schedule(m, ismining)
 			}
 		}
 	}
