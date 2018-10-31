@@ -7,8 +7,8 @@ import (
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"math/big"
+	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 type QueryBlockInfoInterface struct {
@@ -42,7 +42,12 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	//commonHash := common.HexToHash(hash)
 
-	mutableInfo, _ := storage.ReadBlockMutableInfo(h, hash)
+	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
+
+	if err != nil {
+		log.Error("Read Txblock Info fail")
+		return ""
+	}
 	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
 		Status:              blockStatus,
@@ -62,11 +67,11 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
 
+
 	mainInfo, err := storage.ReadMainBlock(h, slice)
 	if err != nil {
 		return ""
 	}
-
 	mainHash := mainInfo.Hash
 
 	MainBlockInfo := q.GetBlockInfo(h, mainHash)
@@ -76,10 +81,13 @@ func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint6
 
 func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string {
 
-	var mianBlock *mainchain.MainChain
-	finalMainBlockSlice := mianBlock.GetMainTail()
 
-	mainInfo, err := storage.ReadMainBlock(h, finalMainBlockSlice.Time)
+
+	finalMainBlockSlice, _ := storage.ReadTailMainBlockInfo(h)
+	Time := utils.GetMainTime(finalMainBlockSlice.Time)
+
+	mainInfo, err := storage.ReadMainBlock(h, Time)
+
 	if err != nil {
 		return ""
 	}
@@ -91,3 +99,19 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	return MainBlockInfo
 
 }
+
+//func (q *QueryBlockInfoInterface) GetBlockTxInfo(h tosdb.Database, hash common.Hash) string {
+//
+//	 var TxBlockInfo  *types.TxBlock
+//	 var tempTxBlockInfo []string
+//
+//	temp := storage.ReadBlock(h, hash)
+//	tempTxBlockInfo = append(tempTxBlockInfo, "Header:"+fmt.Sprint(temp.))
+//	tempTxBlockInfo = append(tempTxBlockInfo, "AccountNonce:"+fmt.Sprint(TxBlockInfo.AccountNonce))
+//	tempTxBlockInfo = append(tempTxBlockInfo, "Links:"+fmt.Sprint(TxBlockInfo.Links))
+//	tempTxBlockInfo = append(tempTxBlockInfo, "Outs:"+fmt.Sprint(TxBlockInfo.Outs))
+//	tempTxBlockInfo = append(tempTxBlockInfo, "Payload:"+fmt.Sprint(TxBlockInfo.Payload))
+//
+//	return fmt.Sprintln(tempTxBlockInfo)
+//
+//}
