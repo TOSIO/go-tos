@@ -282,7 +282,7 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
-	nodeIdMessage := api.s.networkID
+	nodeIdMessage := api.s.nodeID
 	nodeIdMsg, err := json.Marshal(nodeIdMessage)
 	if err != nil {
 		fmt.Println("error:", err)

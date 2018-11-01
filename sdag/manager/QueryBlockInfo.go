@@ -26,7 +26,8 @@ type BlockHeader struct {
 //	Amount   *big.Int //tls
 //}
 
-type MutableInfo struct {
+
+type TxBlockInfo struct {
 	Status              string
 	ConfirmItsTimeSlice uint64   //Confirm its time slice
 	Difficulty          *big.Int //self difficulty
@@ -35,6 +36,23 @@ type MutableInfo struct {
 	Time                uint64
 	Links               []common.Hash
 	BlockHash           common.Hash
+	Amount              *big.Int //tls
+	Receiver            common.Address
+	Sender              common.Address
+	GasPrice            *big.Int
+	GasLimit            uint64
+}
+
+type PublicBlockInfo struct {
+	Status              string
+	ConfirmItsTimeSlice uint64   //Confirm its time slice
+	Difficulty          *big.Int //self difficulty
+	CumulativeDiff      *big.Int //cumulative difficulty
+	MaxLinkHash         common.Hash
+	Time                uint64
+	Links               []common.Hash
+	BlockHash           common.Hash
+	Sender              common.Address
 }
 
 type TailMainBlockInfo struct {
@@ -65,25 +83,70 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	//commonHash := common.HexToHash(hash)
 
 	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
+	//BlockInfo := storage.ReadBlock(h, hash)
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
 		return "Query is not possible"
 	}
 
-	TXBlockInfo := storage.ReadBlock(h, hash)
+	Block := storage.ReadBlock(h, hash)
+
+	BlockSend, err :=Block.GetSender()
+	if err != nil {
+		log.Error("Query Block Sender Fail")
+	}
 
 	blockStatus := q.GetUserBlockStatus(h, hash)
-	Data0 := MutableInfo{
+
+	if Block.GetType()==types.BlockTypeTx{
+		TxBlock,ok:=Block.(*types.TxBlock)
+		if !ok{
+			return ""
+		}
+
+		var tempReceiver common.Address
+		var tempAmount   *big.Int
+
+				for _, temp := range TxBlock.Outs{
+					tempReceiver = temp.Receiver
+					tempAmount = temp.Amount
+				}
+
+		Data0 := TxBlockInfo{
+			Status:              blockStatus,
+			ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
+			Difficulty:          mutableInfo.Difficulty,
+			CumulativeDiff:      mutableInfo.CumulativeDiff,
+			MaxLinkHash:         mutableInfo.MaxLinkHash,
+			Links:               Block.GetLinks(),
+			Time:                Block.GetTime(),
+			BlockHash:           Block.GetHash(),
+			Amount:              tempAmount,
+			Receiver:            tempReceiver,
+			Sender:              BlockSend,
+			GasPrice:            Block.GetGasPrice(),
+			GasLimit:            Block.GetGasLimit(),
+		}
+
+		jsonData, err := json.Marshal(Data0)
+		if err != nil {
+			return ""
+		}
+
+		return string(jsonData)
+	}
+
+	Data0 := PublicBlockInfo{
 		Status:              blockStatus,
 		ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
 		Difficulty:          mutableInfo.Difficulty,
 		CumulativeDiff:      mutableInfo.CumulativeDiff,
 		MaxLinkHash:         mutableInfo.MaxLinkHash,
-		Links:               TXBlockInfo.GetLinks(),
-		Time:                TXBlockInfo.GetTime(),
-		BlockHash:           TXBlockInfo.GetHash(),
-
+		Links:               Block.GetLinks(),
+		Time:                Block.GetTime(),
+		BlockHash:           Block.GetHash(),
+		Sender:              BlockSend,
 	}
 
 	jsonData, err := json.Marshal(Data0)
