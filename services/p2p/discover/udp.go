@@ -358,6 +358,7 @@ func (t *udp) handleReply(from NodeID, ptype byte, req packet) bool {
 		// loop will handle it
 		return <-matched
 	case <-t.closing:
+		log.Trace("Connection was closed when try to handle reply", "from", from.String(), "ptype", ptype)
 		return false
 	}
 }
@@ -431,7 +432,6 @@ func (t *udp) loop() {
 				}
 			}
 			r.matched <- matched
-
 		case now := <-timeout.C:
 			nextTimeout = nil
 
@@ -552,6 +552,7 @@ func (t *udp) readLoop(unhandled chan<- ReadPacket) {
 		if t.handlePacket(from, buf[:nbytes]) != nil && unhandled != nil {
 			select {
 			case unhandled <- ReadPacket{buf[:nbytes], from}:
+				log.Trace("Send unhandle-packet to unhandled channel")
 			default:
 			}
 		}

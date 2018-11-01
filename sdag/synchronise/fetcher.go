@@ -88,6 +88,10 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	origins := f.selectOrigins(hash)
 	if len(origins) <= 0 {
 		origins = f.randomSelectOrigins()
+		if origins == nil {
+			log.Warn("Not found data source")
+			return
+		}
 	}
 
 	var task fetchTask
