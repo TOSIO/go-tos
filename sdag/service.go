@@ -7,6 +7,7 @@ import (
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/services/accounts"
+	"github.com/TOSIO/go-tos/services/p2p/discover"
 
 	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/manager"
@@ -66,6 +67,7 @@ type Sdag struct {
 	tosbase        common.Address
 
 	networkID uint64
+	nodeID    string
 
 	lock sync.RWMutex
 	sct  *node.ServiceContext
@@ -162,7 +164,7 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 // Start implements node.Service, starting all internal goroutines needed by the
 // tos protocol implementation.
 //实现service Start()接口,启动协议
-func (s *Sdag) Start(srvr *p2p.Server) error {
+func (s *Sdag) Start(srv *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
 	// Start the RPC service
 	//s.mempool.Start()
@@ -173,9 +175,10 @@ func (s *Sdag) Start(srvr *p2p.Server) error {
 		log.Debug("Cannot start mining without tosbase", "err", err)
 		//return fmt.Errorf("tosbase missing: %v", err)
 	}
-		s.miner.Start(eb,s.config.Mining)
+	s.nodeID = discover.PubkeyID(&srv.Config.PrivateKey.PublicKey).String()
+	s.miner.Start(eb, s.config.Mining)
 
-	s.netRPCService = tosapi.NewPublicNetAPI(srvr, s.NetVersion())
+	s.netRPCService = tosapi.NewPublicNetAPI(srv, s.NetVersion())
 	return nil
 }
 

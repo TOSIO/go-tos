@@ -460,7 +460,7 @@ func (srv *Server) Start() (err error) {
 	)
 
 	if !srv.NoDiscovery || srv.DiscoveryV5 { //
-		log.Debug("Start udp listening...")
+		log.Debug("Start udp listening...", "addr", srv.ListenAddr)
 		addr, err := net.ResolveUDPAddr("udp", srv.ListenAddr)
 		if err != nil {
 			return err
@@ -560,6 +560,7 @@ func (srv *Server) startListening() error {
 	laddr := listener.Addr().(*net.TCPAddr)
 	srv.ListenAddr = laddr.String()
 	srv.listener = listener
+	log.Debug("Tcp listening", "addr", srv.ListenAddr)
 	srv.loopWG.Add(1)
 	go srv.listenLoop()
 	// Map the TCP listening port if NAT is configured.
@@ -845,7 +846,7 @@ func (srv *Server) listenLoop() {
 		}
 
 		fd = newMeteredConn(fd, true)
-		srv.log.Trace("Accepted connection", "addr", fd.RemoteAddr())
+		srv.log.Debug("Accepted TCP connection", "addr", fd.RemoteAddr())
 		go func() {
 			srv.SetupConn(fd, inboundConn, nil)
 			slots <- struct{}{}

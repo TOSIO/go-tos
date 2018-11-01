@@ -194,6 +194,10 @@ func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 		}
 	}
 
+	if crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) != txRequestInfo.From {
+		return ResultStruct{Error: "private key does not match address"}
+	}
+
 	hash, err := transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
 	if err != nil {
 		return ResultStruct{Error: err.Error()}
@@ -288,7 +292,7 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
-	nodeIdMessage := api.s.networkID
+	nodeIdMessage := api.s.nodeID
 	nodeIdMsg, err := json.Marshal(nodeIdMessage)
 	if err != nil {
 		fmt.Println("error:", err)
