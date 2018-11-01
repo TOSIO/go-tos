@@ -14,12 +14,29 @@ import (
 type QueryBlockInfoInterface struct {
 }
 
+type BlockHeader struct {
+	Type     uint //1 tx, 2 miner
+	Time     uint64    //ms  timestamp
+	GasPrice *big.Int  //tls
+	GasLimit uint64    //gas max value
+}
+
+//type TxOut struct {
+//	Receiver common.Address
+//	Amount   *big.Int //tls
+//}
+
 type MutableInfo struct {
 	Status              string
 	ConfirmItsTimeSlice uint64   //Confirm its time slice
 	Difficulty          *big.Int //self difficulty
 	CumulativeDiff      *big.Int //cumulative difficulty
 	MaxLinkHash         common.Hash
+	Time                uint64
+	Links               []common.Hash
+	BlockHash           common.Hash
+	//Outs                []TxOut
+	//Payload             []byte
 }
 
 func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
@@ -48,6 +65,9 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		log.Error("Read Txblock Info fail")
 		return "Query is not possible"
 	}
+
+	TXBlockInfo := storage.ReadBlock(h, hash)
+
 	blockStatus := q.GetUserBlockStatus(h, hash)
 	Data0 := MutableInfo{
 		Status:              blockStatus,
@@ -55,6 +75,10 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		Difficulty:          mutableInfo.Difficulty,
 		CumulativeDiff:      mutableInfo.CumulativeDiff,
 		MaxLinkHash:         mutableInfo.MaxLinkHash,
+		Links:               TXBlockInfo.GetLinks(),
+		Time:                TXBlockInfo.GetTime(),
+		BlockHash:           TXBlockInfo.GetHash(),
+
 	}
 
 	jsonData, err := json.Marshal(Data0)
