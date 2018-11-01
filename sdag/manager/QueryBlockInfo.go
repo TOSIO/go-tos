@@ -35,8 +35,13 @@ type MutableInfo struct {
 	Time                uint64
 	Links               []common.Hash
 	BlockHash           common.Hash
-	//Outs                []TxOut
-	//Payload             []byte
+}
+
+type TailMainBlockInfo struct {
+	Hash           common.Hash
+	CumulativeDiff *big.Int
+	Number         uint64
+	Time           uint64
 }
 
 func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
@@ -89,10 +94,12 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	return string(jsonData)
 }
 
-func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint64) string {
+func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) string {
 
 
-	mainInfo, err := storage.ReadMainBlock(h, slice)
+	Slice := utils.GetMainTime(Time)
+
+	mainInfo, err := storage.ReadMainBlock(h, Slice)
 	if err != nil {
 		return ""
 	}
@@ -105,22 +112,25 @@ func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, slice uint6
 
 func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string {
 
-
-
-	finalMainBlockSlice, _ := storage.ReadTailMainBlockInfo(h)
-	Time := utils.GetMainTime(finalMainBlockSlice.Time)
-
-	mainInfo, err := storage.ReadMainBlock(h, Time)
+	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(h)
 
 	if err != nil {
 		return "Query is not possible"
 	}
 
-	mainHash := mainInfo.Hash
+	MainBlickInfo := TailMainBlockInfo{
+		Hash: finalMainBlockSlice.Hash,
+		CumulativeDiff: finalMainBlockSlice.CumulativeDiff,
+		Number: finalMainBlockSlice.Number,
+		Time: finalMainBlockSlice.Time,
+	}
 
-	MainBlockInfo := q.GetBlockInfo(h, mainHash)
+	jsonData, err := json.Marshal(MainBlickInfo)
+	if err != nil {
+		return ""
+	}
 
-	return MainBlockInfo
+	return string(jsonData)
 
 }
 

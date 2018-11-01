@@ -17,6 +17,9 @@
 package accounts
 
 import (
+	"crypto/ecdsa"
+	"fmt"
+	"github.com/TOSIO/go-tos/devbase/common"
 	"reflect"
 	"sort"
 	"sync"
@@ -196,4 +199,18 @@ func drop(slice []Wallet, wallets ...Wallet) []Wallet {
 		slice = append(slice[:n], slice[n+1:]...)
 	}
 	return slice
+}
+
+func (am *Manager) FindPrivateKey(address common.Address, passphrase string) (*ecdsa.PrivateKey, error) {
+	account := Account{Address: address}
+	wallet, err := am.Find(account)
+	if err != nil {
+		return nil, fmt.Errorf("the key is not found")
+	}
+	PrivateKey, err := wallet.GetPrivateKey(account, passphrase)
+	if err != nil {
+		return nil, fmt.Errorf("passphrase invalid")
+	}
+
+	return PrivateKey, nil
 }

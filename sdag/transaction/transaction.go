@@ -86,17 +86,17 @@ func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestIn
 	return txBlock, nil
 }
 
-func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) error {
+func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) (common.Hash, error) {
 	TxBlock, err := txBlockConstruction(pool, event, txRequestInfo)
 	if err != nil {
-		return err
+		return TxBlock.GetHash(), err
 	}
 
 	log.Debug("block construction success", "hash", TxBlock.GetHash().String(), "block", TxBlock)
 	err = pool.EnQueue(TxBlock)
 	if err != nil {
-		return err
+		return TxBlock.GetHash(), err
 	}
 	log.Debug("Added to the block pool successfully")
-	return nil
+	return TxBlock.GetHash(), nil
 }
