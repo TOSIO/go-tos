@@ -20,6 +20,7 @@ import (
 var (
 	currentAccountNonce uint64 = 0
 	emptyC                     = make(chan struct{}, 1)
+	//balance                    = make(map[common.Address]big.Int)
 )
 
 type ReceiverInfo struct {
@@ -90,6 +91,7 @@ func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *Tran
 	if err != nil {
 		return err
 	}
+
 	log.Debug("block construction success", "hash", TxBlock.GetHash().String(), "block", TxBlock)
 	err = pool.EnQueue(TxBlock)
 	if err != nil {
