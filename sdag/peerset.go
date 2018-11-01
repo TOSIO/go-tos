@@ -103,7 +103,11 @@ func (ps *peerSet) RandomSelectIdlePeer() (core.Peer, error) {
 }
 
 func (ps *peerSet) FindPeer(id string) core.Peer {
-	return ps.Peer(id)
+	peer := ps.Peer(id)
+	if peer != nil {
+		return peer
+	}
+	return nil
 }
 
 func (ps *peerSet) Peers() map[string]core.Peer {
