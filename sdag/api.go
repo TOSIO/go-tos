@@ -36,8 +36,6 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 
-
-
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -191,6 +189,10 @@ func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 			log.Error("PrivateKey invalid", "error", err)
 			return ResultStruct{Error: "PrivateKey invalid error" + err.Error()}
 		}
+	}
+
+	if crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) != txRequestInfo.From {
+		return ResultStruct{Error: "private key does not match address"}
 	}
 
 	hash, err := transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
