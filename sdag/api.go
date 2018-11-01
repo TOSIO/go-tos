@@ -26,8 +26,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"strings"
-
 	"github.com/TOSIO/go-tos/devbase/statistics"
 	"github.com/TOSIO/go-tos/params"
 
@@ -86,7 +84,6 @@ type BlockHash struct {
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
-	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var tempblockInfo BlockHash
 	if err := json.Unmarshal([]byte(jsonString), &tempblockInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
@@ -102,7 +99,6 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
 func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 
-	//jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var RPCmainBlockInfo MainBlockInfo
 	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
 		log.Error("JSON unmarshaling failed", "error", err)
