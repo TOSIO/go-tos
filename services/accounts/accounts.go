@@ -18,6 +18,7 @@
 package accounts
 
 import (
+	"crypto/ecdsa"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/event"
 )
@@ -122,6 +123,7 @@ type Wallet interface {
 	// It looks up the account specified either solely via its address contained within,
 	// or optionally with the aid of any location metadata from the embedded URL field.
 	//SignTxWithPassphrase(account Account, passphrase string, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	GetPrivateKey(account Account, passphrase string) (*ecdsa.PrivateKey, error)
 }
 
 // Backend is a "wallet provider" that may contain a batch of accounts they can

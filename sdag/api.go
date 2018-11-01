@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
 	"io/ioutil"
@@ -66,6 +67,7 @@ type accountInfo struct {
 	PublicKey  string
 	PrivateKey string
 	Balance    string
+	Passphrase string
 }
 
 type TransactionInfo struct {
@@ -94,7 +96,12 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	db := api.s.chainDb
 	var blockInfo []string
 	blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash))
+<<<<<<< HEAD
     tempBlockInfo, _ := json.Marshal(blockInfo)
+=======
+	//blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockTxInfo())
+	tempBlockInfo, _ := json.Marshal(blockInfo)
+>>>>>>> cef7817f00aa9d0f4a2c90228a7ba0125c65991e
 
 	return string(tempBlockInfo)
 }
@@ -104,10 +111,9 @@ func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 	//jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var RPCmainBlockInfo MainBlockInfo
 	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
-		log.Error("JSON unmarshaling failed", "error",err)
+		log.Error("JSON unmarshaling failed", "error", err)
 		return err.Error()
 	}
-
 
 	Time := utils.GetMainTime(RPCmainBlockInfo.Time)
 
@@ -129,7 +135,6 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	log.Debug("RPC receives Transaction", "receives jsonString", jsonString)
-	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var transactionInfo TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
@@ -163,10 +168,28 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
 
-	txRequestInfo.PrivateKey, err = crypto.HexToECDSA(transactionInfo.Form.PrivateKey)
-	if err != nil {
-		log.Error("HexToECDSA failed: %s", err)
-		return "HexToECDSA failed"
+	if len(transactionInfo.Form.PrivateKey) == 0 {
+		if len(transactionInfo.Form.Passphrase) == 0 {
+			log.Error("Passphrase/PrivateKey invalid")
+			return "Passphrase/PrivateKey invalid"
+		}
+		account := accounts.Account{Address: txRequestInfo.From}
+		wallet, err := api.s.accountManager.Find(account)
+		if err != nil {
+			log.Error("the key is not found")
+			return "the key is not found"
+		}
+		txRequestInfo.PrivateKey, err = wallet.GetPrivateKey(account, transactionInfo.Form.Passphrase)
+		if err != nil {
+			log.Error("Passphrase invalid")
+			return "Passphrase invalid"
+		}
+	} else {
+		txRequestInfo.PrivateKey, err = crypto.HexToECDSA(transactionInfo.Form.PrivateKey)
+		if err != nil {
+			log.Error("PrivateKey invalid", "error", err)
+			return "PrivateKey invalid error" + err.Error()
+		}
 	}
 
 	err = transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
@@ -193,9 +216,8 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 
 }
 
-
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(password  string) string {
+func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 
 	log.Debug("RPC GeneraterKeyStore", "receives password", password)
 	privateKey, err := crypto.GenerateKey()
@@ -267,7 +289,7 @@ func (api *PublicSdagAPI) StopMiner() string {
 func (api *PublicSdagAPI) StartMiner(address string) string {
 	coinbase := common.BytesToAddress(common.FromHex(address))
 	api.s.config.Mining = true
-	api.s.miner.Start(coinbase,true)
+	api.s.miner.Start(coinbase, true)
 	return "start ok"
 }
 
