@@ -20,23 +20,20 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/statistics"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
-	"math/rand"
-
-	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/params"
+	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
-
-
 
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
@@ -86,6 +83,10 @@ type MainBlockInfo struct {
 type BlockHash struct {
 	BlockHash common.Hash
 }
+
+type WalletAdress struct {
+	Address string
+} 
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
@@ -244,7 +245,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", rand.Intn(20))
+	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano()) / 1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
@@ -257,8 +258,15 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(address string) (*big.Int, error) {
-	mainblockhash := common.BytesToAddress(common.FromHex(address))
+func (api *PublicSdagAPI) GetBalance(jsonString string) (*big.Int, error) {
+
+	//Unmarshal json
+	var walletadress WalletAdress
+	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return nil,err
+	}
+	address :=common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
 	//find the main timeslice
@@ -273,7 +281,7 @@ func (api *PublicSdagAPI) GetBalance(address string) (*big.Int, error) {
 	if err!=nil{
 		return nil,err
 	}
-	return state.GetBalance(mainblockhash),state.Error()
+	return state.GetBalance(address),state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
@@ -304,8 +312,8 @@ func (api *PublicSdagAPI) GetConnectNumber(jsonstring string) string {
 //stop minner
 func (api *PublicSdagAPI) StopMiner() string {
 	api.s.config.Mining = false
-	api.s.miner.PostStop()
-	return "PostStop ok"
+	result := api.s.miner.PostStop()
+	return result
 }
 
 //start miner
