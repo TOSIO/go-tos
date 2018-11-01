@@ -387,6 +387,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 func (pm *ProtocolManager) GetStatus() status {
+	pm.stat.NodeNum = pm.peers.Len()
 	return pm.stat
 }
 
