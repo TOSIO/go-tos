@@ -36,9 +36,8 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 
-	//"github.com/TOSIO/go-tos/sdag/core/storage"
-	//"github.com/TOSIO/go-tos/sdag/manager"
-	"github.com/TOSIO/go-tos/devbase/utils"
+
+
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -111,9 +110,7 @@ func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 		return err.Error()
 	}
 
-	Time := utils.GetMainTime(RPCmainBlockInfo.Time)
-
-	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, Time)
+	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, RPCmainBlockInfo.Time)
 
 	return tempQueryMainBlockInfo
 }
