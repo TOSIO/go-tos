@@ -20,6 +20,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
 	"io/ioutil"
@@ -249,6 +252,28 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 
 	return "ok"
 
+}
+
+// GetBalance returns the amount of wei for the given address in the state of the
+// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
+// block numbers are also allowed.
+func (api *PublicSdagAPI) GetBalance(address string) (*big.Int, error) {
+	mainblockhash := common.BytesToAddress(common.FromHex(address))
+	//last mainblock info
+	tailMainBlockInfo := api.s.blockchain.GetMainTail()
+	//find the main timeslice
+	sTime := utils.GetMainTime(tailMainBlockInfo.Time)
+	//get mainblock info
+	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
+	if err!=nil{
+		return nil,err
+	}
+	//get  statedb
+	state, err := state.New(mainInfo.Root, api.s.stateDb)
+	if err!=nil{
+		return nil,err
+	}
+	return state.GetBalance(mainblockhash),state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
