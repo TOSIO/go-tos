@@ -87,7 +87,7 @@ type Block interface {
 
 	Validation() error // (check data,校验解签名)
 
-	GetMaxLink() common.Hash        //设置最大连接
+	GetMaxLink() common.Hash        //获取最大连接
 	SetMaxLink(MaxLink common.Hash) //设置最大连接
 }
 
