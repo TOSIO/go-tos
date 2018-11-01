@@ -45,15 +45,28 @@ func main() {
 		runv5       = flag.Bool("v5", false, "run a v5 topic discovery bootnode")
 		verbosity   = flag.Int("verbosity", int(log.LvlInfo), "log verbosity (0-9)")
 		vmodule     = flag.String("vmodule", "", "log verbosity pattern")
+		logdir      = flag.String("logdir", "", "log directory")
 
 		nodeKey *ecdsa.PrivateKey
 		err     error
 	)
 	flag.Parse()
 
-	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
+	ostream := log.StreamHandler(os.Stderr, log.TerminalFormat(false))
+	glogger := log.NewGlogHandler(ostream)
 	glogger.Verbosity(log.Lvl(*verbosity))
 	glogger.Vmodule(*vmodule)
+	if logdir != nil && *logdir != "" {
+		fmt.Println("logdir is ", *logdir)
+		if rfh, err := log.RotatingFileHandler(
+			*logdir,
+			//262144,
+			2097152,
+			log.JSONFormatOrderedEx(false, true),
+		); err == nil {
+			glogger.SetHandler(log.MultiHandler(ostream, rfh))
+		}
+	}
 	log.Root().SetHandler(glogger)
 
 	natm, err := nat.Parse(*natdesc)
