@@ -94,12 +94,10 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
-	var blockInfo []string
-	blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash))
 
-    tempBlockInfo, _ := json.Marshal(blockInfo)
-
-	return string(tempBlockInfo)
+	blockInfo := api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash)
+	
+	return string(blockInfo)
 }
 
 func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
