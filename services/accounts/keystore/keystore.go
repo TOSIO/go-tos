@@ -489,3 +489,25 @@ func zeroKey(k *ecdsa.PrivateKey) {
 		b[i] = 0
 	}
 }
+
+func (ks *KeyStore) GetPrivateKey(a accounts.Account, auth string) (*ecdsa.PrivateKey, error) {
+	var (
+		unlockedKey *unlocked
+		found       bool
+	)
+
+	ks.mu.RLock()
+	unlockedKey, found = ks.unlocked[a.Address]
+	ks.mu.RUnlock()
+
+	if !found {
+		if err := ks.Unlock(a, auth); err != nil {
+			return nil, fmt.Errorf("auth invalid")
+		}
+		unlockedKey, _ = ks.unlocked[a.Address]
+	}
+
+	privateKey := *unlockedKey.PrivateKey
+
+	return &privateKey, nil
+}

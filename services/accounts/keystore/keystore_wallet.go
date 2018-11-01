@@ -17,6 +17,7 @@
 package keystore
 
 import (
+	"crypto/ecdsa"
 	"github.com/TOSIO/go-tos/services/accounts"
 )
 
@@ -133,3 +134,14 @@ func (w *keystoreWallet) SignHashWithPassphrase(account accounts.Account, passph
 // 	// Account seems valid, request the keystore to sign
 // 	return w.keystore.SignTxWithPassphrase(account, passphrase, tx, chainID)
 // }
+func (w *keystoreWallet) GetPrivateKey(account accounts.Account, passphrase string) (*ecdsa.PrivateKey, error) {
+	// Make sure the requested account is contained within
+	if account.Address != w.account.Address {
+		return nil, accounts.ErrUnknownAccount
+	}
+	if account.URL != (accounts.URL{}) && account.URL != w.account.URL {
+		return nil, accounts.ErrUnknownAccount
+	}
+	// Account seems valid, request the keystore to sign
+	return w.keystore.GetPrivateKey(account, passphrase)
+}
