@@ -20,14 +20,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"math/big"
-	"math/rand"
-
+	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/services/accounts"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
-
+	"io/ioutil"
+	"math/big"
+	"math/rand"
+	"strings"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
 	"github.com/TOSIO/go-tos/params"
@@ -36,8 +37,9 @@ import (
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 
-
-
+	//"github.com/TOSIO/go-tos/sdag/core/storage"
+	//"github.com/TOSIO/go-tos/sdag/manager"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
@@ -60,9 +62,6 @@ func NewPublicSdagAPI(s *Sdag) *PublicSdagAPI {
 func (api *PublicSdagAPI) DoRequest(data string) string {
 	log.Trace("func PublicSdagAPI.DoRequest | receive request,", "param", data)
 	return ""
-}
-func (api *PublicSdagAPI) Status() string {
-	return api.s.Status()
 }
 
 type accountInfo struct {
@@ -89,6 +88,7 @@ type BlockHash struct {
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
+	jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var tempblockInfo BlockHash
 	if err := json.Unmarshal([]byte(jsonString), &tempblockInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
@@ -96,21 +96,26 @@ func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 	}
 
 	db := api.s.chainDb
+	var blockInfo []string
+	blockInfo = append(blockInfo, api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash))
 
-	blockInfo := api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash)
+    tempBlockInfo, _ := json.Marshal(blockInfo)
 
-	return blockInfo
+	return string(tempBlockInfo)
 }
 
 func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
 
+	//jsonString = strings.Replace(jsonString, `\`, "", -1)
 	var RPCmainBlockInfo MainBlockInfo
 	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
 		log.Error("JSON unmarshaling failed", "error", err)
 		return err.Error()
 	}
 
-	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, RPCmainBlockInfo.Time)
+	Time := utils.GetMainTime(RPCmainBlockInfo.Time)
+
+	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, Time)
 
 	return tempQueryMainBlockInfo
 }
@@ -244,6 +249,28 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 
 	return "ok"
 
+}
+
+// GetBalance returns the amount of wei for the given address in the state of the
+// given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
+// block numbers are also allowed.
+func (api *PublicSdagAPI) GetBalance(address string) (*big.Int, error) {
+	mainblockhash := common.BytesToAddress(common.FromHex(address))
+	//last mainblock info
+	tailMainBlockInfo := api.s.blockchain.GetMainTail()
+	//find the main timeslice
+	sTime := utils.GetMainTime(tailMainBlockInfo.Time)
+	//get mainblock info
+	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
+	if err!=nil{
+		return nil,err
+	}
+	//get  statedb
+	state, err := state.New(mainInfo.Root, api.s.stateDb)
+	if err!=nil{
+		return nil,err
+	}
+	return state.GetBalance(mainblockhash),state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {

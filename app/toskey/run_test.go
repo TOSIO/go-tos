@@ -18,11 +18,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/TOSIO/go-tos/internal/cmdtest"
 	"os"
 	"testing"
 
 	"github.com/docker/docker/pkg/reexec"
-	"github.com/ethereum/go-ethereum/internal/cmdtest"
 )
 
 type testEthkey struct {
