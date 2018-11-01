@@ -20,12 +20,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/TOSIO/go-tos/services/accounts"
-	"github.com/TOSIO/go-tos/services/accounts/keystore"
-	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
+
+	"github.com/TOSIO/go-tos/services/accounts"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
+	"github.com/pborman/uuid"
+
+
 	"github.com/TOSIO/go-tos/devbase/statistics"
 	"github.com/TOSIO/go-tos/params"
 
@@ -58,6 +61,9 @@ func NewPublicSdagAPI(s *Sdag) *PublicSdagAPI {
 func (api *PublicSdagAPI) DoRequest(data string) string {
 	log.Trace("func PublicSdagAPI.DoRequest | receive request,", "param", data)
 	return ""
+}
+func (api *PublicSdagAPI) Status() string {
+	return api.s.Status()
 }
 
 type accountInfo struct {

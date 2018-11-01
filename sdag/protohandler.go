@@ -32,8 +32,9 @@ const (
 )
 
 type status struct {
-	nodeNum  int `json:node_num`
-	progress int `json:progress` //0-none,1-syncing,2-ready,3-working,4-connecting
+	NodeNum  int                  `json:"node_num"`
+	Status   int                  `json:"status"` //0-none,1-syncing,2-ready,3-working,4-connecting
+	Syncstat core.SYNCStatusEvent `json:"sync_status,omitempty"`
 }
 
 // tos sdag协议管理、实现
@@ -116,7 +117,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 		networkFeed:    feed,
 		blockPoolEvent: poolFeed,
 		feeded:         false,
-		stat:           status{nodeNum: 0, progress: STAT_NONE},
+		stat:           status{NodeNum: 0, Status: STAT_NONE},
 		syncResult:     make(chan error),
 	}
 
@@ -175,8 +176,10 @@ func (pm *ProtocolManager) loop() {
 		case ev := <-pm.syncstatSub.Chan():
 			if event, ok := ev.Data.(core.SYNCStatusEvent); ok {
 				if event.Progress == core.SYNC_END && event.Err == nil {
-					pm.stat.progress = STAT_WORKING
+					pm.stat.Status = STAT_WORKING
+					pm.stat.Syncstat = core.SYNCStatusEvent{}
 				}
+				pm.stat.Syncstat = event
 				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
 					"startTS", event.BeginTS,
 					"endTS", event.EndTS,
@@ -252,14 +255,14 @@ func (pm *ProtocolManager) removePeer(id string) {
 		pm.networkFeed.Send(core.NETWORK_CLOSED)
 		log.Debug("Post connection close event completed")
 		pm.feeded = false
-		pm.stat.progress = STAT_NET_UNVAILABLE
+		pm.stat.Status = STAT_NET_UNVAILABLE
 	}
 }
 
 func (pm *ProtocolManager) Start(maxPeers int) {
 	log.Info("ProtocolManager.Start called.")
 	// start sync procedure
-	pm.stat.progress = STAT_SYNCING
+	pm.stat.Status = STAT_SYNCING
 
 	pm.synchroniser.Start()
 	go pm.loop()
@@ -384,6 +387,7 @@ func errResp(code errCode, format string, v ...interface{}) error {
 }
 
 func (pm *ProtocolManager) GetStatus() status {
+	pm.stat.NodeNum = pm.peers.Len()
 	return pm.stat
 }
 
