@@ -16,7 +16,7 @@ type TailMainBlockInfo struct {
 	Hash           common.Hash
 	CumulativeDiff *big.Int
 	Number         uint64
-	Time           uint64
+	Time           uint64//
 }
 
 func (mb *MainBlockInfo) Rlp() []byte {

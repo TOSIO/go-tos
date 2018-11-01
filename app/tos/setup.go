@@ -130,43 +130,43 @@ func activeAccount(ctx *cli.Context, stack *node.Node) {
 	events := make(chan accounts.WalletEvent, 16)
 	stack.AccountManager().Subscribe(events)
 
-	go func() {
-		// Create a chain state reader for self-derivation
-		//rpcClient, err := stack.Attach()
-		//if err != nil {
-		//	utils.Fatalf("Failed to attach to self: %v", err)
-		//}
-		//stateReader := ethclient.NewClient(rpcClient)
-
-		// Open any wallets already attached
-		for _, wallet := range stack.AccountManager().Wallets() {
-			if err := wallet.Open(""); err != nil {
-				log.Warn("Failed to open wallet", "url", wallet.URL(), "err", err)
-			}
-		}
-		// Listen for wallet event till termination
-		for event := range events {
-			switch event.Kind {
-			case accounts.WalletArrived:
-				if err := event.Wallet.Open(""); err != nil {
-					log.Warn("New wallet appeared, failed to open", "url", event.Wallet.URL(), "err", err)
-				}
-			case accounts.WalletOpened:
-				status, _ := event.Wallet.Status()
-				log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
-
-				//derivationPath := accounts.DefaultBaseDerivationPath
-				if event.Wallet.URL().Scheme == "ledger" {
-					//derivationPath = accounts.DefaultLedgerBaseDerivationPath
-				}
-				//event.Wallet.SelfDerive(derivationPath, stateReader)
-
-			case accounts.WalletDropped:
-				log.Info("Old wallet dropped", "url", event.Wallet.URL())
-				event.Wallet.Close()
-			}
-		}
-	}()
+	//go func() {
+	//	// Create a chain state reader for self-derivation
+	//	//rpcClient, err := stack.Attach()
+	//	//if err != nil {
+	//	//	utils.Fatalf("Failed to attach to self: %v", err)
+	//	//}
+	//	//stateReader := ethclient.NewClient(rpcClient)
+	//
+	//	// Open any wallets already attached
+	//	for _, wallet := range stack.AccountManager().Wallets() {
+	//		if err := wallet.Open(""); err != nil {
+	//			log.Warn("Failed to open wallet", "url", wallet.URL(), "err", err)
+	//		}
+	//	}
+	//	// Listen for wallet event till termination
+	//	for event := range events {
+	//		switch event.Kind {
+	//		case accounts.WalletArrived:
+	//			if err := event.Wallet.Open(""); err != nil {
+	//				log.Warn("New wallet appeared, failed to open", "url", event.Wallet.URL(), "err", err)
+	//			}
+	//		case accounts.WalletOpened:
+	//			status, _ := event.Wallet.Status()
+	//			log.Info("New wallet appeared", "url", event.Wallet.URL(), "status", status)
+	//
+	//			//derivationPath := accounts.DefaultBaseDerivationPath
+	//			if event.Wallet.URL().Scheme == "ledger" {
+	//				//derivationPath = accounts.DefaultLedgerBaseDerivationPath
+	//			}
+	//			//event.Wallet.SelfDerive(derivationPath, stateReader)
+	//
+	//		case accounts.WalletDropped:
+	//			log.Info("Old wallet dropped", "url", event.Wallet.URL())
+	//			event.Wallet.Close()
+	//		}
+	//	}
+	//}()
 }
 
 //启动辅助服务
