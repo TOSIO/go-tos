@@ -20,14 +20,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
+	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
-
-	"github.com/TOSIO/go-tos/services/accounts"
-	"github.com/TOSIO/go-tos/services/accounts/keystore"
-	"github.com/pborman/uuid"
-
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
 	"github.com/TOSIO/go-tos/params"
@@ -130,11 +127,25 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
+	result := api.transaction(jsonString)
+	byteString, err := json.Marshal(result)
+	if err != nil {
+		return `{"Error":"result parse error","Hash":""}`
+	}
+	return string(byteString)
+}
+
+type ResultStruct struct {
+	Error string
+	Hash  common.Hash
+}
+
+func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 	log.Debug("RPC receives Transaction", "receives jsonString", jsonString)
 	var transactionInfo TransactionInfo
 	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
-		return err.Error()
+		return ResultStruct{Error: err.Error()}
 	}
 	var txRequestInfo transaction.TransInfo
 
@@ -143,23 +154,23 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 
 	err := hexString2Address(transactionInfo.Form.Address, &txRequestInfo.From)
 	if err != nil {
-		return err.Error()
+		return ResultStruct{Error: err.Error()}
 	}
 
 	var to common.Address
 	err = hexString2Address(transactionInfo.To, &to)
 	if err != nil {
-		return err.Error()
+		return ResultStruct{Error: err.Error()}
 	}
 	Amount := new(big.Int)
 	_, ok := Amount.SetString(transactionInfo.Amount, 10)
 	if Amount.Sign() < 0 {
 		log.Error("The amount must be positive: %s", transactionInfo.Amount)
-		return "The amount must be positive"
+		return ResultStruct{Error: "The amount must be positive"}
 	}
 	if !ok {
 		log.Error("Amount is invalid: %s", transactionInfo.Amount)
-		return "Amount is invalid"
+		return ResultStruct{Error: "Amount is invalid"}
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
@@ -167,32 +178,26 @@ func (api *PublicSdagAPI) Transaction(jsonString string) string {
 	if len(transactionInfo.Form.PrivateKey) == 0 {
 		if len(transactionInfo.Form.Passphrase) == 0 {
 			log.Error("Passphrase/PrivateKey invalid")
-			return "Passphrase/PrivateKey invalid"
+			return ResultStruct{Error: "Passphrase/PrivateKey invalid"}
 		}
-		account := accounts.Account{Address: txRequestInfo.From}
-		wallet, err := api.s.accountManager.Find(account)
+		txRequestInfo.PrivateKey, err = api.s.accountManager.FindPrivateKey(txRequestInfo.From, transactionInfo.Form.Passphrase)
 		if err != nil {
-			log.Error("the key is not found")
-			return "the key is not found"
-		}
-		txRequestInfo.PrivateKey, err = wallet.GetPrivateKey(account, transactionInfo.Form.Passphrase)
-		if err != nil {
-			log.Error("Passphrase invalid")
-			return "Passphrase invalid"
+			log.Error(err.Error())
+			return ResultStruct{Error: err.Error()}
 		}
 	} else {
 		txRequestInfo.PrivateKey, err = crypto.HexToECDSA(transactionInfo.Form.PrivateKey)
 		if err != nil {
 			log.Error("PrivateKey invalid", "error", err)
-			return "PrivateKey invalid error" + err.Error()
+			return ResultStruct{Error: "PrivateKey invalid error" + err.Error()}
 		}
 	}
 
-	err = transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
+	hash, err := transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
 	if err != nil {
-		return err.Error()
+		return ResultStruct{Error: err.Error()}
 	}
-	return "OK"
+	return ResultStruct{Hash: hash}
 }
 
 func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard RPC server function
