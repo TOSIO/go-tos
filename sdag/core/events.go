@@ -56,19 +56,19 @@ type NewSYNCTask struct {
 }
 
 type SYNCStatusEvent struct {
-	Progress SYNCProgress
-	BeginTS  uint64
-	EndTS    uint64
-	CurTS    uint64
+	Progress SYNCProgress `json:"progress"`
+	BeginTS  uint64       `json:"begin_timeslice"`
+	EndTS    uint64       `json:"end_timeslice"`
+	CurTS    uint64       `json:"cur_timeslice"`
 
-	AccumulateSYNCNum uint64
+	AccumulateSYNCNum uint64 `json:"cumulated_sync_block_num"`
 
-	BeginTime time.Time
-	EndTime   time.Time
+	BeginTime time.Time `json:"begin_time"`
+	EndTime   time.Time `json:"end_time"`
 
 	//TriedOrigin []string
-	CurOrigin string
-	Err       error
+	CurOrigin string `json:"datasource"`
+	Err       error  `json:"error"`
 }
 
 type GetUnverifyBlocksEvent struct {
