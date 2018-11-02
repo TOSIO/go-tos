@@ -93,6 +93,12 @@ type WalletAdress struct {
 	Address string
 }
 
+type RpcMinerInfo struct {
+	Address string
+	password string
+}
+
+
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
 	var tempblockInfo BlockHash
@@ -336,14 +342,25 @@ func (api *PublicSdagAPI) StartMiner(jsonString string) string {
 		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
 	}
 	//Unmarshal json
-	var walletadress WalletAdress
-	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
+	var rpcMinerInfo RpcMinerInfo
+	if err := json.Unmarshal([]byte(jsonString), &rpcMinerInfo); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
 		return err.Error()
 	}
-	address :=common.HexToAddress(walletadress.Address)
+	if rpcMinerInfo.Address==""{
+		return "address is empty"
+	}
+	if rpcMinerInfo.password==""{
+		return "password is empty"
+	}
+	address :=common.HexToAddress(rpcMinerInfo.Address)
+	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.password)
+	if err!=nil{
+		log.Error("get private key error", err)
+		return err.Error()
+	}
 	api.s.config.Mining = true
-	api.s.miner.Start(address)
+	api.s.miner.Start(rpcMinerInfo.Address,privatekey)
 	return "start ok"
 }
 

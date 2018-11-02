@@ -19,7 +19,6 @@ package miner
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -61,7 +60,7 @@ type Miner struct {
 	canStop      int32
 	stopCount    int32
 	mineBlockI types.Block
-	coinbase   common.Address
+	coinbase   string
 }
 
 type MinerInfo struct {
@@ -79,14 +78,14 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	//init start
 	minerinfo.GasLimit = 2000
 	minerinfo.GasPrice = big.NewInt(20)
-	PrivateKey, err := crypto.GenerateKey()
-	if err != nil {
-		fmt.Errorf("PrivateKey err")
-		return nil
-	}
-	//fmt.Println("miner new ..................................")
-	log.Debug("miner", "new", minerinfo.GasLimit)
-	minerinfo.PrivateKey = PrivateKey
+	//PrivateKey, err := crypto.GenerateKey()
+	//if err != nil {
+	//	fmt.Errorf("PrivateKey err")
+	//	return nil
+	//}
+	////fmt.Println("miner new ..................................")
+	//log.Debug("miner", "new", minerinfo.GasLimit)
+	//minerinfo.PrivateKey = PrivateKey
 	//init end
 	mine := &Miner{
 		blockPool:    pool,
@@ -163,9 +162,10 @@ func (m *Miner) listen() {
 }
 
 //start miner work
-func (m *Miner) Start(coinbase common.Address) {
-	log.Debug("miner", "Start", coinbase)
+func (m *Miner) Start(coinbase string,privatekey *ecdsa.PrivateKey) {
+	log.Debug("miner", "Start address", coinbase)
 	m.SetTosCoinbase(coinbase)
+	m.mineinfo.PrivateKey = privatekey
 	go m.listen()
 	m.miningCh <- true
 }
@@ -279,7 +279,7 @@ func (m *Miner) getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
 
-func (m *Miner) SetTosCoinbase(coinbase common.Address) {
+func (m *Miner) SetTosCoinbase(coinbase string) {
 	m.coinbase = coinbase
 
 }

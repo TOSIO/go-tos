@@ -169,16 +169,16 @@ func (s *Sdag) Start(srv *p2p.Server) error {
 	//s.mempool.Start()
 	s.protocolManager.Start(100)
 	// Configure the local mining address
-	eb, err := s.Tosbase()
-	if err != nil {
-		log.Debug("Cannot start mining without tosbase", "err", err)
-		//return fmt.Errorf("tosbase missing: %v", err)
-	}
+	//eb, err := s.Tosbase()
+	//if err != nil {
+	//	log.Debug("Cannot start mining without tosbase", "err", err)
+	//	//return fmt.Errorf("tosbase missing: %v", err)
+	//}
 	s.nodeID = discover.PubkeyID(&srv.Config.PrivateKey.PublicKey).String()
-	if s.config.Mining{
-		log.Debug("Cannot start mining ", "configMining", s.config.Mining)
-		s.miner.Start(eb)
-	}
+	//if s.config.Mining{
+	//	log.Debug("Cannot start mining ", "configMining", s.config.Mining)
+	//	s.miner.Start(eb)
+	//}
 	s.netRPCService = tosapi.NewPublicNetAPI(srv, s.NetVersion())
 	return nil
 }
