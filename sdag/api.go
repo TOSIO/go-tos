@@ -98,6 +98,9 @@ type RpcMinerInfo struct {
 	password string
 }
 
+type RpcGenerKeyStore struct {
+	password string
+}
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
@@ -237,9 +240,17 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 }
 
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
-
-	log.Debug("RPC GeneraterKeyStore", "receives password", password)
+func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
+	//Unmarshal json
+	var rpcGenerKeyStore RpcGenerKeyStore
+	if err := json.Unmarshal([]byte(jsonString), &rpcGenerKeyStore); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	if rpcGenerKeyStore.password==""{
+		return "password is empty"
+	}
+	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		fmt.Println("GenerateKey fail")
@@ -255,7 +266,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	// Encrypt key with passphrase.
-	passphrase := password
+	passphrase := rpcGenerKeyStore.password
 	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
 	if err != nil {
 		fmt.Printf("Error encrypting key: %v\n", err)
