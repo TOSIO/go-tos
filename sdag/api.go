@@ -95,11 +95,11 @@ type WalletAdress struct {
 
 type RpcMinerInfo struct {
 	Address string
-	password string
+	Password string
 }
 
 type RpcGenerKeyStore struct {
-	password string
+	Password string
 }
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
@@ -247,10 +247,10 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 		log.Error("JSON unmarshaling failed: %s", err)
 		return err.Error()
 	}
-	if rpcGenerKeyStore.password==""{
+	if rpcGenerKeyStore.Password==""{
 		return "password is empty"
 	}
-	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.password)
+	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		fmt.Println("GenerateKey fail")
