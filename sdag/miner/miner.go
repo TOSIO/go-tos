@@ -56,8 +56,10 @@ type Miner struct {
 	miningCh     chan bool
 	quitCh       chan struct{}
 	stopMiningCh chan struct{}
+	poststopMiningCh chan struct{}
 	wg           sync.WaitGroup
-
+	canStop      int32
+	stopCount    int32
 	mineBlockI types.Block
 	coinbase   common.Address
 }
@@ -68,6 +70,10 @@ type MinerInfo struct {
 	GasLimit   uint64   //gas max value
 	PrivateKey *ecdsa.PrivateKey
 }
+
+type SyncState struct {
+	//state
+} 
 
 func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, feed *event.Feed) *Miner {
 	//init start
@@ -89,9 +95,12 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		mainchin:     mc,
 		feed:         feed,
 		mining:       0,
+		canStop:      1, //1  stop   0 can not stop
+		stopCount:    0,
 		miningCh:     make(chan bool),
 		quitCh:       make(chan struct{}),
 		stopMiningCh: make(chan struct{}),
+		poststopMiningCh:make(chan struct{}),
 	}
 
 	return mine
@@ -129,14 +138,19 @@ func (m *Miner) listen() {
 			switch ev {
 			case core.NETWORK_CONNECTED: //net ok
 				schedule(m, true)
+			log.Debug("miner netstatus core.NETWORK_CONNECTED")
 			case core.NETWORK_CLOSED: //net closed
 				schedule(m, false)
+				log.Debug("miner netstatus core.NETWORK_CLOSED")
 			case core.SDAGSYNC_SYNCING:
 				schedule(m, false)
+				log.Debug("miner netstatus core.SDAGSYNC_SYNCING")
 			case core.SDAGSYNC_COMPLETED:
 				schedule(m, true)
+				log.Debug("miner netstatus core.SDAGSYNC_COMPLETED")
 			}
 		case ismining, ok := <-m.miningCh:
+			log.Debug("miner netstatus ","m.miningCh",ismining)
 			if ok {
 				schedule(m, ismining)
 			}
@@ -149,6 +163,8 @@ func (m *Miner) listen() {
 //start miner work
 func (m *Miner) Start(coinbase common.Address,cofigMing bool) {
 	//fmt.Println("miner start ..................................")
+	m.stopCount =0
+	atomic.StoreInt32(&m.canStop,m.stopCount)
 	log.Debug("miner", "Start", coinbase)
 	m.SetTosCoinbase(coinbase)
 	go m.listen()
@@ -171,7 +187,7 @@ func work(m *Miner) {
 	}
 	defer clean()
 
-	log.Debug("miner work")
+	//log.Debug("miner work")
 	//get random nonce
 
 newMinerTash:
@@ -201,6 +217,9 @@ newMinerTash:
 		for {
 			select {
 			case <-m.stopMiningCh:
+				log.Debug("Stop mining work")
+				return
+			case <-m.poststopMiningCh:
 				log.Debug("Stop mining work")
 				return
 			default:
@@ -247,12 +266,16 @@ func (m *Miner) Stop() {
 	m.wg.Wait()
 }
 
-func (m *Miner) PostStop() {
+func (m *Miner) PostStop() string {
 	//fmt.Println("miner stop ..................................")
 	log.Debug("miner PostStop")
-	close(m.stopMiningCh)
-	//m.quitCh <- struct{}{}
-	//m.wg.Wait()
+	//if atomic.LoadInt32(&m.mining)==0{
+	//	return "PostStop aready ok"
+	//}
+	//close(m.stopMiningCh)
+	m.miningCh <- false
+	return "PostStop ok"
+
 }
 
 //send miner result
