@@ -59,7 +59,12 @@ func (api *PublicSdagAPI) DoRequest(data string) string {
 	return ""
 }
 func (api *PublicSdagAPI) Status() string {
-	return api.s.Status()
+	data, err := json.Marshal(api.s.Status())
+	if err != nil {
+		return ""
+	} else {
+		return string(data)
+	}
 }
 
 type accountInfo struct {
@@ -86,7 +91,7 @@ type BlockHash struct {
 
 type WalletAdress struct {
 	Address string
-} 
+}
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
@@ -128,6 +133,9 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
+	if api.s.Status().Status != STAT_WORKING {
+		return fmt.Sprintf(`{"Error":"current status cannot be traded. status=%d","Hash":""}`, api.s.Status().Status)
+	}
 	result := api.transaction(jsonString)
 	byteString, err := json.Marshal(result)
 	if err != nil {
@@ -249,7 +257,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano()) / 1e6)
+	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano())/1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
@@ -268,26 +276,26 @@ func (api *PublicSdagAPI) GetBalance(jsonString string) (string, error) {
 	var walletadress WalletAdress
 	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
-		return "",err
+		return "", err
 	}
-	address :=common.HexToAddress(walletadress.Address)
+	address := common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
 	//find the main timeslice
 	sTime := utils.GetMainTime(tailMainBlockInfo.Time)
 	//get mainblock info
 	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
-	if err!=nil{
-		return "",err
+	if err != nil {
+		return "", err
 	}
 	//get  statedb
 	state, err := state.New(mainInfo.Root, api.s.stateDb)
-	if err!=nil{
-		return "",err
+	if err != nil {
+		return "", err
 	}
 	bigbalance := state.GetBalance(address)
 	balance := bigbalance.String()
-	return balance,state.Error()
+	return balance, state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {

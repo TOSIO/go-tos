@@ -1,7 +1,6 @@
 package sdag
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -202,14 +201,8 @@ func (s *Sdag) BlockPoolEvent() *event.TypeMux {
 	return s.blockPoolEvent
 }
 
-func (s *Sdag) Status() string {
-	status := s.protocolManager.GetStatus()
-	data, err := json.Marshal(status)
-	if err != nil {
-		return ""
-	} else {
-		return string(data)
-	}
+func (s *Sdag) Status() status {
+	return s.protocolManager.GetStatus()
 }
 
 // CreateDB creates the chain database.
