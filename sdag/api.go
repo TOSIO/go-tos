@@ -94,6 +94,15 @@ type WalletAdress struct {
 	Address string
 }
 
+type RpcMinerInfo struct {
+	Address string
+	Password string
+}
+
+type RpcGenerKeyStore struct {
+	Password string
+}
+
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
 	var tempblockInfo BlockHash
@@ -244,9 +253,17 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 }
 
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
-
-	log.Debug("RPC GeneraterKeyStore", "receives password", password)
+func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
+	//Unmarshal json
+	var rpcGenerKeyStore RpcGenerKeyStore
+	if err := json.Unmarshal([]byte(jsonString), &rpcGenerKeyStore); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	if rpcGenerKeyStore.Password==""{
+		return "password is empty"
+	}
+	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		fmt.Println("GenerateKey fail")
@@ -262,7 +279,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	// Encrypt key with passphrase.
-	passphrase := password
+	passphrase := rpcGenerKeyStore.Password
 	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
 	if err != nil {
 		fmt.Printf("Error encrypting key: %v\n", err)
@@ -344,10 +361,30 @@ func (api *PublicSdagAPI) StopMiner() string {
 }
 
 //start miner
-func (api *PublicSdagAPI) StartMiner(address string) string {
-	coinbase := common.BytesToAddress(common.FromHex(address))
+func (api *PublicSdagAPI) StartMiner(jsonString string) string {
+	if !api.s.miner.CanMiner(){
+		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	}
+	//Unmarshal json
+	var rpcMinerInfo RpcMinerInfo
+	if err := json.Unmarshal([]byte(jsonString), &rpcMinerInfo); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	if rpcMinerInfo.Address==""{
+		return "address is empty"
+	}
+	if rpcMinerInfo.Password==""{
+		return "password is empty"
+	}
+	address :=common.HexToAddress(rpcMinerInfo.Address)
+	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.Password)
+	if err!=nil{
+		log.Error("get private key error", err)
+		return err.Error()
+	}
 	api.s.config.Mining = true
-	api.s.miner.Start(coinbase, true)
+	api.s.miner.Start(rpcMinerInfo.Address,privatekey)
 	return "start ok"
 }
 
