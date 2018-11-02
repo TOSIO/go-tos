@@ -266,7 +266,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 	}
 
 	// Encrypt key with passphrase.
-	passphrase := rpcGenerKeyStore.password
+	passphrase := rpcGenerKeyStore.Password
 	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
 	if err != nil {
 		fmt.Printf("Error encrypting key: %v\n", err)
@@ -361,11 +361,11 @@ func (api *PublicSdagAPI) StartMiner(jsonString string) string {
 	if rpcMinerInfo.Address==""{
 		return "address is empty"
 	}
-	if rpcMinerInfo.password==""{
+	if rpcMinerInfo.Password==""{
 		return "password is empty"
 	}
 	address :=common.HexToAddress(rpcMinerInfo.Address)
-	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.password)
+	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.Password)
 	if err!=nil{
 		log.Error("get private key error", err)
 		return err.Error()
