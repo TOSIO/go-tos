@@ -12,7 +12,7 @@ type Statistics struct {
 	lastTime       int64
 }
 
-func (s *Statistics) Statistics() bool {
+func (s *Statistics) Statistics(info string) bool {
 	if s.totalCount == nil {
 		s.totalCount = big.NewInt(0)
 		s.lastTotalCount = big.NewInt(0)
@@ -25,6 +25,7 @@ func (s *Statistics) Statistics() bool {
 		temp = temp.Sub(s.totalCount, s.lastTotalCount)
 		tempInt := temp.Int64()
 		fmt.Println("========================")
+		fmt.Println(info)
 		fmt.Println("totalCount=", s.totalCount)
 		fmt.Println("lastTotalCount=", s.lastTotalCount)
 		fmt.Println("10 s totalCount=", tempInt)

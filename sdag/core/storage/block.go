@@ -69,7 +69,6 @@ func ReadBlocksHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, err
 	}
 
 	for iterator.Next() {
-		fmt.Printf("key:%s, value:%s\n", iterator.Key(), iterator.Value())
 		hash := common.BytesToHash(iterator.Value())
 		hashes = append(hashes, hash)
 	}
