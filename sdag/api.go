@@ -29,6 +29,7 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -69,16 +70,16 @@ func (api *PublicSdagAPI) Status() string {
 
 type accountInfo struct {
 	Address    string
-	PublicKey  string
 	PrivateKey string
-	Balance    string
 	Passphrase string
 }
 
 type TransactionInfo struct {
-	Form   accountInfo
-	To     string
-	Amount string
+	Form     accountInfo
+	To       string
+	Amount   string
+	GasPrice string
+	GasLimit string
 }
 
 type MainBlockInfo struct {
@@ -172,14 +173,26 @@ func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 		return ResultStruct{Error: err.Error()}
 	}
 	Amount := new(big.Int)
-	_, ok := Amount.SetString(transactionInfo.Amount, 10)
+	var ok bool
+	_, ok = Amount.SetString(transactionInfo.Amount, 10)
+	if !ok {
+		log.Error("Amount is invalid", "Amount", transactionInfo.Amount)
+		return ResultStruct{Error: "Amount is invalid"}
+	}
 	if Amount.Sign() < 0 {
-		log.Error("The amount must be positive: %s", transactionInfo.Amount)
+		log.Error("The amount must be positive", "Amount", transactionInfo.Amount)
 		return ResultStruct{Error: "The amount must be positive"}
 	}
+	txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
 	if !ok {
-		log.Error("Amount is invalid: %s", transactionInfo.Amount)
-		return ResultStruct{Error: "Amount is invalid"}
+		log.Error("GasPrice is invalid", "GasPrice", transactionInfo.GasPrice)
+		return ResultStruct{Error: "GasPrice is invalid"}
+	}
+
+	txRequestInfo.GasLimit, err = strconv.ParseUint(transactionInfo.GasLimit, 10, 64)
+	if err != nil {
+		log.Error("GasLimit is invalid", "GasLimit", transactionInfo.GasLimit, "error", err.Error())
+		return ResultStruct{Error: "GasLimit is invalid"}
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})

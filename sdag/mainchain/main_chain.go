@@ -374,23 +374,20 @@ func (mainChain *MainChain) Confirm() error {
 	for _, block := range listMainBlock {
 		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block)
 		mainTimeSlice := utils.GetMainTime(block.GetTime())
+		info := block.GetMutableInfo()
+		info.Status |= types.BlockMain
+		block.SetMutableInfo(info)
 		confirmReward, err := mainChain.singleBlockConfirm(block, mainTimeSlice, state)
 		if err != nil {
 			return err
 		}
-		info := block.GetMutableInfo()
-		info.Status |= types.BlockMain
-		block.SetMutableInfo(info)
 		if err := storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), info); err != nil {
 			return err
 		}
 
 		log.Debug("the main block confirm finished", "confirmReward.userReward", confirmReward.userReward, "confirmReward.minerReward", confirmReward.minerReward)
-		if _, err := CalculatingAccounts(block, ComputeMainConfirmReward(confirmReward), state); err != nil {
-			log.Info(err.Error())
-		}
 
-		if err := CalculatingMinerReward(block, blockNumber, state); err != nil {
+		if err := CalculatingMinerReward(block, blockNumber, confirmReward, state); err != nil {
 			log.Error(err.Error())
 		}
 
