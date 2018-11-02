@@ -262,13 +262,13 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(jsonString string) (*big.Int, error) {
+func (api *PublicSdagAPI) GetBalance(jsonString string) (string, error) {
 
 	//Unmarshal json
 	var walletadress WalletAdress
 	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
-		return nil,err
+		return "",err
 	}
 	address :=common.HexToAddress(walletadress.Address)
 	//last mainblock info
@@ -278,14 +278,16 @@ func (api *PublicSdagAPI) GetBalance(jsonString string) (*big.Int, error) {
 	//get mainblock info
 	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
 	if err!=nil{
-		return nil,err
+		return "",err
 	}
 	//get  statedb
 	state, err := state.New(mainInfo.Root, api.s.stateDb)
 	if err!=nil{
-		return nil,err
+		return "",err
 	}
-	return state.GetBalance(address),state.Error()
+	bigbalance := state.GetBalance(address)
+	balance := bigbalance.String()
+	return balance,state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
