@@ -331,10 +331,19 @@ func (api *PublicSdagAPI) StopMiner() string {
 }
 
 //start miner
-func (api *PublicSdagAPI) StartMiner(address string) string {
-	coinbase := common.BytesToAddress(common.FromHex(address))
+func (api *PublicSdagAPI) StartMiner(jsonString string) string {
+	if !api.s.miner.CanMiner(){
+		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	}
+	//Unmarshal json
+	var walletadress WalletAdress
+	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	address :=common.HexToAddress(walletadress.Address)
 	api.s.config.Mining = true
-	api.s.miner.Start(coinbase, true)
+	api.s.miner.Start(address)
 	return "start ok"
 }
 

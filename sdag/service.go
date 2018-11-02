@@ -175,8 +175,10 @@ func (s *Sdag) Start(srv *p2p.Server) error {
 		//return fmt.Errorf("tosbase missing: %v", err)
 	}
 	s.nodeID = discover.PubkeyID(&srv.Config.PrivateKey.PublicKey).String()
-	s.miner.Start(eb, s.config.Mining)
-
+	if s.config.Mining{
+		log.Debug("Cannot start mining ", "configMining", s.config.Mining)
+		s.miner.Start(eb)
+	}
 	s.netRPCService = tosapi.NewPublicNetAPI(srv, s.NetVersion())
 	return nil
 }

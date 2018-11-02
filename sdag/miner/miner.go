@@ -51,7 +51,7 @@ type Miner struct {
 	mainchin  mainchain.MainChainI
 	blockPool core.BlockPoolI
 	feed      *event.Feed
-
+	SyncState  int32
 	mining       int32
 	miningCh     chan bool
 	quitCh       chan struct{}
@@ -71,9 +71,9 @@ type MinerInfo struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-type SyncState struct {
-	//state
-} 
+//type SyncState struct {
+//	//state
+//}
 
 func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, feed *event.Feed) *Miner {
 	//init start
@@ -97,6 +97,7 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 		mining:       0,
 		canStop:      1, //1  stop   0 can not stop
 		stopCount:    0,
+		SyncState:   core.SDAGSYNC_SYNCING,
 		miningCh:     make(chan bool),
 		quitCh:       make(chan struct{}),
 		stopMiningCh: make(chan struct{}),
@@ -111,7 +112,6 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 func (m *Miner) listen() {
 	m.wg.Add(1)
 	defer m.wg.Done()
-	//fmt.Println("miner listen ..................................")
 	log.Debug("miner listen")
 	//listen subscribe event
 	sub := m.feed.Subscribe(m.netstatus)
@@ -143,9 +143,11 @@ func (m *Miner) listen() {
 				schedule(m, false)
 				log.Debug("miner netstatus core.NETWORK_CLOSED")
 			case core.SDAGSYNC_SYNCING:
+				m.SyncState = core.SDAGSYNC_SYNCING
 				schedule(m, false)
 				log.Debug("miner netstatus core.SDAGSYNC_SYNCING")
 			case core.SDAGSYNC_COMPLETED:
+				m.SyncState = core.SDAGSYNC_COMPLETED
 				schedule(m, true)
 				log.Debug("miner netstatus core.SDAGSYNC_COMPLETED")
 			}
@@ -161,23 +163,15 @@ func (m *Miner) listen() {
 }
 
 //start miner work
-func (m *Miner) Start(coinbase common.Address,cofigMing bool) {
-	//fmt.Println("miner start ..................................")
-	m.stopCount =0
-	atomic.StoreInt32(&m.canStop,m.stopCount)
+func (m *Miner) Start(coinbase common.Address) {
 	log.Debug("miner", "Start", coinbase)
 	m.SetTosCoinbase(coinbase)
 	go m.listen()
-	if cofigMing {
-		m.miningCh <- true
-	}
-
+	m.miningCh <- true
 }
 
 //miner work
 func work(m *Miner) {
-
-	//fmt.Println("miner work ..................................")
 	m.wg.Add(1)
 	atomic.StoreInt32(&m.mining, 1)
 
@@ -259,7 +253,6 @@ newMinerTash:
 
 //stop miner work
 func (m *Miner) Stop() {
-	//fmt.Println("miner stop ..................................")
 	log.Debug("miner stopped")
 	close(m.stopMiningCh)
 	m.quitCh <- struct{}{}
@@ -267,12 +260,7 @@ func (m *Miner) Stop() {
 }
 
 func (m *Miner) PostStop() string {
-	//fmt.Println("miner stop ..................................")
 	log.Debug("miner PostStop")
-	//if atomic.LoadInt32(&m.mining)==0{
-	//	return "PostStop aready ok"
-	//}
-	//close(m.stopMiningCh)
 	m.miningCh <- false
 	return "PostStop ok"
 
@@ -280,7 +268,6 @@ func (m *Miner) PostStop() string {
 
 //send miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
-	//fmt.Println("miner sender ..................................",fmt.Sprintln(mineblock))
 	log.Debug("miner sender")
 	m.mineBlockI = mineblock
 	m.mineBlockI.Sign(m.mineinfo.PrivateKey)
@@ -295,4 +282,11 @@ func (m *Miner) getNonceSeed() (nonce uint64) {
 func (m *Miner) SetTosCoinbase(coinbase common.Address) {
 	m.coinbase = coinbase
 
+}
+//只有同步完成才能挖矿
+func (m *Miner) CanMiner() bool{
+	if m.SyncState==core.SDAGSYNC_COMPLETED{
+		return true
+	}
+	return false
 }
