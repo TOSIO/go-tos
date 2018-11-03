@@ -262,7 +262,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 func (pm *ProtocolManager) Start(maxPeers int) {
 	log.Info("ProtocolManager.Start called.")
 	// start sync procedure
-	pm.stat.Status = STAT_SYNCING
+	pm.stat.Status = STAT_READY
 
 	pm.synchroniser.Start()
 	go pm.loop()
@@ -364,6 +364,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number)
 
 	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
+		pm.stat.Status = STAT_SYNCING
 		pm.syncEvent.Post(&core.NewSYNCTask{
 			NodeID:              p.NodeID(),
 			LastCumulatedDiff:   *p.lastCumulatedDiff,
@@ -372,6 +373,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 			LastTempMBTimeslice: p.lastTempMBTimeslice,
 		})
 		p.Log().Debug("Post SYNCTask", "lastCumulatedDiff", p.lastCumulatedDiff, "lastMainBlockNum", p.lastMainBlockNum, "lastTS", p.lastTempMBTimeslice)
+	} else {
+		pm.stat.Status = STAT_WORKING
 	}
 	// main loop. handle incoming messages.
 	for {

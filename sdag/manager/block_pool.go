@@ -65,7 +65,8 @@ type BlockPool struct {
 	listLock         sync.RWMutex
 
 	//UnverifiedBlockList *list.List
-	statisticsObj statistics.Statistics
+	statisticsAddBlock            statistics.Statistics
+	statisticsdeleteIsolatedBlock statistics.Statistics
 
 	mainChainI mainchain.MainChainI
 }
@@ -217,6 +218,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
 		p.IsolatedBlockMap[isolated] = v
 		delete(p.lackBlockMap, isolated)
 	}
+	log.Debug("end addIsolatedBlock", "hash", block.GetHash(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
 }
 
 type verifyMarker struct {
@@ -229,11 +231,10 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 	p.rwlock.Lock()
 
 	log.Debug("begin deleteIsolatedBlock", "hash", block.GetHash().String())
+	count := 0
 	blockHash := block.GetHash()
 	v, ok := p.lackBlockMap[blockHash]
 	if ok {
-		log.Debug("Delete block from orphan graph", "hash", blockHash.String())
-
 		delete(p.lackBlockMap, blockHash)
 		//save blcok
 		currentList := v.LinkIt // descendants
@@ -260,7 +261,19 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 					if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
 						ancestorCache[hash] = &verifyMarker{fullBlock, false}
 						delete(p.IsolatedBlockMap, hash)
-						p.saveBlock(fullBlock)
+						hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(fullBlock)
+						if err == nil {
+							log.Debug("ComputeCumulativeDiff finish", "hash", fullBlock.GetHash().String())
+							p.saveBlock(fullBlock)
+							if hasUpdateCumulativeDiff {
+								p.mainChainI.UpdateTail(fullBlock)
+							}
+							log.Debug("Delete block from orphan graph", "hash", blockHash.String(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
+							p.statisticsdeleteIsolatedBlock.Statistics("delete isolated block")
+							count++
+						} else {
+							log.Error("deleteIsolatedBlock ComputeCumulativeDiff failed", "block", hash.String(), "err", err)
+						}
 					} else {
 						log.Error("Unserialize(UnRLP) failed", "block", hash.String(), "err", err)
 					}
@@ -271,6 +284,8 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 			nextLayerList = []common.Hash{}
 		}
 	}
+
+	log.Debug("end deleteIsolatedBlock", "count", count)
 }
 
 func (p *BlockPool) EnQueue(block types.Block) error {
@@ -322,7 +337,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 
 	log.Debug("addBlock finish", "hash", block.GetHash().String())
 
-	p.statisticsObj.Statistics()
+	p.statisticsAddBlock.Statistics("add block")
 	return err
 }
 

@@ -5,27 +5,26 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"math/big"
-	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 type QueryBlockInfoInterface struct {
 }
 
 type BlockHeader struct {
-	Type     uint //1 tx, 2 miner
-	Time     uint64    //ms  timestamp
-	GasPrice *big.Int  //tls
-	GasLimit uint64    //gas max value
+	Type     uint     //1 tx, 2 miner
+	Time     uint64   //ms  timestamp
+	GasPrice *big.Int //tls
+	GasLimit uint64   //gas max value
 }
 
 //type TxOut struct {
 //	Receiver common.Address
 //	Amount   *big.Int //tls
 //}
-
 
 type TxBlockInfo struct {
 	Status              string
@@ -92,26 +91,27 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	Block := storage.ReadBlock(h, hash)
 
-	BlockSend, err :=Block.GetSender()
+	BlockSend, err := Block.GetSender()
 	if err != nil {
 		log.Error("Query Block Sender Fail")
 	}
 
 	blockStatus := q.GetUserBlockStatus(h, hash)
 
+
 	if Block.GetType() == types.BlockTypeTx{
 		TxBlock,ok:=Block.(*types.TxBlock)
-		if !ok{
+		if !ok {
 			return ""
 		}
 
 		var tempReceiver common.Address
-		var tempAmount   *big.Int
+		var tempAmount *big.Int
 
-				for _, temp := range TxBlock.Outs{
-					tempReceiver = temp.Receiver
-					tempAmount = temp.Amount
-				}
+		for _, temp := range TxBlock.Outs {
+			tempReceiver = temp.Receiver
+			tempAmount = temp.Amount
+		}
 
 		Data0 := TxBlockInfo{
 			Status:              blockStatus,
@@ -159,7 +159,6 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) string {
 
-
 	Slice := utils.GetMainTime(Time)
 
 	mainInfo, err := storage.ReadMainBlock(h, Slice)
@@ -182,10 +181,10 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	}
 
 	MainBlickInfo := TailMainBlockInfo{
-		Hash: finalMainBlockSlice.Hash,
+		Hash:           finalMainBlockSlice.Hash,
 		CumulativeDiff: finalMainBlockSlice.CumulativeDiff,
-		Number: finalMainBlockSlice.Number,
-		Time: finalMainBlockSlice.Time,
+		Number:         finalMainBlockSlice.Number,
+		Time:           finalMainBlockSlice.Time,
 	}
 
 	jsonData, err := json.Marshal(MainBlickInfo)
@@ -196,5 +195,3 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	return string(jsonData)
 
 }
-
-

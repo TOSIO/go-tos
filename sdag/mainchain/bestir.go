@@ -37,7 +37,7 @@ func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state
 	log.Debug("Calculate the balance after confirming the reward", "address", address, "balance", balance.String())
 
 	actualCostDeduction := deductCost(address, balance, cost, state)
-	log.Debug("deduct cost", "address", address, "actualCostDeduction", actualCostDeduction.String(), "balance", balance.String())
+	log.Debug("deduct cost", "address", address, "actualCostDeduction", actualCostDeduction.String(), "balance", state.GetBalance(address))
 	if block.GetType() == types.BlockTypeTx {
 		if !IsGasCostOverrun {
 			txBlock, ok := block.(*types.TxBlock)
@@ -55,9 +55,10 @@ func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state
 
 			for _, out := range txBlock.Outs {
 				log.Debug("calculate transaction", "address", address, "out", out)
+				log.Debug("Receiver balance", "Receiver", out.Receiver, "balance", state.GetBalance(out.Receiver))
 				state.SubBalance(address, out.Amount)
 				state.AddBalance(out.Receiver, out.Amount)
-				log.Debug("after calculate transaction", "address", address, "balance", balance.String())
+				log.Debug("after calculate transaction", "address", address, "balance", balance.String(), "Receiver", out.Receiver, "Receiver balance", state.GetBalance(out.Receiver))
 			}
 		}
 	}
@@ -143,14 +144,16 @@ func ComputeMainConfirmReward(reward *ConfirmRewardInfo) *big.Int {
 	return new(big.Int).Add(reward.userReward, reward.minerReward)
 }
 
-func CalculatingMinerReward(block types.Block, blockNumber uint64, state *state.StateDB) error {
+func CalculatingMinerReward(block types.Block, blockNumber uint64, confirmRewardInfo *ConfirmRewardInfo, state *state.StateDB) error {
 	address, err := block.GetSender()
 	if err != nil {
 		return err
 	}
 	RewardMiner := RewardMiner(blockNumber)
-	state.AddBalance(address, RewardMiner)
-	log.Debug("CalculatingMinerReward", "RewardMiner", RewardMiner.String(), "address", address, "hash", block.GetHash().String())
+	state.AddBalance(address, new(big.Int).Add(ComputeMainConfirmReward(confirmRewardInfo), RewardMiner))
+	log.Debug("CalculatingMinerReward", "RewardMiner", RewardMiner.String(),
+		"confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String(),
+		"address", address, "hash", block.GetHash().String())
 
 	return nil
 }
