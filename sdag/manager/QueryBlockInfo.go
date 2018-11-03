@@ -99,7 +99,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	blockStatus := q.GetUserBlockStatus(h, hash)
 
-	if Block.GetType()==types.BlockTypeTx{
+	if Block.GetType() == types.BlockTypeTx{
 		TxBlock,ok:=Block.(*types.TxBlock)
 		if !ok{
 			return ""

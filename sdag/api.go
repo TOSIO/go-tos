@@ -37,6 +37,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 
 	"github.com/TOSIO/go-tos/sdag/transaction"
+	"github.com/TOSIO/go-tos/node"
 )
 
 var (
@@ -282,8 +283,19 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
+	var localIDAndIP  = make([]string, 0)
 	nodeIdMessage := api.s.nodeID
-	nodeIdMsg, err := json.Marshal(nodeIdMessage)
+	nodeIpMessage, ok := api.s.LocalNodeIP()
+	//---------------
+	var temp  = node.DefaultConfig
+	nodePortMessage := temp.P2P.ListenAddr
+
+	if !ok {
+		return "Query IP Fail"
+	}
+	localIDAndIP = append(localIDAndIP, "IP: "+nodeIpMessage+nodePortMessage)
+	localIDAndIP = append(localIDAndIP, "ID: "+nodeIdMessage)
+	nodeIdMsg, err := json.Marshal(localIDAndIP)
 	if err != nil {
 		fmt.Println("error:", err)
 	}

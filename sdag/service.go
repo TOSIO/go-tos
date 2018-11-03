@@ -25,6 +25,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
+	"net"
 )
 
 /*
@@ -250,4 +251,27 @@ func (s *Sdag) Tosbase() (eb common.Address, err error) {
 		}
 	}
 	return common.Address{}, fmt.Errorf("tosbase must be explicitly specified")
+}
+
+func (s *Sdag) LocalNodeIP() (string, bool) {
+	netInterfaces, err := net.Interfaces()
+	if err != nil {
+		fmt.Println("net.Interfaces failed, err:", err.Error())
+		return "", false
+	}
+
+	for i := 0; i < len(netInterfaces); i++ {
+		if (netInterfaces[i].Flags & net.FlagUp) != 0 {
+			addrs, _ := netInterfaces[i].Addrs()
+
+			for _, address := range addrs {
+				if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+					if ipnet.IP.To4() != nil {
+						return ipnet.IP.String(), true
+					}
+				}
+			}
+		}
+	}
+	return "", false
 }
