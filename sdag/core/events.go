@@ -35,6 +35,10 @@ func (s *SYNCProgress) String() string {
 	return syncStrDICT[SYNCProgress(*s)]
 }
 
+type AnnounceEvent struct {
+	Hash common.Hash
+}
+
 type NewBlocksEvent struct {
 	Blocks []types.Block
 }

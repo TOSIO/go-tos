@@ -30,6 +30,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"strconv"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -288,13 +290,19 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano())/1e6)
+	pathtmp := filepath.Join(api.s.sct.ResolvePath("keystore"),"")
+	errmakefile := os.MkdirAll(pathtmp, 0777)
+	if errmakefile != nil {
+		return errmakefile.Error()
+	}
+	path := filepath.Join(pathtmp,"keystore%d")
+	keyFilePath := fmt.Sprintf(path, uint64(time.Now().UnixNano())/1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
 	}
 
-	return "ok"
+	return keyFilePath
 
 }
 
@@ -375,8 +383,11 @@ func (api *PublicSdagAPI) StopMiner() string {
 
 //start miner
 func (api *PublicSdagAPI) StartMiner(jsonString string) string {
-	if !api.s.miner.CanMiner(){
-		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	//if !api.s.miner.CanMiner(){
+	//	return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	//}
+	if api.s.Status().Status != STAT_WORKING {
+		return fmt.Sprintf(`{"Error":"current status cannot be miner. current status=%d"}`, api.s.Status().Status)
 	}
 	//Unmarshal json
 	var rpcMinerInfo RpcMinerInfo
