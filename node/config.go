@@ -399,7 +399,7 @@ func (c *Config) parsePersistentNodes(path string) []*discover.Node {
 		keydir = c.KeyStoreDir
 	case c.DataDir != "":
 		if c.KeyStoreDir == "" {
-			keydir = filepath.Join(c.DataDir, datadirDefaultKeyStore)
+			keydir = filepath.Join(c.ResolvePath(datadirDefaultKeyStore), "")
 		} else {
 			keydir, err = filepath.Abs(c.KeyStoreDir)
 		}

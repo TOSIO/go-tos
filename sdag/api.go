@@ -29,6 +29,8 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -274,13 +276,19 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano())/1e6)
+	pathtmp := filepath.Join(api.s.sct.ResolvePath("keystore"),"")
+	errmakefile := os.MkdirAll(pathtmp, 0777)
+	if errmakefile != nil {
+		return errmakefile.Error()
+	}
+	path := filepath.Join(pathtmp,"keystore%d")
+	keyFilePath := fmt.Sprintf(path, uint64(time.Now().UnixNano())/1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
 	}
 
-	return "ok"
+	return keyFilePath
 
 }
 
