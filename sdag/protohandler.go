@@ -84,7 +84,7 @@ func (pm *ProtocolManager) RealNodeIdMessage() ([]string, int) {
 	for _, peerIdMessage := range peerMessage {
 		//fmt.Println("IDorIP:  ", peerIdMessage.id, peerIdMessage.RemoteAddr().String())
 		ConnectNumber = ConnectNumber + 1
-		peerId = append(peerId, "ID:"+peerIdMessage.id+"  and  "+"IP:"+peerIdMessage.RemoteAddr().String()+"-------")
+		peerId = append(peerId, "ID:"+peerIdMessage.id+"  "+"IP:"+peerIdMessage.RemoteAddr().String(),"------")
 	}
 
 	return peerId, ConnectNumber

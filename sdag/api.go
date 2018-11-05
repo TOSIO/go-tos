@@ -29,6 +29,7 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
+	"strconv"
 	"os"
 	"path/filepath"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 
 	"github.com/TOSIO/go-tos/sdag/transaction"
+	"github.com/TOSIO/go-tos/node"
 )
 
 var (
@@ -71,16 +73,16 @@ func (api *PublicSdagAPI) Status() string {
 
 type accountInfo struct {
 	Address    string
-	PublicKey  string
 	PrivateKey string
-	Balance    string
 	Passphrase string
 }
 
 type TransactionInfo struct {
-	Form   accountInfo
-	To     string
-	Amount string
+	Form     accountInfo
+	To       string
+	Amount   string
+	GasPrice string
+	GasLimit string
 }
 
 type MainBlockInfo struct {
@@ -183,14 +185,26 @@ func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 		return ResultStruct{Error: err.Error()}
 	}
 	Amount := new(big.Int)
-	_, ok := Amount.SetString(transactionInfo.Amount, 10)
+	var ok bool
+	_, ok = Amount.SetString(transactionInfo.Amount, 10)
+	if !ok {
+		log.Error("Amount is invalid", "Amount", transactionInfo.Amount)
+		return ResultStruct{Error: "Amount is invalid"}
+	}
 	if Amount.Sign() < 0 {
-		log.Error("The amount must be positive: %s", transactionInfo.Amount)
+		log.Error("The amount must be positive", "Amount", transactionInfo.Amount)
 		return ResultStruct{Error: "The amount must be positive"}
 	}
+	txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
 	if !ok {
-		log.Error("Amount is invalid: %s", transactionInfo.Amount)
-		return ResultStruct{Error: "Amount is invalid"}
+		log.Error("GasPrice is invalid", "GasPrice", transactionInfo.GasPrice)
+		return ResultStruct{Error: "GasPrice is invalid"}
+	}
+
+	txRequestInfo.GasLimit, err = strconv.ParseUint(transactionInfo.GasLimit, 10, 64)
+	if err != nil {
+		log.Error("GasLimit is invalid", "GasLimit", transactionInfo.GasLimit, "error", err.Error())
+		return ResultStruct{Error: "GasLimit is invalid"}
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
@@ -327,8 +341,19 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
+	var localIDAndIP  = make([]string, 0)
 	nodeIdMessage := api.s.nodeID
-	nodeIdMsg, err := json.Marshal(nodeIdMessage)
+	nodeIpMessage, ok := api.s.LocalNodeIP()
+	//---------------
+	var temp  = node.DefaultConfig
+	nodePortMessage := temp.P2P.ListenAddr
+
+	if !ok {
+		return "Query IP Fail"
+	}
+	localIDAndIP = append(localIDAndIP, "IP: "+nodeIpMessage+nodePortMessage)
+	localIDAndIP = append(localIDAndIP, "ID: "+nodeIdMessage)
+	nodeIdMsg, err := json.Marshal(localIDAndIP)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
