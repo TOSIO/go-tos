@@ -32,7 +32,6 @@ func NewStorage(db tosdb.Database) (*StorageProxy, error) {
 
 // 根据指定的时间片获取对应的所有区块hash
 func (s *StorageProxy) GetBlockHashByTmSlice(slice uint64) ([]common.Hash, error) {
-
 	return storage.ReadBlocksHashByTmSlice(s.db, slice)
 }
 

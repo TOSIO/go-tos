@@ -2,6 +2,7 @@ package synchronise
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 )
 
 type TimeslicePacket struct {
@@ -26,6 +27,21 @@ type NewBlockPacket struct {
 	blocks [][]byte
 }
 
+type SYNCBlockRespPacket struct {
+	peerID   string
+	response *protocol.SYNCBlockResponse
+}
+
+type SYNCBlockResACKPacket struct {
+	peerID   string
+	response *protocol.SYNCBlockResponseACK
+}
+
+/* type SYNCBlockEndPacket struct {
+	peerID   string
+	response *protocol.SYNCBlockEnd
+}
+*/
 func (ts *TimeslicePacket) NodeID() string {
 	return ts.peerId
 }
@@ -57,3 +73,31 @@ func (bds *NewBlockPacket) NodeID() string {
 func (bds *NewBlockPacket) ItemCount() int {
 	return 1
 }
+
+func (p *SYNCBlockRespPacket) NodeID() string {
+	return p.peerID
+}
+
+func (p *SYNCBlockRespPacket) ItemCount() int {
+	if p.response != nil {
+		return len(p.response.TSBlocks)
+	}
+	return 0
+}
+
+func (p *SYNCBlockResACKPacket) NodeID() string {
+	return p.peerID
+}
+
+func (p *SYNCBlockResACKPacket) ItemCount() int {
+	return 0
+}
+
+/* func (p *SYNCBlockEndPacket) NodeID() string {
+	return p.peerID
+}
+
+func (p *SYNCBlockEndPacket) ItemCount() int {
+	return 0
+}
+*/
