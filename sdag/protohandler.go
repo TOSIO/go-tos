@@ -84,7 +84,7 @@ func (pm *ProtocolManager) RealNodeIdMessage() ([]string, int) {
 	for _, peerIdMessage := range peerMessage {
 		//fmt.Println("IDorIP:  ", peerIdMessage.id, peerIdMessage.RemoteAddr().String())
 		ConnectNumber = ConnectNumber + 1
-		peerId = append(peerId, "ID:"+peerIdMessage.id+"  "+"IP:"+peerIdMessage.RemoteAddr().String(),"------")
+		peerId = append(peerId, "ID:"+peerIdMessage.id, "IP:"+peerIdMessage.RemoteAddr().String(), "------")
 	}
 
 	return peerId, ConnectNumber
@@ -590,6 +590,7 @@ func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
 	}
 	p.Log().Debug("<< NEW-BLOCK-HASH", "hash", response.String())
 	pm.synchroniser.MarkAnnounced(response, p.NodeID())
+	pm.blockPoolEvent.Post(&core.AnnounceEvent{Hash: response})
 	return nil
 }
 

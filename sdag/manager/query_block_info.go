@@ -86,14 +86,14 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		return "Query is not possible"
+		return "Query failure"
 	}
 
 	Block := storage.ReadBlock(h, hash)
 
 	BlockSend, err := Block.GetSender()
 	if err != nil {
-		log.Error("Query Block Sender Fail")
+		log.Error("Query failure")
 	}
 
 	blockStatus := q.GetUserBlockStatus(h, hash)
@@ -177,7 +177,7 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(h)
 
 	if err != nil {
-		return "Query is not possible"
+		return "Query failure"
 	}
 
 	MainBlickInfo := TailMainBlockInfo{
