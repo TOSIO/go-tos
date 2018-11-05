@@ -343,6 +343,7 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if !ok {
 		return "Query IP Fail"
 	}
+
 	localIDAndIP = append(localIDAndIP, "IP: "+nodeIpMessage+nodePortMessage)
 	localIDAndIP = append(localIDAndIP, "ID: "+nodeIdMessage)
 	nodeIdMsg, err := json.Marshal(localIDAndIP)

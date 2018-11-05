@@ -89,7 +89,7 @@ class Main extends Component<Props> {
 
 	render() {
 			var a = this.props.content.nodeMsg.nodeId;
-              a = a.replace(/,/g, '')
+              a = a.replace(/,/g, ' \n ')
         	a = a.replace(/"/g, '')
 
          var b = this.props.content.nodeMsg.localnodeId;
