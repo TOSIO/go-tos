@@ -61,7 +61,10 @@ class Main extends Component<Props> {
 		super(props);
 		this.container = React.createRef();
 		this.content = React.createRef();
+
 	}
+
+
 
 	getSnapshotBeforeUpdate() {
 		if (this.content && typeof this.content.beforeUpdate === 'function') {
@@ -82,8 +85,17 @@ class Main extends Component<Props> {
 		}
 	};
 
+
+
 	render() {
-		const {
+			var a = this.props.content.nodeMsg.nodeId;
+              a = a.replace(/,/g, '')
+        	a = a.replace(/"/g, '')
+
+         var b = this.props.content.nodeMsg.localnodeId;
+          b = b.replace(/"/g, '')
+
+        const {
 			classes, active, content, shouldUpdate,
 		} = this.props;
 
@@ -91,9 +103,10 @@ class Main extends Component<Props> {
 		switch (active) {
 		case MENU.get('messeges').id:
             children = <div>
-				<h4>本节点的ID：{this.props.content.nodeMsg.localnodeId}</h4>
-				<h2>连接个数：{this.props.content.nodeMsg.connectnumber}</h2>
-				<h2>连接到的节点ID和IP：{this.props.content.nodeMsg.nodeId}</h2>
+				<h3>本节点的ID：{b}</h3>
+				<h3>连接个数：{this.props.content.nodeMsg.connectnumber}</h3>
+				<h3>连接到的节点ID和IP：{a}</h3>
+
             </div>
                 break;
 		case MENU.get('home').id:
@@ -137,6 +150,7 @@ class Main extends Component<Props> {
 			</div>
 		);
 	}
+
 }
 
 export default withStyles(themeStyles)(Main);

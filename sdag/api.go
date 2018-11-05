@@ -29,6 +29,7 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -36,6 +37,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/log"
 
 	"github.com/TOSIO/go-tos/sdag/transaction"
+	"github.com/TOSIO/go-tos/node"
 )
 
 var (
@@ -59,21 +61,26 @@ func (api *PublicSdagAPI) DoRequest(data string) string {
 	return ""
 }
 func (api *PublicSdagAPI) Status() string {
-	return api.s.Status()
+	data, err := json.Marshal(api.s.Status())
+	if err != nil {
+		return ""
+	} else {
+		return string(data)
+	}
 }
 
 type accountInfo struct {
 	Address    string
-	PublicKey  string
 	PrivateKey string
-	Balance    string
 	Passphrase string
 }
 
 type TransactionInfo struct {
-	Form   accountInfo
-	To     string
-	Amount string
+	Form     accountInfo
+	To       string
+	Amount   string
+	GasPrice string
+	GasLimit string
 }
 
 type MainBlockInfo struct {
@@ -86,7 +93,16 @@ type BlockHash struct {
 
 type WalletAdress struct {
 	Address string
-} 
+}
+
+type RpcMinerInfo struct {
+	Address string
+	Password string
+}
+
+type RpcGenerKeyStore struct {
+	Password string
+}
 
 func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
 
@@ -128,6 +144,9 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
+	if api.s.Status().Status != STAT_WORKING {
+		return fmt.Sprintf(`{"Error":"current status cannot be traded. status=%d","Hash":""}`, api.s.Status().Status)
+	}
 	result := api.transaction(jsonString)
 	byteString, err := json.Marshal(result)
 	if err != nil {
@@ -164,14 +183,26 @@ func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
 		return ResultStruct{Error: err.Error()}
 	}
 	Amount := new(big.Int)
-	_, ok := Amount.SetString(transactionInfo.Amount, 10)
+	var ok bool
+	_, ok = Amount.SetString(transactionInfo.Amount, 10)
+	if !ok {
+		log.Error("Amount is invalid", "Amount", transactionInfo.Amount)
+		return ResultStruct{Error: "Amount is invalid"}
+	}
 	if Amount.Sign() < 0 {
-		log.Error("The amount must be positive: %s", transactionInfo.Amount)
+		log.Error("The amount must be positive", "Amount", transactionInfo.Amount)
 		return ResultStruct{Error: "The amount must be positive"}
 	}
+	txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
 	if !ok {
-		log.Error("Amount is invalid: %s", transactionInfo.Amount)
-		return ResultStruct{Error: "Amount is invalid"}
+		log.Error("GasPrice is invalid", "GasPrice", transactionInfo.GasPrice)
+		return ResultStruct{Error: "GasPrice is invalid"}
+	}
+
+	txRequestInfo.GasLimit, err = strconv.ParseUint(transactionInfo.GasLimit, 10, 64)
+	if err != nil {
+		log.Error("GasLimit is invalid", "GasLimit", transactionInfo.GasLimit, "error", err.Error())
+		return ResultStruct{Error: "GasLimit is invalid"}
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
@@ -223,9 +254,17 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 }
 
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
-
-	log.Debug("RPC GeneraterKeyStore", "receives password", password)
+func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
+	//Unmarshal json
+	var rpcGenerKeyStore RpcGenerKeyStore
+	if err := json.Unmarshal([]byte(jsonString), &rpcGenerKeyStore); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	if rpcGenerKeyStore.Password==""{
+		return "password is empty"
+	}
+	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
 		fmt.Println("GenerateKey fail")
@@ -241,7 +280,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	// Encrypt key with passphrase.
-	passphrase := password
+	passphrase := rpcGenerKeyStore.Password
 	keyjson, err := keystore.EncryptKey(key, passphrase, keystore.StandardScryptN, keystore.StandardScryptP)
 	if err != nil {
 		fmt.Printf("Error encrypting key: %v\n", err)
@@ -249,7 +288,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 	}
 
 	//Write to File
-	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano()) / 1e6)
+	keyFilePath := fmt.Sprintf(api.s.sct.ResolvePath("")+"\\keystore%d", uint64(time.Now().UnixNano())/1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		return err.Error()
@@ -262,38 +301,51 @@ func (api *PublicSdagAPI) GeneraterKeyStore(password string) string {
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(jsonString string) (*big.Int, error) {
+func (api *PublicSdagAPI) GetBalance(jsonString string) (string, error) {
 
 	//Unmarshal json
 	var walletadress WalletAdress
 	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
 		log.Error("JSON unmarshaling failed: %s", err)
-		return nil,err
+		return "", err
 	}
-	address :=common.HexToAddress(walletadress.Address)
+	address := common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
 	//find the main timeslice
 	sTime := utils.GetMainTime(tailMainBlockInfo.Time)
 	//get mainblock info
 	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
-	if err!=nil{
-		return nil,err
+	if err != nil {
+		return "", err
 	}
 	//get  statedb
 	state, err := state.New(mainInfo.Root, api.s.stateDb)
-	if err!=nil{
-		return nil,err
+	if err != nil {
+		return "", err
 	}
-	return state.GetBalance(address),state.Error()
+	bigbalance := state.GetBalance(address)
+	balance := bigbalance.String()
+	return balance, state.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
+	var localIDAndIP  = make([]string, 0)
 	nodeIdMessage := api.s.nodeID
-	nodeIdMsg, err := json.Marshal(nodeIdMessage)
+	nodeIpMessage, ok := api.s.LocalNodeIP()
+	//---------------
+	var temp  = node.DefaultConfig
+	nodePortMessage := temp.P2P.ListenAddr
+
+	if !ok {
+		return "Query IP Fail"
+	}
+	localIDAndIP = append(localIDAndIP, "IP: "+nodeIpMessage+nodePortMessage)
+	localIDAndIP = append(localIDAndIP, "ID: "+nodeIdMessage)
+	nodeIdMsg, err := json.Marshal(localIDAndIP)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
@@ -321,10 +373,30 @@ func (api *PublicSdagAPI) StopMiner() string {
 }
 
 //start miner
-func (api *PublicSdagAPI) StartMiner(address string) string {
-	coinbase := common.BytesToAddress(common.FromHex(address))
+func (api *PublicSdagAPI) StartMiner(jsonString string) string {
+	if !api.s.miner.CanMiner(){
+		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	}
+	//Unmarshal json
+	var rpcMinerInfo RpcMinerInfo
+	if err := json.Unmarshal([]byte(jsonString), &rpcMinerInfo); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return err.Error()
+	}
+	if rpcMinerInfo.Address==""{
+		return "address is empty"
+	}
+	if rpcMinerInfo.Password==""{
+		return "password is empty"
+	}
+	address :=common.HexToAddress(rpcMinerInfo.Address)
+	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.Password)
+	if err!=nil{
+		log.Error("get private key error", err)
+		return err.Error()
+	}
 	api.s.config.Mining = true
-	api.s.miner.Start(coinbase, true)
+	api.s.miner.Start(rpcMinerInfo.Address,privatekey)
 	return "start ok"
 }
 

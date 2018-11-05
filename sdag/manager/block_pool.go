@@ -54,6 +54,7 @@ type BlockPool struct {
 	newblockFeed *event.Feed
 	blockEvent   *event.TypeMux
 
+	newAnnounceSub   *event.TypeMuxSubscription
 	newBlocksSub     *event.TypeMuxSubscription
 	queryUnverifySub *event.TypeMuxSubscription
 
@@ -93,6 +94,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 		//newBlocksEvent: make(chan core.NewBlocksEvent, 8),
 		//unverifiedGetChan: make(chan unverifiedReq),
 	}
+	pool.newAnnounceSub = pool.blockEvent.Subscribe(&core.AnnounceEvent{})
 	pool.newBlocksSub = pool.blockEvent.Subscribe(&core.NewBlocksEvent{})
 	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
 	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
@@ -113,6 +115,16 @@ func (p *BlockPool) loop() {
 		currentTime := time.Now().UnixNano()
 		for {
 			select {
+			case ch := <-p.newAnnounceSub.Chan():
+				if ev, ok := ch.Data.(*core.AnnounceEvent); ok {
+					if inlocal := storage.HasBlock(p.db, ev.Hash); !inlocal {
+						hashes := make([]common.Hash, 0)
+						hashes = append(hashes, ev.Hash)
+						event := &core.GetBlocksEvent{Hashes: hashes}
+						p.blockEvent.Post(event)
+						log.Debug("Post fetch block event", "hash", ev.Hash)
+					}
+				}
 			case ch := <-p.newBlocksSub.Chan():
 				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
 					go func(event *core.NewBlocksEvent) {
