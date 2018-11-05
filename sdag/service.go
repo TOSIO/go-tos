@@ -180,6 +180,7 @@ func (s *Sdag) Start(srv *p2p.Server) error {
 	//	log.Debug("Cannot start mining ", "configMining", s.config.Mining)
 	//	s.miner.Start(eb)
 	//}
+	s.miner.StartInit()
 	s.netRPCService = tosapi.NewPublicNetAPI(srv, s.NetVersion())
 	return nil
 }

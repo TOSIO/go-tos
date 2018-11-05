@@ -382,8 +382,11 @@ func (api *PublicSdagAPI) StopMiner() string {
 
 //start miner
 func (api *PublicSdagAPI) StartMiner(jsonString string) string {
-	if !api.s.miner.CanMiner(){
-		return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	//if !api.s.miner.CanMiner(){
+	//	return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
+	//}
+	if api.s.Status().Status != STAT_WORKING {
+		return fmt.Sprintf(`{"Error":"current status cannot be miner. current status=%d"}`, api.s.Status().Status)
 	}
 	//Unmarshal json
 	var rpcMinerInfo RpcMinerInfo

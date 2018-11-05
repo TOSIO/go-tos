@@ -170,6 +170,10 @@ func (m *Miner) Start(coinbase string,privatekey *ecdsa.PrivateKey) {
 	m.miningCh <- true
 }
 
+func (m *Miner) StartInit() {
+	go m.listen()
+}
+
 //miner work
 func work(m *Miner) {
 	m.wg.Add(1)
