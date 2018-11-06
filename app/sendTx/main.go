@@ -22,7 +22,7 @@ var (
 {
 "jsonrpc":"2.0",
 "method":"sdag_transaction",
-"params":["{\"Form\":{\"Address\" :\"%s\",\"PrivateKey\"  :\"%s\"},\"To\":\"%s\",\"Amount\":\"%s\"}"],
+"params":["{\"Form\":{\"Address\" :\"%s\",\"PrivateKey\"  :\"%s\"},\"GasPrice\":\"100\",\"GasLimit\":\"1000000000\",\"To\":\"%s\",\"Amount\":\"%s\"}"],
 "id":1
 }`
 	passphrase              = "12345"
