@@ -195,7 +195,7 @@ func SetMemPool(mp *MemPool) {
 	//mempool = mp
 } */
 
-func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
+func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) bool {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
 
@@ -203,7 +203,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
 	isolated := block.GetHash()
 	if _, ok := p.IsolatedBlockMap[isolated]; ok {
 		//log.Warn("the Isolated block already exists")
-		return
+		return false
 	}
 
 	p.IsolatedBlockMap[isolated] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
@@ -231,6 +231,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) {
 		delete(p.lackBlockMap, isolated)
 	}
 	log.Debug("end addIsolatedBlock", "hash", block.GetHash(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
+	return true
 }
 
 type verifyMarker struct {
@@ -389,15 +390,11 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 
 	if isIsolated {
 		log.Warn("is a Isolated block", "hash", block.GetHash().String())
-		p.addIsolatedBlock(block, linksLackBlock)
-		/* for _, linkBlock := range linksLackBlock {
-			//p.pm.GetBlock(linkBlock)
-
-		} */
-		log.Debug("Request ancestor", "hash", block.GetHash().String())
-		event := &core.GetBlocksEvent{Hashes: linksLackBlock}
-		p.blockEvent.Post(event)
-
+		if p.addIsolatedBlock(block, linksLackBlock) {
+			log.Debug("Request ancestor", "hash", block.GetHash().String())
+			event := &core.GetBlocksEvent{Hashes: linksLackBlock}
+			p.blockEvent.Post(event)
+		}
 	} else {
 		//log.Trace("Verification passed")
 		p.verifyAncestors(linkBlockIs)
