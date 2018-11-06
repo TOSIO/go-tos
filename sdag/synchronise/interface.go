@@ -37,6 +37,7 @@ type SynchroniserI interface {
 	//SyncHeavy() error
 	//SyncLight() error
 	//SendBlock(blk interface{}) error
+	Clear(nodeID string)
 
 	RequestBlock(hash common.Hash) error
 	Broadcast(hash common.Hash) error

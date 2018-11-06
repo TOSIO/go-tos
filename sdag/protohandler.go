@@ -250,6 +250,7 @@ func (pm *ProtocolManager) removePeer(id string) {
 	if peer != nil {
 		peer.Peer.Disconnect(p2p.DiscUselessPeer)
 	}
+	pm.synchroniser.Clear(id)
 
 	if pm.peers.Len() <= 0 {
 		log.Debug("Post connection close event")
