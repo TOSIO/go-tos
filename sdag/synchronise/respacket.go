@@ -27,6 +27,11 @@ type NewBlockPacket struct {
 	blocks [][]byte
 }
 
+type SYNCBlockReqPacket struct {
+	peerID     string
+	beginPoint *protocol.TimesliceIndex
+}
+
 type SYNCBlockRespPacket struct {
 	peerID   string
 	response *protocol.SYNCBlockResponse
@@ -90,6 +95,14 @@ func (p *SYNCBlockResACKPacket) NodeID() string {
 }
 
 func (p *SYNCBlockResACKPacket) ItemCount() int {
+	return 0
+}
+
+func (p *SYNCBlockReqPacket) NodeID() string {
+	return p.peerID
+}
+
+func (p *SYNCBlockReqPacket) ItemCount() int {
 	return 0
 }
 

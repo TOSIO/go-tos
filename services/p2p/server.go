@@ -846,9 +846,10 @@ func (srv *Server) listenLoop() {
 		}
 
 		fd = newMeteredConn(fd, true)
-		srv.log.Debug("Accepted TCP connection", "addr", fd.RemoteAddr())
+		srv.log.Debug("TCP-listener accepted TCP connection", "addr", fd.RemoteAddr())
 		go func() {
-			srv.SetupConn(fd, inboundConn, nil)
+			err := srv.SetupConn(fd, inboundConn, nil)
+			srv.log.Debug("TCP-listener setup connection", "addr", fd.RemoteAddr(), "err", err)
 			slots <- struct{}{}
 		}()
 	}
@@ -858,6 +859,7 @@ func (srv *Server) listenLoop() {
 // as a peer. It returns when the connection has been added as a peer
 // or the handshakes have failed.
 func (srv *Server) SetupConn(fd net.Conn, flags connFlag, dialDest *discover.Node) error {
+	log.Debug("Try to setup connection", "node.Addr", fd.RemoteAddr().String())
 	self := srv.Self()
 	if self == nil {
 		return errors.New("shutdown")

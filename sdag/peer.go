@@ -227,7 +227,7 @@ func (p *peer) SendSYNCBlockRequest(timeslice uint64, index uint) error {
 
 func (p *peer) SendSYNCBlockResponse(packet *protocol.SYNCBlockResponse) error {
 	err := p2p.Send(p.rw, protocol.SYNCBlockResponseMsg, packet)
-	p.Log().Debug(">> SYNC-BLOCK-REQUEST", "err", err)
+	p.Log().Debug(">> SYNC-BLOCK-RESPONSE", "size", len(packet.TSBlocks), "err", err)
 	return err
 }
 

@@ -424,6 +424,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleBlockHashBySlice(p, msg)
 	case protocol.GetBlocksBySliceMsg: //获取区块数据
 		return pm.handleGetBlocksBySlice(p, msg)
+	case protocol.SYNCBlockRequestMsg:
+		return pm.handleSYNCblockRequest(p, msg)
+	case protocol.SYNCBlockResponseMsg:
+		return pm.handleSYNCblockResponse(p, msg)
+	case protocol.SYNCBlockResponseACKMsg:
+		return pm.handleSYNCblockResponseACK(p, msg)
 	case protocol.BlocksBySliceMsg:
 		return pm.handleBlocksBySlice(p, msg)
 	case protocol.GetBlockByHashMsg:
@@ -593,6 +599,16 @@ func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
 	pm.synchroniser.MarkAnnounced(response, p.NodeID())
 	pm.blockPoolEvent.Post(&core.AnnounceEvent{Hash: response})
 	return nil
+}
+
+func (pm *ProtocolManager) handleSYNCblockRequest(p *peer, msg p2p.Msg) error {
+	var request protocol.SYNCBlockRequest
+	err := msg.Decode(&request)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< SYNC-BLOCK-REQUEST", "timeslice", request.BeginPoint.Timeslice, "index", request.BeginPoint.Index)
+	return pm.synchroniser.DeliverSYNCBlockRequest(p.id, &request.BeginPoint)
 }
 
 func (pm *ProtocolManager) handleSYNCblockResponse(p *peer, msg p2p.Msg) error {

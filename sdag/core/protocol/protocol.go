@@ -125,7 +125,7 @@ type SYNCBlockRequest struct {
 }
 
 type SYNCBlockResponse struct {
-	TSBlocks []TimesliceBlocks
+	TSBlocks []*TimesliceBlocks
 	End      bool
 }
 

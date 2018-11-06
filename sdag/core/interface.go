@@ -42,5 +42,5 @@ type Response interface {
 }
 
 type Request interface {
-	Node() string
+	NodeID() string
 }

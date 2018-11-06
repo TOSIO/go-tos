@@ -48,6 +48,7 @@ type SynchroniserI interface {
 
 	DeliverNewBlockResp(id string, data [][]byte) error
 
+	DeliverSYNCBlockRequest(id string, beginPoint *protocol.TimesliceIndex) error
 	DeliverSYNCBlockResponse(id string, response *protocol.SYNCBlockResponse) error
 	DeliverSYNCBlockACKResponse(id string, response *protocol.SYNCBlockResponseACK) error
 
