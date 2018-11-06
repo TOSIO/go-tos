@@ -1,4 +1,4 @@
-package sdag
+package protocol
 
 import (
 	"math/big"
@@ -38,11 +38,16 @@ const (
 	GetBlocksBySliceMsg    = 0x08
 	BlocksBySliceMsg       = 0x09
 
+	SYNCBlockRequestMsg     = 0x0A
+	SYNCBlockResponseMsg    = 0x0B
+	SYNCBlockResponseACKMsg = 0x0C
+	//MSG_SYNCBlockEndMsg     = 0x0D
+
 	// Protocol messages belonging to tos/63
-	GetNodeDataMsg = 0x0d
-	NodeDataMsg    = 0x0e
-	GetReceiptsMsg = 0x0f
-	ReceiptsMsg    = 0x10
+/* 	GetNodeDataMsg = 0x0d
+NodeDataMsg    = 0x0e
+GetReceiptsMsg = 0x0f
+ReceiptsMsg    = 0x10 */
 )
 
 var msgcodeToString = map[int]string{
@@ -58,11 +63,15 @@ var msgcodeToString = map[int]string{
 	GetBlocksBySliceMsg:    "GET-BLOCKS-BY-TIMESLICE",
 	BlocksBySliceMsg:       "BLOCKS-BY-TIMESLICE",
 
+	SYNCBlockRequestMsg:     "SYNC-BLOCK-REQUEST",
+	SYNCBlockResponseMsg:    "SYNC-BLOCK-RESPONSE",
+	SYNCBlockResponseACKMsg: "SYNC-BLOCK-RESPONSE-ACK",
+	//MSG_SYNCBlockEndMsg:     "SYNC-BLOCK-END",
 	// Protocol messages belonging to tos/63
-	GetNodeDataMsg: "GET-NODEDATA",
-	NodeDataMsg:    "NODEDATA",
-	GetReceiptsMsg: "GET-RECEIPTS",
-	ReceiptsMsg:    "RECEIPTS",
+	/* 	GetNodeDataMsg: "GET-NODEDATA",
+	   	NodeDataMsg:    "NODEDATA",
+	   	GetReceiptsMsg: "GET-RECEIPTS",
+	   	ReceiptsMsg:    "RECEIPTS", */
 }
 
 func MsgCodeToString(code int) string {
@@ -70,7 +79,7 @@ func MsgCodeToString(code int) string {
 }
 
 // statusData is the network packet for the status message.
-type statusData struct {
+type StatusData struct {
 	ProtocolVersion uint32
 	NetworkId       uint64
 	TD              *big.Int
@@ -101,7 +110,35 @@ type GetBlockDataBySliceResp struct {
 	Blocks    [][]byte
 }
 
-type errCode int
+type TimesliceIndex struct {
+	Timeslice uint64
+	Index     uint
+}
+
+type TimesliceBlocks struct {
+	TSIndex TimesliceIndex
+	Blocks  [][]byte
+}
+
+type SYNCBlockRequest struct {
+	BeginPoint TimesliceIndex
+}
+
+type SYNCBlockResponse struct {
+	TSBlocks        []*TimesliceBlocks
+	CurEndTimeslice uint64
+	End             bool
+}
+
+/* type SYNCBlockEnd struct {
+	EndPoint TimesliceIndex
+} */
+
+type SYNCBlockResponseACK struct {
+	ConfirmPoint TimesliceIndex
+}
+
+type ErrCode int
 
 const (
 	ErrMsgTooLarge = iota
@@ -115,7 +152,7 @@ const (
 	ErrSuspendedPeer
 )
 
-func (e errCode) String() string {
+func (e ErrCode) String() string {
 	return errorToString[int(e)]
 }
 

@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
+
 	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/utils"
 
@@ -17,6 +19,9 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 )
+
+var maxSYNCCapLimit = 3000
+var maxRetryCount = 3
 
 var (
 	errNoSyncActive   = errors.New("no sync active")
@@ -48,6 +53,10 @@ type Synchroniser struct {
 	blockhashesCh chan core.Response
 	blocksCh      chan core.Response
 
+	syncreqCh     chan core.Request
+	blockresCh    chan core.Response
+	blockresAckCh chan core.Response
+
 	//newTask chan core.NewSYNCTask
 
 	blockReqCh chan struct{}
@@ -61,6 +70,8 @@ type Synchroniser struct {
 	cancelCh chan struct{} // Channel to cancel mid-flight syncs
 	quitCh   chan struct{} // Channel to cancel mid-flight syncs
 
+	sliceCache map[string][]common.Hash
+	cachelock  sync.RWMutex
 	//syncResultCh chan error
 	genesisTimeslice uint64
 	genesis          common.Hash
@@ -83,6 +94,11 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.blockhashesCh = make(chan core.Response)
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
+
+	syncer.blockresCh = make(chan core.Response, 100)
+	syncer.blockresAckCh = make(chan core.Response, 100)
+	syncer.syncreqCh = make(chan core.Request)
+	syncer.sliceCache = make(map[string][]common.Hash)
 
 	syncer.done = make(chan struct{})
 	syncer.cancelCh = make(chan struct{})
@@ -120,11 +136,11 @@ func (s *Synchroniser) Stop() {
 	s.wg.Wait()
 }
 
-func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask) {
+func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) {
 	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
 	lastTempMBTimeslice := s.mainChain.GetLastTempMainBlkSlice()
 	if lastTempMBTimeslice >= nowTimeslice {
-		s.netFeed.Send(core.SDAGSYNC_COMPLETED)
+		//s.netFeed.Send(core.SDAGSYNC_COMPLETED)
 		log.Info("Synchronise is completed", "lastTS", s.mainChain.GetLastTempMainBlkSlice(), "nowTS", nowTimeslice)
 		return
 	}
@@ -149,16 +165,21 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask) {
 		delete(tasks, target)
 		peer = s.peerset.FindPeer(target)
 	}
-
-	if target != "" && origin.LastMainBlockNum > s.mainChain.GetMainTail().Number &&
+	if peer == nil {
+		return
+	}
+	if target != "" && s.mainChain.GetMainTail().CumulativeDiff.Cmp(&origin.LastCumulatedDiff) < 0 &&
+		/* origin.LastMainBlockNum > s.mainChain.GetMainTail().Number && */
 		origin.LastTempMBTimeslice > s.mainChain.GetLastTempMainBlkSlice()+3 {
 		beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
 		if beginTimeslice < 0 || beginTimeslice <= s.genesisTimeslice {
 			beginTimeslice = origin.FirstMBTimeslice
 			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
 		}
+		*idle = false
 		s.netFeed.Send(core.SDAGSYNC_SYNCING)
-		go s.synchroinise(peer, beginTimeslice, origin.LastTempMBTimeslice, origin.LastMainBlockNum)
+		//go s.synchroinise(peer, beginTimeslice, origin.LastTempMBTimeslice, origin.LastMainBlockNum)
+		go s.synchroiniseV2(peer, beginTimeslice)
 	} else {
 		for key, _ := range tasks {
 			delete(tasks, key)
@@ -172,20 +193,313 @@ func (s *Synchroniser) loop() {
 	defer s.wg.Done()
 
 	queuedTask := make(map[string]*core.NewSYNCTask)
+	discharg := func(resCh chan core.Response, resackCh chan core.Response) {
+		select {
+		case <-resackCh:
+			log.Debug("Discharge ACK")
+		case <-resCh:
+			log.Debug("Discharge SYNC-BLOCK-RESPONSE")
+		default:
 
+		}
+	}
+	idle := true
 	for {
-		s.schedule(queuedTask)
+		s.schedule(queuedTask, &idle)
+		if idle {
+			discharg(s.blockresCh, s.blockresAckCh)
+		}
 		select {
 		case newTask := <-s.newTaskSub.Chan():
 			if task, ok := newTask.Data.(*core.NewSYNCTask); ok {
 				queuedTask[task.NodeID] = task
 			}
+		case req := <-s.syncreqCh:
+			go s.handleSYNCBlockRequest(req)
+		case packet := <-s.blockresAckCh:
+			go s.handleSYNCBlockResponseACK(packet)
 		case <-s.done:
+			idle = true
 			continue
 		case <-s.quitCh:
 			return
 		}
 	}
+}
+
+func (s *Synchroniser) synchroiniseV2(peer core.Peer, beginTimeslice uint64) {
+	s.wg.Add(1)
+	defer s.wg.Done()
+
+	atomic.StoreInt32(&s.syncing, 1)
+	stat := core.SYNCStatusEvent{
+		Progress:          core.SYNC_READY,
+		BeginTS:           beginTimeslice,
+		EndTS:             0,
+		CurTS:             0,
+		AccumulateSYNCNum: 0,
+		BeginTime:         time.Now(),
+		CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
+		//TriedOrigin:       make([]string, 0)
+	}
+
+	s.syncEvent.Post(stat)
+
+	if err := peer.SendSYNCBlockRequest(beginTimeslice, 0); err != nil {
+		log.Debug("Error send SYNC-request-message", "beginTS", beginTimeslice, "err", err)
+		return
+	} else {
+		log.Debug("Send request-message OK", "timeslice", beginTimeslice)
+	}
+	waitTimeout := time.After(s.requestTTL())
+
+	stat.CurTS = beginTimeslice
+	stat.Err = nil
+	stat.Progress = core.SYNC_SYNCING
+	s.syncEvent.Post(stat)
+
+	postErrStat := func(status *core.SYNCStatusEvent, err error) {
+		status.Err = err
+		status.EndTime = time.Now()
+		status.Progress = core.SYNC_ERROR
+		s.syncEvent.Post(stat)
+	}
+	var lastAck *protocol.TimesliceIndex
+	retry := 0
+loop:
+
+	for {
+		select {
+		case packet := <-s.blockresCh:
+			retry = 0
+			log.Debug("Reset retry")
+			if lastTSIndex, end, err := s.handleSYNCBlockResponse(packet, &stat); err == nil {
+				if end {
+					stat.Err = nil
+					stat.EndTS = lastTSIndex.Timeslice
+					stat.EndTime = time.Now()
+					stat.Progress = core.SYNC_END
+					s.syncEvent.Post(stat)
+					s.netFeed.Send(core.SDAGSYNC_COMPLETED)
+					break loop
+				} else {
+					//lastAck = lastTSIndex.Timeslice
+					lastAck = lastTSIndex
+
+					stat.CurTS = lastAck.Timeslice
+					stat.Err = nil
+					stat.Progress = core.SYNC_SYNCING
+					s.syncEvent.Post(stat)
+					if err = peer.SendSYNCBlockResponseACK(lastTSIndex.Timeslice, lastTSIndex.Index); err != nil {
+						log.Debug("Error send SYNC-BLOCK-RESPONSE-ACK message", "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
+						postErrStat(&stat, err)
+						break loop
+					}
+					waitTimeout = time.After(s.requestTTL())
+				}
+
+			}
+		case <-waitTimeout:
+			if retry > maxRetryCount {
+				postErrStat(&stat, fmt.Errorf("timeout"))
+				log.Debug("Stop to retry send SYNC-BLOCK-*** request")
+				break loop
+			}
+			retry++
+			log.Debug("Retry send SYNC-BLOCK-*** request", "retry", retry)
+			if lastAck != nil {
+				if err := peer.SendSYNCBlockResponseACK(lastAck.Timeslice, lastAck.Index); err != nil {
+					log.Debug("Error send SYNC-BLOCK-RESPONSE-ACK message", "timeslice", lastAck.Timeslice, "index", lastAck.Index)
+					postErrStat(&stat, err)
+					break loop
+				}
+			} else {
+				if err := peer.SendSYNCBlockRequest(beginTimeslice, 0); err != nil {
+					log.Debug("Error send SYNC-request-message", "beginTS", beginTimeslice, "err", err)
+					postErrStat(&stat, err)
+					break loop
+				} else {
+					log.Debug("Send request-message OK", "timeslice", beginTimeslice)
+				}
+			}
+			waitTimeout = time.After(s.requestTTL())
+		case <-s.cancelCh:
+			break loop
+		}
+	}
+	s.done <- struct{}{}
+	atomic.StoreInt32(&s.syncing, 0)
+}
+
+func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.SYNCStatusEvent) (*protocol.TimesliceIndex, bool, error) {
+	maxTSIndex := protocol.TimesliceIndex{Timeslice: 0, Index: 0}
+	end := false
+	if res, ok := packet.(*SYNCBlockRespPacket); ok {
+		if res.response != nil {
+			end = res.response.End
+			stat.EndTS = res.response.CurEndTimeslice
+			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+			for _, tsblocks := range res.response.TSBlocks {
+				if maxTSIndex.Timeslice < tsblocks.TSIndex.Timeslice {
+					maxTSIndex.Timeslice = tsblocks.TSIndex.Timeslice
+					maxTSIndex.Index = tsblocks.TSIndex.Index
+				}
+				//hashes := make([]common.Hash, 0)
+				for _, blk := range tsblocks.Blocks {
+					//s.mempool.EnQueue(blk)
+					if block, err := types.BlockDecode(blk); err == nil {
+						newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+						//hashes = append(hashes, block.GetHash())
+					}
+				}
+				//log.Debug("process response 1")
+				//s.fetcher.UnMarkFlighting(hashes)
+				//log.Debug("process response 2")
+				stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
+				if len(newblockEvent.Blocks) > 0 {
+					s.blockPoolEvent.Post(newblockEvent)
+				}
+				//if tsblocks.Blocks
+			}
+			log.Debug("Handle SYNC-BLOCK-RESPONSE response completed", "endTimeslice", maxTSIndex.Timeslice, "index", maxTSIndex.Index, "size", len(newblockEvent.Blocks))
+		}
+	}
+	return &maxTSIndex, end, nil
+}
+
+func (s *Synchroniser) handleSYNCBlockRequest(packet core.Request) {
+	if req, ok := packet.(*SYNCBlockReqPacket); ok {
+		response := &protocol.SYNCBlockResponseACK{ConfirmPoint: *req.beginPoint}
+		fake := &SYNCBlockResACKPacket{peerID: req.peerID, response: response}
+		s.handleSYNCBlockResponseACK(fake)
+	}
+
+}
+
+func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
+	/* forwardPack := func(syncer *Synchroniser, ID string, timeslice uint64, out *protocol.SYNCBlockResponse, cnt int) uint64 {
+		//timeslice := ack.response.ConfirmPoint.Timeslice
+		for cnt < maxSYNCCapLimit {
+			timeslice++
+			tsblocks := protocol.TimesliceBlocks{}
+			tsblocks.TSIndex.Index = 0
+			if hashes, err := syncer.blkstorage.GetBlockHashByTmSlice(timeslice); err == nil {
+				tsblocks.TSIndex.Timeslice = timeslice
+
+				if len(hashes) <= maxSYNCCapLimit-cnt {
+					if blocks, err := syncer.blkstorage.GetBlocks(hashes); err == nil {
+						tsblocks.Blocks = blocks
+						out.TSBlocks = append(out.TSBlocks, tsblocks)
+						cnt += len(hashes)
+						continue
+					}
+				} else {
+					syncer.cachelock.Lock()
+					syncer.sliceCache[ID] = hashes
+					syncer.cachelock.Unlock()
+					if blocks, err := syncer.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-cnt]); err == nil {
+						tsblocks.Blocks = blocks
+						out.TSBlocks = append(out.TSBlocks, tsblocks)
+						break
+					}
+				}
+			} else {
+				log.Debug("Error get local block-hash", "timeslice", timeslice)
+			}
+		}
+		return timeslice
+	} */
+	if ack, ok := packet.(*SYNCBlockResACKPacket); ok {
+		curEndPoint := utils.GetMainTime(s.mainChain.GetMainTail().Time)
+		//maxCap := 3000
+		nodeID := ack.NodeID()
+		count := 0
+		response := protocol.SYNCBlockResponse{TSBlocks: make([]*protocol.TimesliceBlocks, 0)}
+		response.CurEndTimeslice = curEndPoint
+		endTimeslice := ack.response.ConfirmPoint.Timeslice
+
+		if ack.response != nil {
+			s.cachelock.RLock()
+			if cache, existed := s.sliceCache[nodeID]; existed {
+				s.cachelock.RUnlock()
+				pos := int(ack.response.ConfirmPoint.Index)
+
+				if len(cache) > pos { // handle the remain block since last sync
+					tsblocks := &protocol.TimesliceBlocks{}
+					tsblocks.TSIndex.Timeslice = ack.response.ConfirmPoint.Timeslice
+					tsblocks.TSIndex.Index = ack.response.ConfirmPoint.Index
+					tsblocks.Blocks = make([][]byte, 0)
+					endTimeslice = tsblocks.TSIndex.Timeslice
+					for pos++; count < maxSYNCCapLimit && pos < len(cache); pos++ {
+						block := s.blkstorage.GetBlock(cache[pos])
+						if block != nil {
+							tsblocks.TSIndex.Index = uint(pos)
+							tsblocks.Blocks = append(tsblocks.Blocks, block.GetRlp())
+							count++
+						}
+					}
+					response.TSBlocks = append(response.TSBlocks, tsblocks)
+				} /*  else {
+					forwardPack(ack.response.ConfirmPoint.Timeslice)
+				} */
+			} else {
+				s.cachelock.RUnlock()
+			}
+			//endTimeslice = forwardPack(s, nodeID, ack.response.ConfirmPoint.Timeslice, &response, count)
+			//endTimeslice =
+			remain := false
+			for endTimeslice <= curEndPoint && count < maxSYNCCapLimit {
+				endTimeslice++
+				tsblocks := &protocol.TimesliceBlocks{}
+				tsblocks.TSIndex.Index = 0
+				if hashes, err := s.blkstorage.GetBlockHashByTmSlice(endTimeslice); err == nil {
+					tsblocks.TSIndex.Timeslice = endTimeslice
+					if len(hashes) == 0 {
+						continue
+					}
+
+					if len(hashes) <= maxSYNCCapLimit-count {
+						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
+							tsblocks.Blocks = blocks
+							tsblocks.TSIndex.Index = uint(len(hashes))
+							response.TSBlocks = append(response.TSBlocks, tsblocks)
+							count += len(hashes)
+							continue
+						}
+					} else {
+						s.cachelock.Lock()
+						s.sliceCache[nodeID] = hashes
+						s.cachelock.Unlock()
+						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
+							tsblocks.Blocks = blocks
+							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
+							response.TSBlocks = append(response.TSBlocks, tsblocks)
+						}
+						remain = true
+						break
+					}
+				} else {
+					log.Debug("Error get local block-hash", "timeslice", endTimeslice)
+				}
+			}
+			if endTimeslice >= curEndPoint && !remain {
+				response.End = true
+			} else {
+				response.End = false
+			}
+
+			if peer := s.peerset.FindPeer(nodeID); peer != nil {
+				if err := peer.SendSYNCBlockResponse(&response); err != nil {
+					log.Debug("Error send SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "curTS", ack.response.ConfirmPoint.Timeslice, "err", err)
+				}
+				// send new syn-blocks-response message
+			} else {
+				log.Debug("Error to find peer", "nodeID", nodeID)
+				return fmt.Errorf("peer offline")
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Synchroniser) synchroinise(peer core.Peer, beginTimeslice uint64, endTimeslice uint64, blockNum uint64) {
@@ -352,7 +666,7 @@ func (s *Synchroniser) MarkAnnounced(hash common.Hash, nodeID string) {
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
-	return time.Duration(10 * time.Second)
+	return time.Duration(60 * time.Second)
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
@@ -370,6 +684,18 @@ func (s *Synchroniser) DeliverBlockDatasResp(id string, ts uint64, blocks [][]by
 
 func (s *Synchroniser) DeliverNewBlockResp(id string, data [][]byte) error {
 	return s.deliverResponse(id, s.fetcher.resCh, &NewBlockPacket{peerId: id, blocks: data})
+}
+
+func (s *Synchroniser) DeliverSYNCBlockRequest(id string, beginPoint *protocol.TimesliceIndex) error {
+	return s.deliverRequest(id, s.syncreqCh, &SYNCBlockReqPacket{peerID: id, beginPoint: beginPoint})
+}
+
+func (s *Synchroniser) DeliverSYNCBlockResponse(id string, response *protocol.SYNCBlockResponse) error {
+	return s.deliverResponse(id, s.blockresCh, &SYNCBlockRespPacket{peerID: id, response: response})
+}
+
+func (s *Synchroniser) DeliverSYNCBlockACKResponse(id string, response *protocol.SYNCBlockResponseACK) error {
+	return s.deliverResponse(id, s.blockresCh, &SYNCBlockResACKPacket{peerID: id, response: response})
 }
 
 // deliver injects a new batch of data received from a remote node.
@@ -390,6 +716,31 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan core.Response, res
 	}
 	select {
 	case destCh <- response:
+		log.Trace("Deliver was finished")
+		return nil
+	case <-cancel:
+		return errNoSyncActive
+	}
+}
+
+// deliver injects a new batch of data received from a remote node.
+func (s *Synchroniser) deliverRequest(id string, destCh chan core.Request, request core.Request) (err error) {
+	// Update the delivery metrics for both good and failed deliveries
+	/* inMeter.Mark(int64(packet.Items()))
+	defer func() {
+		if err != nil {
+			dropMeter.Mark(int64(packet.Items()))
+		}
+	}() */
+	// Deliver or abort if the sync is canceled while queuing
+	s.cancelLock.RLock()
+	cancel := s.cancelCh
+	s.cancelLock.RUnlock()
+	if cancel == nil {
+		return errNoSyncActive
+	}
+	select {
+	case destCh <- request:
 		log.Trace("Deliver was finished")
 		return nil
 	case <-cancel:

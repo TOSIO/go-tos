@@ -21,6 +21,7 @@ import (
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
 	"github.com/TOSIO/go-tos/internal/tosapi"
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
@@ -120,7 +121,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		sct:             ctx,
 	}
 
-	log.Info("Initialising Sdag protocol", "versions", ProtocolVersions, "network", config.NetworkId)
+	log.Info("Initialising Sdag protocol", "versions", protocol.ProtocolVersions, "network", config.NetworkId)
 
 	sdag.APIBackend = &SdagAPIBackend{sdag}
 

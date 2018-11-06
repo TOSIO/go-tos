@@ -350,8 +350,11 @@ func (t *dialTask) dial(srv *Server, dest *discover.Node) error {
 	if err != nil {
 		return &dialError{err}
 	}
+	log.Debug("DISCOVERY dial a connection successulf", "node.Addr", fd.RemoteAddr().String())
 	mfd := newMeteredConn(fd, false)
-	return srv.SetupConn(mfd, t.flags, dest)
+	err = srv.SetupConn(mfd, t.flags, dest)
+	log.Debug("DISCOVERY setup connection", "node.Addr", fd.RemoteAddr().String(), "err", err)
+	return err
 }
 
 func (t *dialTask) String() string {

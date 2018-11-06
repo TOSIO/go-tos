@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
@@ -23,6 +24,10 @@ type Peer interface {
 	//RequestBlocks(hashes []common.Hash) error
 	RequestLastMainSlice() error
 	SendNewBlockHash(hash common.Hash) error
+
+	SendSYNCBlockRequest(timeslice uint64, index uint) error
+	SendSYNCBlockResponse(packet *protocol.SYNCBlockResponse) error
+	SendSYNCBlockResponseACK(timeslice uint64, index uint) error
 }
 
 type PeerSet interface {
@@ -34,4 +39,8 @@ type PeerSet interface {
 type Response interface {
 	NodeID() string
 	ItemCount() int
+}
+
+type Request interface {
+	NodeID() string
 }

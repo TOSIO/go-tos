@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
-
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 	"github.com/TOSIO/go-tos/services/p2p"
 )
 
@@ -85,10 +85,10 @@ func (p *peer) broadcast() {
 func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, ts uint64, num uint64, diff *big.Int) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
-	var status statusData
+	var status protocol.StatusData
 
 	go func() {
-		errc <- p2p.Send(p.rw, StatusMsg, &statusData{
+		errc <- p2p.Send(p.rw, protocol.StatusMsg, &protocol.StatusData{
 			ProtocolVersion: uint32(p.version),
 			NetworkId:       network,
 			CurFistMBTS:     firstMBTS,
@@ -121,69 +121,65 @@ func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, 
 	return nil
 }
 
-func (p *peer) readStatus(network uint64, status *statusData, genesis common.Hash) (err error) {
+func (p *peer) readStatus(network uint64, status *protocol.StatusData, genesis common.Hash) (err error) {
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
 	}
-	if msg.Code != StatusMsg {
-		return errResp(ErrNoStatusMsg, "first msg has code %x (!= %x)", msg.Code, StatusMsg)
+	if msg.Code != protocol.StatusMsg {
+		return errResp(protocol.ErrNoStatusMsg, "first msg has code %x (!= %x)", msg.Code, protocol.StatusMsg)
 	}
-	if msg.Size > ProtocolMaxMsgSize {
-		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+	if msg.Size > protocol.ProtocolMaxMsgSize {
+		return errResp(protocol.ErrMsgTooLarge, "%v > %v", msg.Size, protocol.ProtocolMaxMsgSize)
 	}
 	// Decode the handshake and make sure everything matches
 	if err := msg.Decode(&status); err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	if status.GenesisBlock != genesis {
-		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock[:8], genesis[:8])
+		return errResp(protocol.ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock[:8], genesis[:8])
 	}
 	if status.NetworkId != network {
-		return errResp(ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)
+		return errResp(protocol.ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)
 	}
 	if int(status.ProtocolVersion) != p.version {
-		return errResp(ErrProtocolVersionMismatch, "%d (!= %d)", status.ProtocolVersion, p.version)
+		return errResp(protocol.ErrProtocolVersionMismatch, "%d (!= %d)", status.ProtocolVersion, p.version)
 	}
 	return nil
 }
 
 // 发送时间片点
 func (p *peer) SendTimeSlice(slice uint64) error {
-	return p2p.Send(p.rw, LastMainTimeSlice, slice)
+	return p2p.Send(p.rw, protocol.LastMainTimeSlice, slice)
 }
 
 func (p *peer) SendNewBlocks(blocks [][]byte) error {
-	return p2p.Send(p.rw, NewBlockMsg, blocks)
+	return p2p.Send(p.rw, protocol.NewBlockMsg, blocks)
 }
 
 func (p *peer) SendNewBlockHash(hash common.Hash) error {
-	return p2p.Send(p.rw, NewBlockHashMsg, hash)
+	return p2p.Send(p.rw, protocol.NewBlockHashMsg, hash)
 }
 
 func (p *peer) SendBlockHashes(timeslice uint64, hashes []common.Hash) error {
-	return p2p.Send(p.rw, BlockHashBySliceMsg, &GetBlockHashBySliceResp{Timeslice: timeslice, Hashes: hashes})
+	return p2p.Send(p.rw, protocol.BlockHashBySliceMsg, &protocol.GetBlockHashBySliceResp{Timeslice: timeslice, Hashes: hashes})
 }
 
 func (p *peer) SendSliceBlocks(timeslice uint64, blocks [][]byte) error {
-	return p2p.Send(p.rw, BlocksBySliceMsg, &GetBlockDataBySliceResp{Timeslice: timeslice, Blocks: blocks})
+	return p2p.Send(p.rw, protocol.BlocksBySliceMsg, &protocol.GetBlockDataBySliceResp{Timeslice: timeslice, Blocks: blocks})
 }
 
 func (p *peer) RequestBlocksBySlice(timeslice uint64, hashes []common.Hash) error {
-	err := p2p.Send(p.rw, GetBlocksBySliceMsg, &GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
+	err := p2p.Send(p.rw, protocol.GetBlocksBySliceMsg, &protocol.GetBlockDataBySliceReq{Timeslice: timeslice, Hashes: hashes})
 	p.Log().Debug(">> GET-BLOCK-BY-TIMESLICE-HASH", "timeslice", timeslice, "hash.size", len(hashes), "err", err)
 	return err
 }
-
-/* func (p *peer) RequestBlocks(hashes []common.Hash) error {
-	return p2p.Send(p.rw, GetBlockByHashMsg, hashes)
-} */
 
 func (p *peer) RequestBlock(hash common.Hash) error {
 	hashes := make([]common.Hash, 0)
 	hashes = append(hashes, hash)
 	p.Log().Debug(">> GET-BLOCK-BY-HASH", "hash", hash.String())
-	return p2p.Send(p.rw, GetBlockByHashMsg, hashes)
+	return p2p.Send(p.rw, protocol.GetBlockByHashMsg, hashes)
 }
 
 func (p *peer) NodeID() string {
@@ -198,13 +194,13 @@ func (p *peer) SetIdle(idle bool) {
 }
 
 func (p *peer) RequestBlockHashBySlice(slice uint64) error {
-	err := p2p.Send(p.rw, GetBlockHashBySliceMsg, slice)
+	err := p2p.Send(p.rw, protocol.GetBlockHashBySliceMsg, slice)
 	p.Log().Debug(">> GET-BLOCK-HASH-BY-TIMESLICE", "timeslice", slice, "err", err)
 	return err
 }
 
 func (p *peer) RequestLastMainSlice() error {
-	err := p2p.Send(p.rw, GetLastMainTimeSlice, GetLastMainBlockTSReq{})
+	err := p2p.Send(p.rw, protocol.GetLastMainTimeSlice, protocol.GetLastMainBlockTSReq{})
 	p.Log().Debug(">> GET-LAST-MAINBLOCK-TIMESLICE", "err", err)
 	return err
 }
@@ -222,3 +218,21 @@ func (p *peer) AsyncSendBlock(block []byte) {
 	return p.knownBlocks.Contains(hash)
 }
 */
+
+func (p *peer) SendSYNCBlockRequest(timeslice uint64, index uint) error {
+	err := p2p.Send(p.rw, protocol.SYNCBlockRequestMsg, protocol.SYNCBlockRequest{BeginPoint: protocol.TimesliceIndex{Timeslice: timeslice, Index: index}})
+	p.Log().Debug(">> SYNC-BLOCK-REQUEST", "timeslice", timeslice, "index", index, "err", err)
+	return err
+}
+
+func (p *peer) SendSYNCBlockResponse(packet *protocol.SYNCBlockResponse) error {
+	err := p2p.Send(p.rw, protocol.SYNCBlockResponseMsg, packet)
+	p.Log().Debug(">> SYNC-BLOCK-RESPONSE", "size", len(packet.TSBlocks), "err", err)
+	return err
+}
+
+func (p *peer) SendSYNCBlockResponseACK(timeslice uint64, index uint) error {
+	err := p2p.Send(p.rw, protocol.SYNCBlockResponseACKMsg, protocol.SYNCBlockResponseACK{ConfirmPoint: protocol.TimesliceIndex{Timeslice: timeslice, Index: index}})
+	p.Log().Debug(">> SYNC-BLOCK-RESPONSE-ACK", "timeslice", timeslice, "index", index, "err", err)
+	return err
+}

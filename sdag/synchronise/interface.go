@@ -2,6 +2,7 @@ package synchronise
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
@@ -46,6 +47,11 @@ type SynchroniserI interface {
 	DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error
 
 	DeliverNewBlockResp(id string, data [][]byte) error
+
+	DeliverSYNCBlockRequest(id string, beginPoint *protocol.TimesliceIndex) error
+	DeliverSYNCBlockResponse(id string, response *protocol.SYNCBlockResponse) error
+	DeliverSYNCBlockACKResponse(id string, response *protocol.SYNCBlockResponseACK) error
+
 	//DeliverBlockHashesResp(id string, resp *SliceBlkHashesResp) error
 	//DeliverBlockHashesResp(id string, resp RespPacketI) error
 }

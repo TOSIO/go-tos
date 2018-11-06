@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/TOSIO/go-tos/sdag/core"
+	"github.com/TOSIO/go-tos/sdag/core/protocol"
 
 	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/utils"
@@ -182,7 +183,7 @@ func (pm *ProtocolManager) loop() {
 				pm.stat.Syncstat = event
 				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
 					"startTS", event.BeginTS,
-					"endTS", event.EndTS,
+					"endTS(cur)", event.EndTS,
 					"beginTime", event.BeginTime,
 					"endTime", event.EndTime,
 					"accumlatedNum", event.AccumulateSYNCNum,
@@ -195,15 +196,15 @@ func (pm *ProtocolManager) loop() {
 }
 
 func (pm *ProtocolManager) initProtocols() error {
-	pm.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
-	for i, version := range ProtocolVersions {
+	pm.SubProtocols = make([]p2p.Protocol, 0, len(protocol.ProtocolVersions))
+	for i, version := range protocol.ProtocolVersions {
 
 		// Compatible; initialise the sub-protocol
 		version := version // Closure for the run
 		pm.SubProtocols = append(pm.SubProtocols, p2p.Protocol{
-			Name:    ProtocolName,
+			Name:    protocol.ProtocolName,
 			Version: version,
-			Length:  ProtocolLengths[i],
+			Length:  protocol.ProtocolLengths[i],
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
 				peer := pm.newPeer(int(version), p, rw)
 				select {
@@ -361,7 +362,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	defer pm.removePeer(p.id)
 
 	p.Log().Debug("TOS handshake is done", "Node.LastTempMBTS", p.lastTempMBTimeslice, "local.LastTempMBTS", lastTmpMBTimeslice,
-		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number)
+		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number,
+		"node.Diff", p.lastCumulatedDiff.String(), "local.Diff", pm.mainChain.GetMainTail().CumulativeDiff.String())
 
 	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
 		pm.stat.Status = STAT_SYNCING
@@ -385,7 +387,7 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	}
 	//p.Log().Debug("TOS message handling exit")
 }
-func errResp(code errCode, format string, v ...interface{}) error {
+func errResp(code protocol.ErrCode, format string, v ...interface{}) error {
 	return fmt.Errorf("%v - %v", code, fmt.Sprintf(format, v...))
 }
 
@@ -403,33 +405,39 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		log.Debug("Error handle message", "err", err)
 		return err
 	}
-	if msg.Size > ProtocolMaxMsgSize {
-		return errResp(ErrMsgTooLarge, "%v > %v", msg.Size, ProtocolMaxMsgSize)
+	if msg.Size > protocol.ProtocolMaxMsgSize {
+		return errResp(protocol.ErrMsgTooLarge, "%v > %v", msg.Size, protocol.ProtocolMaxMsgSize)
 	}
 	defer msg.Discard()
-	p.Log().Debug("Handle message", "msg.Code", MsgCodeToString(int(msg.Code)))
+	p.Log().Debug("Handle message", "msg.Code", protocol.MsgCodeToString(int(msg.Code)))
 	//dispatch message here
 	switch msg.Code {
-	case StatusMsg:
+	case protocol.StatusMsg:
 		// Status messages should never arrive after the handshake
-		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
-	case GetLastMainTimeSlice: //获取最近一次临时主块的时间片
+		return errResp(protocol.ErrExtraStatusMsg, "uncontrolled status message")
+	case protocol.GetLastMainTimeSlice: //获取最近一次临时主块的时间片
 		return pm.handleGetLastMainTimeSlice(p, msg)
-	case LastMainTimeSlice:
+	case protocol.LastMainTimeSlice:
 		return pm.handleLastMainTimeSlice(p, msg)
-	case GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
+	case protocol.GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
 		return pm.handleGetBlockHashBySlice(p, msg)
-	case BlockHashBySliceMsg:
+	case protocol.BlockHashBySliceMsg:
 		return pm.handleBlockHashBySlice(p, msg)
-	case GetBlocksBySliceMsg: //获取区块数据
+	case protocol.GetBlocksBySliceMsg: //获取区块数据
 		return pm.handleGetBlocksBySlice(p, msg)
-	case BlocksBySliceMsg:
+	case protocol.SYNCBlockRequestMsg:
+		return pm.handleSYNCblockRequest(p, msg)
+	case protocol.SYNCBlockResponseMsg:
+		return pm.handleSYNCblockResponse(p, msg)
+	case protocol.SYNCBlockResponseACKMsg:
+		return pm.handleSYNCblockResponseACK(p, msg)
+	case protocol.BlocksBySliceMsg:
 		return pm.handleBlocksBySlice(p, msg)
-	case GetBlockByHashMsg:
+	case protocol.GetBlockByHashMsg:
 		return pm.handleGetBlockByHash(p, msg)
-	case NewBlockHashMsg:
+	case protocol.NewBlockHashMsg:
 		return pm.handleNewBlockAnnounce(p, msg)
-	case NewBlockMsg:
+	case protocol.NewBlockMsg:
 		return pm.handleNewBlocks(p, msg)
 
 	}
@@ -459,7 +467,7 @@ func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 	var timeslice uint64
 	err := msg.Decode(&timeslice)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< LAST-MAINBLOCK-TIMESLICE", "timeslice", timeslice)
 	// 将回复结果递送到同步器
@@ -473,14 +481,14 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 	var targetSlice uint64 = 0
 	err := msg.Decode(&targetSlice)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< GET-BLOCK-HASH-BY-TIMESLICE", "timeslice", targetSlice)
 
 	var hashes []common.Hash
 	hashes, err = pm.blkstorage.GetBlockHashByTmSlice(targetSlice)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 
 	err = p.SendBlockHashes(targetSlice, hashes)
@@ -491,10 +499,10 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 // 根据时间片获取对应所有区块hash消息处理
 func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 
-	var response GetBlockHashBySliceResp
+	var response protocol.GetBlockHashBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< BLOCK-HASH-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Hashes))
 	// 将回复结果递送到同步器
@@ -505,10 +513,10 @@ func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 // 根据区块hash返回对应区块（字节流）消息处理
 func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 
-	var req GetBlockDataBySliceReq
+	var req protocol.GetBlockDataBySliceReq
 	err := msg.Decode(&req)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 
 	if len(req.Hashes) <= 0 {
@@ -519,7 +527,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req.Hashes)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	if len(blocks) <= 0 {
 		return nil
@@ -532,10 +540,10 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 
 func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
 
-	var response GetBlockDataBySliceResp
+	var response protocol.GetBlockDataBySliceResp
 	err := msg.Decode(&response)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< BLOCK-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Blocks))
 	// 将回复结果递送到同步器
@@ -547,7 +555,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 	var req []common.Hash
 	err := msg.Decode(&req)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 
 	if len(req) <= 0 {
@@ -560,7 +568,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 	var blocks [][]byte
 	blocks, err = pm.blkstorage.GetBlocks(req)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	if len(blocks) <= 0 {
 		return nil
@@ -575,7 +583,7 @@ func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
 	var response [][]byte
 	err := msg.Decode(&response)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< NEW-BLOCK(response/sync)", "size", len(response))
 	return pm.synchroniser.DeliverNewBlockResp(p.id, response)
@@ -586,12 +594,42 @@ func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
 	var response common.Hash
 	err := msg.Decode(&response)
 	if err != nil {
-		return errResp(ErrDecode, "msg %v: %v", msg, err)
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< NEW-BLOCK-HASH", "hash", response.String())
 	pm.synchroniser.MarkAnnounced(response, p.NodeID())
 	pm.blockPoolEvent.Post(&core.AnnounceEvent{Hash: response})
 	return nil
+}
+
+func (pm *ProtocolManager) handleSYNCblockRequest(p *peer, msg p2p.Msg) error {
+	var request protocol.SYNCBlockRequest
+	err := msg.Decode(&request)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< SYNC-BLOCK-REQUEST", "timeslice", request.BeginPoint.Timeslice, "index", request.BeginPoint.Index)
+	return pm.synchroniser.DeliverSYNCBlockRequest(p.id, &request.BeginPoint)
+}
+
+func (pm *ProtocolManager) handleSYNCblockResponse(p *peer, msg p2p.Msg) error {
+	var response protocol.SYNCBlockResponse
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< SYNC-BLOCK-RESPONSE", "size", len(response.TSBlocks))
+	return pm.synchroniser.DeliverSYNCBlockResponse(p.id, &response)
+}
+
+func (pm *ProtocolManager) handleSYNCblockResponseACK(p *peer, msg p2p.Msg) error {
+	var response protocol.SYNCBlockResponseACK
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< SYNC-BLOCK-RESPONSE-ACK", "timeslice", response.ConfirmPoint.Timeslice, "index", response.ConfirmPoint.Index)
+	return pm.synchroniser.DeliverSYNCBlockACKResponse(p.id, &response)
 }
 
 /* func (pm *ProtocolManager) relayBlock(event *core.RelayBlocksEvent) error {
