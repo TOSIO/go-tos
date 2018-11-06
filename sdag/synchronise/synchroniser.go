@@ -335,7 +335,7 @@ func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.
 	if res, ok := packet.(*SYNCBlockRespPacket); ok {
 		if res.response != nil {
 			end = res.response.End
-
+			stat.EndTS = res.response.CurEndTimeslice
 			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
 			for _, tsblocks := range res.response.TSBlocks {
 				if maxTSIndex.Timeslice < tsblocks.TSIndex.Timeslice {
@@ -413,6 +413,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 		nodeID := ack.NodeID()
 		count := 0
 		response := protocol.SYNCBlockResponse{TSBlocks: make([]*protocol.TimesliceBlocks, 0)}
+		response.CurEndTimeslice = curEndPoint
 		endTimeslice := ack.response.ConfirmPoint.Timeslice
 
 		if ack.response != nil {

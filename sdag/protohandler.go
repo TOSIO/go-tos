@@ -183,7 +183,7 @@ func (pm *ProtocolManager) loop() {
 				pm.stat.Syncstat = event
 				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
 					"startTS", event.BeginTS,
-					"endTS", event.EndTS,
+					"endTS(cur)", event.EndTS,
 					"beginTime", event.BeginTime,
 					"endTime", event.EndTime,
 					"accumlatedNum", event.AccumulateSYNCNum,
@@ -362,7 +362,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	defer pm.removePeer(p.id)
 
 	p.Log().Debug("TOS handshake is done", "Node.LastTempMBTS", p.lastTempMBTimeslice, "local.LastTempMBTS", lastTmpMBTimeslice,
-		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number)
+		"node.LastMBNum", p.lastMainBlockNum, "local.LastMBNum", pm.mainChain.GetMainTail().Number,
+		"node.Diff", p.lastCumulatedDiff.String(), "local.Diff", pm.mainChain.GetMainTail().CumulativeDiff.String())
 
 	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
 		pm.stat.Status = STAT_SYNCING

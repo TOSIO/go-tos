@@ -221,7 +221,7 @@ func (p *peer) AsyncSendBlock(block []byte) {
 
 func (p *peer) SendSYNCBlockRequest(timeslice uint64, index uint) error {
 	err := p2p.Send(p.rw, protocol.SYNCBlockRequestMsg, protocol.SYNCBlockRequest{BeginPoint: protocol.TimesliceIndex{Timeslice: timeslice, Index: index}})
-	p.Log().Debug(">> SYNC-BLOCK-REQUEST", "err", err)
+	p.Log().Debug(">> SYNC-BLOCK-REQUEST", "timeslice", timeslice, "index", index, "err", err)
 	return err
 }
 
@@ -233,6 +233,6 @@ func (p *peer) SendSYNCBlockResponse(packet *protocol.SYNCBlockResponse) error {
 
 func (p *peer) SendSYNCBlockResponseACK(timeslice uint64, index uint) error {
 	err := p2p.Send(p.rw, protocol.SYNCBlockResponseACKMsg, protocol.SYNCBlockResponseACK{ConfirmPoint: protocol.TimesliceIndex{Timeslice: timeslice, Index: index}})
-	p.Log().Debug(">> SYNC-BLOCK-RESPONSE-ACK", "err", err)
+	p.Log().Debug(">> SYNC-BLOCK-RESPONSE-ACK", "timeslice", timeslice, "index", index, "err", err)
 	return err
 }

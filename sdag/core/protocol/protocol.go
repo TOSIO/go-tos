@@ -125,8 +125,9 @@ type SYNCBlockRequest struct {
 }
 
 type SYNCBlockResponse struct {
-	TSBlocks []*TimesliceBlocks
-	End      bool
+	TSBlocks        []*TimesliceBlocks
+	CurEndTimeslice uint64
+	End             bool
 }
 
 /* type SYNCBlockEnd struct {
