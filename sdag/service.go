@@ -72,6 +72,7 @@ type Sdag struct {
 
 	lock sync.RWMutex
 	sct  *node.ServiceContext
+
 	// Protects the variadic fields (e.g. gas price and etherbase)
 }
 

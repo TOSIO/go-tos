@@ -445,3 +445,26 @@ func NewPrivateAdminAPI(s *Sdag) *PrivateAdminAPI {
 func (api *PrivateAdminAPI) Do(data int) int {
 	return data
 }
+
+func (api *PublicSdagAPI) QueryWallet(jsonstring string) string {
+	if jsonstring != "ok" {
+		fmt.Printf("accept params error")
+	}
+
+	var wallet = make([]string, 0)
+
+	tempWallets := api.s.accountManager.Wallets()
+
+	for _, temp := range tempWallets {
+		tempA := temp.Accounts()
+		for _, temp2 := range tempA {
+			wallet = append(wallet, temp2.Address.String())
+		}
+	}
+
+	walletsMsg, err := json.Marshal(wallet)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+	return string(walletsMsg)
+}

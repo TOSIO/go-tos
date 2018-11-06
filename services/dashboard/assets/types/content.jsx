@@ -42,8 +42,10 @@ export type General = {
 export type NodeMsg = {
 	nodeId: ?string,
     localnodeId: ?string,
-    connectnumber: ?string
+    connectnumber: ?string,
+	querywallet:    ?string,
 }
+
 
 export type Home = {
 	/* TODO (kurkomisi) */
