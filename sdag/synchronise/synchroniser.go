@@ -323,6 +323,8 @@ loop:
 				}
 			}
 			waitTimeout = time.After(s.requestTTL())
+		case <-s.cancelCh:
+			break loop
 		}
 	}
 	s.done <- struct{}{}
