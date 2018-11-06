@@ -33,9 +33,10 @@ type Message struct {
 }
 
 type NodeMessage struct {
-	NodeId string `json:"nodeId,omitempty"`
-	LocalNodeID string `json:"localnodeId,omitempty"`
+	NodeId        string `json:"nodeId,omitempty"`
+	LocalNodeID   string `json:"localnodeId,omitempty"`
 	ConnectNumber string `json:"connectnumber,omitempty"`
+	QueryWallet   string `json:"querywallet,omitempty"`
 }
 
 //type p2pMessage struct

@@ -318,6 +318,7 @@ func (db *Dashboard) collectData() {
 			nodeId := NodeMessagefun()
 			localnodeId := LocalNodeMessagefun()
 			connectnumber := GetConnectNumber()
+			querywallet := GetAllWallet()
 			var (
 				curNetworkIngress = collectNetworkIngress()
 				curNetworkEgress  = collectNetworkEgress()
@@ -402,6 +403,7 @@ func (db *Dashboard) collectData() {
 					nodeId,
 					localnodeId,
 					connectnumber,
+					querywallet,
 				},
 			})
 
@@ -470,9 +472,9 @@ func NodeMessagefun() string {
 
 func LocalNodeMessagefun() string {
 	var (
-		localnodeIdstring     string
-		urlString        = "http://localhost:8545"
-		jsonStringFormat = `
+		localnodeIdstring string
+		urlString         = "http://localhost:8545"
+		jsonStringFormat  = `
 {
 "jsonrpc":"2.0",
 "method":"sdag_getLocalNodeID",
@@ -516,12 +518,58 @@ func LocalNodeMessagefun() string {
 
 func GetConnectNumber() string {
 	var (
-		localnodeIdstring     string
-		urlString        = "http://localhost:8545"
-		jsonStringFormat = `
+		localnodeIdstring string
+		urlString         = "http://localhost:8545"
+		jsonStringFormat  = `
 {
 "jsonrpc":"2.0",
 "method":"sdag_getConnectNumber",
+"params":["ok"],
+"id":1
+}`
+	)
+	type resultInfo struct {
+		Jsonrpc string
+		Id      uint64
+		//	Error   resultError
+		Result string
+	}
+	/*	type resultNodeId struct {
+			Realid string
+		}
+	*/
+	jsonString := fmt.Sprintf(jsonStringFormat)
+	NodeIdMsg, err := httpSend.SendHttp(urlString, jsonString)
+	if err != nil {
+		fmt.Printf("SendHttp error")
+	}
+
+	var result resultInfo
+	err = json.Unmarshal(NodeIdMsg, &result)
+	if err != nil {
+		fmt.Println("Unmarshal error:", err)
+	}
+	//var resultNode resultNodeId
+	/*	err = json.Unmarshal(NodeIdMsg.Result, &resultNode)
+		if err != nil {
+			fmt.Println("Unmarshal error:", err)
+		}*/
+	localnodeIdstring = result.Result
+	if localnodeIdstring == "" {
+		localnodeIdstring = "connection is none"
+	}
+	return localnodeIdstring
+
+}
+
+func GetAllWallet() string {
+	var (
+		localnodeIdstring string
+		urlString         = "http://localhost:8545"
+		jsonStringFormat  = `
+{
+"jsonrpc":"2.0",
+"method":"sdag_queryWallet",
 "params":["ok"],
 "id":1
 }`
