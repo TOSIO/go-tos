@@ -258,13 +258,15 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 			for _, hash := range currentList { // process descendants by layer
 				isolated := p.IsolatedBlockMap[hash]
 				// verify ancestors
-				for i, ancestor := range isolated.Links {
-					if marker, ok := ancestorCache[ancestor]; ok && marker != nil {
+				for i := 0; i < len(isolated.Links); {
+					if marker, ok := ancestorCache[isolated.Links[i]]; ok && marker != nil {
 						if !marker.verified {
 							p.verifyAncestor(marker.block)
 							marker.verified = true
 						}
 						isolated.Links = append(isolated.Links[:i], isolated.Links[i+1:]...)
+					} else {
+						i++
 					}
 				}
 
