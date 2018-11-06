@@ -176,6 +176,9 @@ func (m *Miner) StartInit() {
 
 //miner work
 func work(m *Miner) {
+	if m.mineinfo.PrivateKey==nil{
+		return
+	}
 	m.wg.Add(1)
 	atomic.StoreInt32(&m.mining, 1)
 
