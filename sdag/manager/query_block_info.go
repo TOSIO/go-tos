@@ -98,9 +98,8 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	blockStatus := q.GetUserBlockStatus(h, hash)
 
-
-	if Block.GetType() == types.BlockTypeTx{
-		TxBlock,ok:=Block.(*types.TxBlock)
+	if Block.GetType() == types.BlockTypeTx {
+		TxBlock, ok := Block.(*types.TxBlock)
 		if !ok {
 			return ""
 		}
@@ -157,6 +156,97 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	return string(jsonData)
 }
 
+func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) string {
+
+	//commonHash := common.HexToHash(hash)
+
+	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
+	//BlockInfo := storage.ReadBlock(h, hash)
+
+	if err != nil {
+		log.Error("Read Txblock Info fail")
+		return "Query is not possible"
+	}
+
+	Block := storage.ReadBlock(h, hash)
+
+	BlockSend, err := Block.GetSender()
+	if err != nil {
+		log.Error("Query Block Sender Fail")
+	}
+
+	blockStatus := q.GetUserBlockStatus(h, hash)
+
+	if Block.GetType() == types.BlockTypeTx {
+		TxBlock, ok := Block.(*types.TxBlock)
+		if !ok {
+			return ""
+		}
+
+		var tempReceiver common.Address
+		var tempAmount *big.Int
+
+		for _, temp := range TxBlock.Outs {
+			tempReceiver = temp.Receiver
+			tempAmount = temp.Amount
+		}
+
+		Data0 := struct {
+			TxBlockInfo
+			types.MainBlockInfo
+		}{
+			TxBlockInfo{
+				Status:              blockStatus,
+				ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
+				Difficulty:          mutableInfo.Difficulty,
+				CumulativeDiff:      mutableInfo.CumulativeDiff,
+				MaxLinkHash:         mutableInfo.MaxLinkHash,
+				Links:               Block.GetLinks(),
+				Time:                Block.GetTime(),
+				BlockHash:           Block.GetHash(),
+				Amount:              tempAmount,
+				Receiver:            tempReceiver,
+				Sender:              BlockSend,
+				GasPrice:            Block.GetGasPrice(),
+				GasLimit:            Block.GetGasLimit(),
+			},
+			*mainBlockInfo,
+		}
+
+		jsonData, err := json.Marshal(Data0)
+		if err != nil {
+			return ""
+		}
+
+		return string(jsonData)
+	}
+
+	Data0 := struct {
+		PublicBlockInfo
+		types.MainBlockInfo
+	}{
+		PublicBlockInfo{
+			Status:              blockStatus,
+			ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
+			Difficulty:          mutableInfo.Difficulty,
+			CumulativeDiff:      mutableInfo.CumulativeDiff,
+			MaxLinkHash:         mutableInfo.MaxLinkHash,
+			Links:               Block.GetLinks(),
+			Time:                Block.GetTime(),
+			BlockHash:           Block.GetHash(),
+			Sender:              BlockSend,
+		},
+		*mainBlockInfo,
+	}
+
+	jsonData, err := json.Marshal(Data0)
+	if err != nil {
+		return ""
+	}
+
+	return string(jsonData)
+}
+
 func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) string {
 
 	Slice := utils.GetMainTime(Time)
@@ -167,7 +257,7 @@ func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64
 	}
 	mainHash := mainInfo.Hash
 
-	MainBlockInfo := q.GetBlockInfo(h, mainHash)
+	MainBlockInfo := q.GetBlockAndMainInfo(h, mainHash, mainInfo)
 
 	return MainBlockInfo
 }

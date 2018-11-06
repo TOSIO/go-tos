@@ -33,7 +33,7 @@ func (mainChain *MainChain) initTail() error {
 	if err != nil {
 		return err
 	}
-	tailMainBlockInfo, err := storage.ReadTailMainBlockInfo(mainChain.db)
+	tailMainBlockInfo, err := storage.ReadTailBlockInfo(mainChain.db)
 	if err != nil {
 		log.Info("generate genesis")
 		genesisBlock, err := mainChain.genesis.Genesis()
@@ -47,62 +47,41 @@ func (mainChain *MainChain) initTail() error {
 	}
 	mainChain.genesis.GetGenesisHash()
 	mainChain.Tail = *tailMainBlockInfo
+	tailMainBlockInfo, err = storage.ReadTailMainBlockInfo(mainChain.db)
+	if err != nil {
+		return err
+	}
+	mainChain.MainTail = *tailMainBlockInfo
 	err = mainChain.setPerv()
 	return err
 }
 
 func (mainChain *MainChain) setPerv() error {
 	hash := mainChain.Tail.Hash
-	notSelf := false
-	PervTailIsFilled := false
-	Number := mainChain.Tail.Number
-	count := 0
-	for {
-		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
-		if err != nil {
-			return err
-		}
 
-		if notSelf {
-			Number--
-			if !PervTailIsFilled {
-				block := storage.ReadBlock(mainChain.db, hash)
-				if block == nil {
-					return fmt.Errorf("ReadBlock err")
-				}
-				block.SetMutableInfo(mutableInfo)
+	mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
+	if err != nil {
+		return err
+	}
 
-				mainChain.PervTail.Hash = hash
-				mainChain.PervTail.Time = block.GetTime()
-				mainChain.PervTail.Number = Number
-				mainChain.PervTail.CumulativeDiff = block.GetCumulativeDiff()
-				PervTailIsFilled = true
-			}
-		}
-		if (mutableInfo.Status & types.BlockMain) != 0 {
-			block := storage.ReadBlock(mainChain.db, hash)
-			if block == nil {
-				return fmt.Errorf("ReadBlock err")
-			}
-			block.SetMutableInfo(mutableInfo)
+	if (mutableInfo.Status & types.BlockMain) != 0 {
+		mainChain.PervTail = mainChain.Tail
+		return nil
+	}
+	hash = mutableInfo.MaxLinkHash
+	mutableInfo, err = storage.ReadBlockMutableInfo(mainChain.db, hash)
+	if err != nil {
+		return err
+	}
 
-			mainChain.MainTail.Hash = hash
-			mainChain.MainTail.Time = block.GetTime()
-			mainChain.MainTail.Number = Number
-			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
-			break
-		}
-		hash = mutableInfo.MaxLinkHash
-		notSelf = true
-		count++
+	block := storage.ReadBlock(mainChain.db, hash)
+	if block == nil {
+		return fmt.Errorf("ReadBlock err")
 	}
-	log.Warn("setPerv loop", "count", count)
-	if mainChain.MainTail.Hash == (common.Hash{}) {
-		return fmt.Errorf("not found MainTail")
-	}
-	if mainChain.PervTail.Hash == (common.Hash{}) {
-		mainChain.PervTail = mainChain.MainTail
-	}
+	block.SetMutableInfo(mutableInfo)
+	mainChain.PervTail.Hash = block.GetHash()
+	mainChain.PervTail.Time = block.GetTime()
+	mainChain.PervTail.CumulativeDiff = block.GetCumulativeDiff()
 	return nil
 }
 
@@ -195,12 +174,12 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 		mainChain.tailRWLock.Lock()
 		if !IsTheSameTimeSlice(mainChain.Tail.Time, block.GetTime()) {
 			mainChain.PervTail = mainChain.Tail
-			mainChain.Tail.Number++
 		}
 		mainChain.Tail.Hash = block.GetHash()
 		mainChain.Tail.CumulativeDiff = block.GetCumulativeDiff()
 		mainChain.Tail.Time = block.GetTime()
-		err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.Tail)
+		mainChain.Tail.Number = 0
+		err := storage.WriteTailBlockInfo(mainChain.db, &mainChain.Tail)
 		if err != nil {
 			log.Error(err.Error())
 		}
@@ -303,34 +282,28 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 }
 
 //Find the main block that can confirm other blocks
-func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types.Block, uint64, uint64, error) {
+func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types.Block, uint64, error) {
 	tail := mainChain.GetTail()
-	number := tail.Number
 	hash := tail.Hash
 	now := utils.GetTimeStamp()
 	var (
 		canConfirm        bool
-		notSelf           bool
 		listBlock         []types.Block
 		lastMainTimeSlice uint64
 	)
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
-			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlockMutableInfo Not found. hash=%s", hash.String())
+			return nil, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlockMutableInfo Not found. hash=%s", hash.String())
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
-			return nil, 0, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
+			return nil, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
 		}
 		block.SetMutableInfo(mutableInfo)
 
 		if !canConfirm && TimeSliceDifference(now, block.GetTime()) > params.ConfirmBlock {
 			canConfirm = true
-		}
-
-		if notSelf {
-			number--
 		}
 
 		if canConfirm {
@@ -342,22 +315,24 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 			log.Debug("findTheMainBlockThatCanConfirmOtherBlocks", "hash", block.GetHash().String(), "block", block)
 		}
 		hash = block.GetMutableInfo().MaxLinkHash
-		notSelf = true
 	}
-	return listBlock, lastMainTimeSlice, number + 1, nil
+	return listBlock, lastMainTimeSlice, nil
 }
 
 func (mainChain *MainChain) Confirm() error {
-	listMainBlock, lastMainTimeSlice, blockNumber, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks()
+	listMainBlock, lastMainTimeSlice, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks()
 	if err != nil {
 		return err
 	}
+	MainTail := mainChain.GetMainTail()
+	number := MainTail.Number
 	for _, block := range listMainBlock {
 		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
+			number--
 			mainChain.RollBackStatus(block.Hash)
 		}
 	}
-
+	number++
 	if len(listMainBlock) == 0 {
 		return nil
 	}
@@ -387,7 +362,7 @@ func (mainChain *MainChain) Confirm() error {
 
 		log.Debug("the main block confirm finished", "confirmReward.userReward", confirmReward.userReward, "confirmReward.minerReward", confirmReward.minerReward)
 
-		if err := CalculatingMinerReward(block, blockNumber, confirmReward, state); err != nil {
+		if err := CalculatingMinerReward(block, number, confirmReward, state); err != nil {
 			log.Error(err.Error())
 		}
 
@@ -409,12 +384,15 @@ func (mainChain *MainChain) Confirm() error {
 			log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
 			mainChain.MainTail.Hash = block.GetHash()
 			mainChain.MainTail.Time = block.GetTime()
-			mainChain.MainTail.Number = blockNumber
+			mainChain.MainTail.Number = number
 			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
+			if err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.MainTail); err != nil {
+				log.Error("Confirm WriteTailMainBlockInfo", "error", err)
+			}
 			log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
 			mainChain.mainTailRWLock.Unlock()
 		}
-		blockNumber++
+		number++
 	}
 	return nil
 }

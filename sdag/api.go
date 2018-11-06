@@ -29,17 +29,17 @@ import (
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
-	"strconv"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
 
-	"github.com/TOSIO/go-tos/sdag/transaction"
 	"github.com/TOSIO/go-tos/node"
+	"github.com/TOSIO/go-tos/sdag/transaction"
 )
 
 var (
@@ -98,7 +98,7 @@ type WalletAdress struct {
 }
 
 type RpcMinerInfo struct {
-	Address string
+	Address  string
 	Password string
 }
 
@@ -146,9 +146,9 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {
-	if api.s.Status().Status != STAT_WORKING {
-		return fmt.Sprintf(`{"Error":"current status cannot be traded. status=%d","Hash":""}`, api.s.Status().Status)
-	}
+	//if api.s.Status().Status != STAT_WORKING {
+	//	return fmt.Sprintf(`{"Error":"current status cannot be traded. status=%d","Hash":""}`, api.s.Status().Status)
+	//}
 	result := api.transaction(jsonString)
 	byteString, err := json.Marshal(result)
 	if err != nil {
@@ -263,7 +263,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 		log.Error("JSON unmarshaling failed: %s", err)
 		return err.Error()
 	}
-	if rpcGenerKeyStore.Password==""{
+	if rpcGenerKeyStore.Password == "" {
 		return "password is empty"
 	}
 	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
@@ -290,12 +290,12 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 	}
 
 	//Write to File
-	pathtmp := filepath.Join(api.s.sct.ResolvePath("keystore"),"")
+	pathtmp := filepath.Join(api.s.sct.ResolvePath("keystore"), "")
 	errmakefile := os.MkdirAll(pathtmp, 0777)
 	if errmakefile != nil {
 		return errmakefile.Error()
 	}
-	path := filepath.Join(pathtmp,"keystore%d")
+	path := filepath.Join(pathtmp, "keystore%d")
 	keyFilePath := fmt.Sprintf(path, uint64(time.Now().UnixNano())/1e6)
 	if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 		fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
@@ -341,17 +341,16 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	if jsonstring != "ok" {
 		fmt.Printf("accept params error")
 	}
-	var localIDAndIP  = make([]string, 0)
+	var localIDAndIP = make([]string, 0)
 	nodeIdMessage := api.s.nodeID
 	nodeIpMessage, ok := api.s.LocalNodeIP()
 	//---------------
-	var temp  = node.DefaultConfig
+	var temp = node.DefaultConfig
 	nodePortMessage := temp.P2P.ListenAddr
 
 	if !ok {
 		return "Query IP Fail"
 	}
-
 	localIDAndIP = append(localIDAndIP, "IP: "+nodeIpMessage+nodePortMessage)
 	localIDAndIP = append(localIDAndIP, "ID: "+nodeIdMessage)
 	nodeIdMsg, err := json.Marshal(localIDAndIP)
@@ -395,20 +394,20 @@ func (api *PublicSdagAPI) StartMiner(jsonString string) string {
 		log.Error("JSON unmarshaling failed: %s", err)
 		return err.Error()
 	}
-	if rpcMinerInfo.Address==""{
+	if rpcMinerInfo.Address == "" {
 		return "address is empty"
 	}
-	if rpcMinerInfo.Password==""{
+	if rpcMinerInfo.Password == "" {
 		return "password is empty"
 	}
-	address :=common.HexToAddress(rpcMinerInfo.Address)
-	privatekey,err :=api.s.accountManager.FindPrivateKey(address,rpcMinerInfo.Password)
-	if err!=nil{
+	address := common.HexToAddress(rpcMinerInfo.Address)
+	privatekey, err := api.s.accountManager.FindPrivateKey(address, rpcMinerInfo.Password)
+	if err != nil {
 		log.Error("get private key error", err)
 		return err.Error()
 	}
 	api.s.config.Mining = true
-	api.s.miner.Start(rpcMinerInfo.Address,privatekey)
+	api.s.miner.Start(rpcMinerInfo.Address, privatekey)
 	return "start ok"
 }
 

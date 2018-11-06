@@ -155,10 +155,29 @@ func WriteMainBlock(db Writer, mb *types.MainBlockInfo, slice uint64) error {
 	return nil
 }
 
-func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
-	data, err := db.Get(tailMainBlockInfoKey())
+func ReadTailBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
+	data, err := db.Get(tailChainInfoKey())
 	if err != nil {
-		log.Error("Read Tail Main Block Info Failed", "err", err)
+		log.Error("read tail temp main block info failed", "err", err)
+		return nil, err
+	}
+
+	return new(types.TailMainBlockInfo).UnRlp(data)
+}
+
+func WriteTailBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
+	if err := db.Put(tailChainInfoKey(), tm.Rlp()); err != nil {
+		log.Error("write tail temp main block info failed", "err", err)
+		return err
+	}
+
+	return nil
+}
+
+func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
+	data, err := db.Get(tailMainChainInfoKey())
+	if err != nil {
+		log.Error("read tail main block info failed", "err", err)
 		return nil, err
 	}
 
@@ -166,8 +185,8 @@ func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
 }
 
 func WriteTailMainBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
-	if err := db.Put(tailMainBlockInfoKey(), tm.Rlp()); err != nil {
-		log.Error("Write Tail Main Block Info Failed", "err", err)
+	if err := db.Put(tailMainChainInfoKey(), tm.Rlp()); err != nil {
+		log.Error("write tail main block info failed", "err", err)
 		return err
 	}
 
