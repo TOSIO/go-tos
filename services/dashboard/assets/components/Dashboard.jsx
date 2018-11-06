@@ -110,6 +110,7 @@ const defaultContent: () => Content = () => ({
 			nodeId:"",
             localnodeId:"",
 			connectnumber:"",
+			querywallet:"",
 		},
 });
 
@@ -140,6 +141,7 @@ const updaters = {
             nodeId:replacer,
             localnodeId:replacer,
 			connectnumber:replacer,
+            querywallet:replacer,
         },
 
 		};

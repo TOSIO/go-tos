@@ -93,7 +93,12 @@ class Main extends Component<Props> {
         	a = a.replace(/"/g, '')
 
          var b = this.props.content.nodeMsg.localnodeId;
+        b = b.replace(/,/g, ' ----- ')
           b = b.replace(/"/g, '')
+
+		var c = this.props.content.nodeMsg.querywallet;
+          c = c.replace(/,/g, ' ----- ')
+        c = c.replace(/"/g, ' \n ')
 
         const {
 			classes, active, content, shouldUpdate,
@@ -106,6 +111,7 @@ class Main extends Component<Props> {
 				<h3>本节点的ID：{b}</h3>
 				<h3>连接个数：{this.props.content.nodeMsg.connectnumber}</h3>
 				<h3>连接到的节点ID和IP：{a}</h3>
+				<h3>所有钱包地址: {c}</h3>
 
             </div>
                 break;

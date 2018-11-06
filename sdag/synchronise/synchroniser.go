@@ -425,11 +425,16 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 
 		if ack.response != nil {
 			remain := false
+			var cache *timesliceHash
+			var existed bool
 			s.cachelock.RLock()
-			if cache, existed := s.sliceCache[nodeID]; existed &&
+			cache, existed = s.sliceCache[nodeID]
+			s.cachelock.RUnlock()
+
+			if existed &&
 				cache != nil &&
 				cache.timeslice == ack.response.ConfirmPoint.Timeslice {
-				s.cachelock.RUnlock()
+
 				pos := int(ack.response.ConfirmPoint.Index)
 
 				if len(cache.hashes) > pos { // handle the remain block since last sync
@@ -453,9 +458,9 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 				} /*  else {
 					forwardPack(ack.response.ConfirmPoint.Timeslice)
 				} */
-			} else {
+			} /* else {
 				s.cachelock.RUnlock()
-			}
+			} */
 			//endTimeslice = forwardPack(s, nodeID, ack.response.ConfirmPoint.Timeslice, &response, count)
 			//endTimeslice =
 
@@ -515,12 +520,12 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 }
 
 func (s *Synchroniser) Clear(nodeID string) {
-	/* 	s.cachelock.Lock()
-	   	if _, ok := s.sliceCache[nodeID]; ok {
-	   		delete(s.sliceCache, nodeID)
-	   	}
-	   	s.cancelLock.Unlock()
-	   	log.Debug("Clear node", "nodeID", nodeID) */
+	s.cachelock.Lock()
+	if _, ok := s.sliceCache[nodeID]; ok {
+		delete(s.sliceCache, nodeID)
+	}
+	s.cachelock.Unlock()
+	log.Debug("Clear node", "nodeID", nodeID)
 }
 
 func (s *Synchroniser) synchroinise(peer core.Peer, beginTimeslice uint64, endTimeslice uint64, blockNum uint64) {
