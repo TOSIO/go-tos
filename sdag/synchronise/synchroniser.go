@@ -490,7 +490,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 							tsblocks.TSIndex.Index = uint(len(hashes))
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 							count += len(hashes)
-							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", cache.timeslice,
+							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
 							continue
 						}
@@ -506,7 +506,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 
-							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", cache.timeslice,
+							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPos", len(blocks), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
 						} else {
 							log.Debug("Error load block", "nodeID", nodeID, "timeslice", endTimeslice)
