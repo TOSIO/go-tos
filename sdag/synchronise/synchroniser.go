@@ -437,7 +437,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 
 				pos := int(ack.response.ConfirmPoint.Index)
 
-				if len(cache.hashes) > pos { // handle the remain block since last sync
+				if len(cache.hashes) > pos+1 { // handle the remain block since last sync
 					tsblocks := &protocol.TimesliceBlocks{}
 					tsblocks.TSIndex.Timeslice = ack.response.ConfirmPoint.Timeslice
 					tsblocks.TSIndex.Index = ack.response.ConfirmPoint.Index
@@ -457,6 +457,9 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					if pos < len(cache.hashes) {
 						remain = true
 					}
+					log.Debug("Handle packing(remain)", "nodeID", nodeID, "timeslice", cache.timeslice,
+						"total", len(cache.hashes), "curPos", pos-1, "curPacking", len(tsblocks.Blocks), "remain", len(cache.hashes)-pos-1)
+
 					response.TSBlocks = append(response.TSBlocks, tsblocks)
 				} /*  else {
 					forwardPack(ack.response.ConfirmPoint.Timeslice)
@@ -481,11 +484,14 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						for _, hash := range hashes {
 							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hash.String())
 						}
+
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(len(hashes))
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 							count += len(hashes)
+							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", cache.timeslice,
+								"total", len(hashes), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
 							continue
 						}
 					} else {
@@ -495,10 +501,13 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						for i := 0; i < maxSYNCCapLimit-count; i++ {
 							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hashes[i].String())
 						}
-						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
+						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count+1]); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
+
+							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", cache.timeslice,
+								"total", len(hashes), "curPos", len(blocks), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
 						} else {
 							log.Debug("Error load block", "nodeID", nodeID, "timeslice", endTimeslice)
 						}
