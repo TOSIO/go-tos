@@ -10,7 +10,6 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/protocol"
 
 	"github.com/TOSIO/go-tos/devbase/event"
-	"github.com/TOSIO/go-tos/devbase/utils"
 
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"github.com/TOSIO/go-tos/sdag/synchronise"
@@ -322,8 +321,8 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if err != nil {
 		return err
 	}
-	firstMBTimeslice := uint64(0)
-	first, _, err := pm.mainChain.GetNextMain(genesis)
+	//firstMBTimeslice := uint64(0)
+	/* first, _, err := pm.mainChain.GetNextMain(genesis)
 	if err == nil {
 		//return err
 		firstMBlock := pm.blkstorage.GetBlock(first)
@@ -339,10 +338,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		} else {
 			p.Log().Debug("Failed to get the genesis-block")
 		}
-	}
+	} */
 
 	lastTmpMBTimeslice := pm.mainChain.GetLastTempMainBlkSlice()
-	if err := p.Handshake(pm.networkID, genesis, firstMBTimeslice, lastTmpMBTimeslice,
+	if err := p.Handshake(pm.networkID, genesis /* firstMBTimeslice,  */, lastTmpMBTimeslice,
 		pm.mainChain.GetMainTail().Number, pm.mainChain.GetMainTail().CumulativeDiff); err != nil {
 		p.Log().Debug("TOS handshake failed", "err", err)
 		return err
@@ -369,10 +368,10 @@ func (pm *ProtocolManager) handle(p *peer) error {
 	if p.lastTempMBTimeslice > lastTmpMBTimeslice && p.lastMainBlockNum > pm.mainChain.GetMainTail().Number {
 		pm.stat.Status = STAT_SYNCING
 		pm.syncEvent.Post(&core.NewSYNCTask{
-			NodeID:              p.NodeID(),
-			LastCumulatedDiff:   *p.lastCumulatedDiff,
-			LastMainBlockNum:    p.lastMainBlockNum,
-			FirstMBTimeslice:    p.firstMBTimeslice,
+			NodeID:            p.NodeID(),
+			LastCumulatedDiff: *p.lastCumulatedDiff,
+			LastMainBlockNum:  p.lastMainBlockNum,
+			//FirstMBTimeslice:    p.firstMBTimeslice,
 			LastTempMBTimeslice: p.lastTempMBTimeslice,
 		})
 		p.Log().Debug("Post SYNCTask", "lastCumulatedDiff", p.lastCumulatedDiff, "lastMainBlockNum", p.lastMainBlockNum, "lastTS", p.lastTempMBTimeslice)

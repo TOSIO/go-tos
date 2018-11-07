@@ -39,7 +39,7 @@ type peer struct {
 
 	//head common.Hash
 	//td   *big.Int
-	firstMBTimeslice    uint64
+	//firstMBTimeslice    uint64
 	lastTempMBTimeslice uint64
 	lastMainBlockNum    uint64
 	lastCumulatedDiff   *big.Int
@@ -82,7 +82,7 @@ func (p *peer) broadcast() {
 	}
 }
 
-func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, ts uint64, num uint64, diff *big.Int) error {
+func (p *peer) Handshake(network uint64, genesis common.Hash /* firstMBTS uint64,  */, ts uint64, num uint64, diff *big.Int) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
 	var status protocol.StatusData
@@ -91,7 +91,7 @@ func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, 
 		errc <- p2p.Send(p.rw, protocol.StatusMsg, &protocol.StatusData{
 			ProtocolVersion: uint32(p.version),
 			NetworkId:       network,
-			CurFistMBTS:     firstMBTS,
+			/* CurFistMBTS:     firstMBTS, */
 			CurLastTempMBTS: ts,
 			CurMainBlockNum: num,
 			CumulateDiff:    diff,
@@ -113,7 +113,7 @@ func (p *peer) Handshake(network uint64, genesis common.Hash, firstMBTS uint64, 
 			return p2p.DiscReadTimeout
 		}
 	}
-	p.firstMBTimeslice = status.CurFistMBTS
+	//p.firstMBTimeslice = status.CurFistMBTS
 	p.lastTempMBTimeslice = status.CurLastTempMBTS
 	p.lastMainBlockNum = status.CurMainBlockNum
 	p.lastCumulatedDiff = status.CumulateDiff

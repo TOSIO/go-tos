@@ -52,8 +52,8 @@ type GetBlocksEvent struct {
 }
 
 type NewSYNCTask struct {
-	NodeID              string
-	FirstMBTimeslice    uint64
+	NodeID string
+	//FirstMBTimeslice    uint64
 	LastTempMBTimeslice uint64
 	LastMainBlockNum    uint64
 	LastCumulatedDiff   big.Int

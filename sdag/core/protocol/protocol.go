@@ -86,7 +86,7 @@ type StatusData struct {
 	//CurrentBlock    common.Hash
 
 	CurMainBlockNum uint64
-	CurFistMBTS     uint64
+	//CurFistMBTS     uint64
 	CurLastTempMBTS uint64
 	CumulateDiff    *big.Int
 	GenesisBlock    common.Hash

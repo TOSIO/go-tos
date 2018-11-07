@@ -177,8 +177,8 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 		/* origin.LastMainBlockNum > s.mainChain.GetMainTail().Number && */
 		origin.LastTempMBTimeslice > s.mainChain.GetLastTempMainBlkSlice()+3 {
 		beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
-		if beginTimeslice < 0 || beginTimeslice <= s.genesisTimeslice {
-			beginTimeslice = origin.FirstMBTimeslice
+		if beginTimeslice < 0 || beginTimeslice < s.genesisTimeslice {
+			beginTimeslice = s.genesisTimeslice
 			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
 		}
 		*idle = false
@@ -445,10 +445,13 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					endTimeslice = ack.response.ConfirmPoint.Timeslice
 					for pos++; count < maxSYNCCapLimit && pos < len(cache.hashes); pos++ {
 						block := s.blkstorage.GetBlock(cache.hashes[pos])
+						log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
 						if block != nil {
 							tsblocks.TSIndex.Index = uint(pos)
 							tsblocks.Blocks = append(tsblocks.Blocks, block.GetRlp())
 							count++
+						} else {
+							log.Debug("Error load block", "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
 						}
 					}
 					if pos < len(cache.hashes) {
@@ -475,6 +478,9 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					}
 
 					if len(hashes) <= maxSYNCCapLimit-count {
+						for _, hash := range hashes {
+							log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", endTimeslice, "hash", hash.String())
+						}
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(len(hashes))
@@ -486,10 +492,15 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						s.cachelock.Lock()
 						s.sliceCache[nodeID] = &timesliceHash{timeslice: endTimeslice, hashes: hashes}
 						s.cachelock.Unlock()
+						for i := 0; i < maxSYNCCapLimit-count; i++ {
+							log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", endTimeslice, "hash", hashes[i].String())
+						}
 						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
+						} else {
+							log.Debug("Error load block", "timeslice", endTimeslice)
 						}
 						remain = true
 						break
