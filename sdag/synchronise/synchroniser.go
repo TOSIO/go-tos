@@ -445,13 +445,13 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					endTimeslice = ack.response.ConfirmPoint.Timeslice
 					for pos++; count < maxSYNCCapLimit && pos < len(cache.hashes); pos++ {
 						block := s.blkstorage.GetBlock(cache.hashes[pos])
-						log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
+						log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
 						if block != nil {
 							tsblocks.TSIndex.Index = uint(pos)
 							tsblocks.Blocks = append(tsblocks.Blocks, block.GetRlp())
 							count++
 						} else {
-							log.Debug("Error load block", "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
+							log.Debug("Error load block", "nodeID", nodeID, "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
 						}
 					}
 					if pos < len(cache.hashes) {
@@ -479,7 +479,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 
 					if len(hashes) <= maxSYNCCapLimit-count {
 						for _, hash := range hashes {
-							log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", endTimeslice, "hash", hash.String())
+							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hash.String())
 						}
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
@@ -493,25 +493,25 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						s.sliceCache[nodeID] = &timesliceHash{timeslice: endTimeslice, hashes: hashes}
 						s.cachelock.Unlock()
 						for i := 0; i < maxSYNCCapLimit-count; i++ {
-							log.Debug(">> SYNC-BLOCK-RESPONSE", "timeslice", endTimeslice, "hash", hashes[i].String())
+							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hashes[i].String())
 						}
 						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 						} else {
-							log.Debug("Error load block", "timeslice", endTimeslice)
+							log.Debug("Error load block", "nodeID", nodeID, "timeslice", endTimeslice)
 						}
 						remain = true
 						break
 					}
 				} else {
-					log.Debug("Error get local block-hash", "timeslice", endTimeslice)
+					log.Debug("Error get local block-hash", "nodeID", nodeID, "timeslice", endTimeslice)
 				}
 			}
 			if endTimeslice >= curEndPoint && !remain {
 				response.End = true
-				log.Debug("Meet the cur-end-timeslice", "endtimeslice", endTimeslice)
+				log.Debug("Meet the cur-end-timeslice", "nodeID", nodeID, "endtimeslice", endTimeslice)
 			} else {
 				response.End = false
 			}
