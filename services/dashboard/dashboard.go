@@ -33,7 +33,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TOSIO/go-tos/app/sendTx/httpSend"
+	"github.com/TOSIO/go-tos/app/rpc/httpSend"
 
 	"github.com/TOSIO/go-tos/sdag"
 
