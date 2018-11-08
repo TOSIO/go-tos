@@ -175,6 +175,27 @@ func (p *BlockPool) loop() {
 			}
 		}
 	}()
+
+	go func() {
+		currentTime := time.Now().Unix()
+		lastTime := currentTime
+		for {
+			currentTime = time.Now().Unix()
+			if lastTime+params.TimePeriod/1000 < currentTime {
+				var linksLackBlock []common.Hash
+				for k, _ := range p.lackBlockMap {
+					log.Debug("Request ancestor", "hash", k.String())
+					linksLackBlock = append(linksLackBlock, k)
+				}
+				if len(linksLackBlock) > 0 {
+					event := &core.GetBlocksEvent{Hashes: linksLackBlock}
+					p.blockEvent.Post(event)
+				}
+				lastTime = currentTime
+			}
+			time.Sleep(time.Second)
+		}
+	}()
 }
 
 /* func SetDB(chainDb tosdb.Database) {
