@@ -48,6 +48,7 @@ type BlockPool struct {
 	IsolatedBlockMap map[common.Hash]IsolatedBlock
 	lackBlockMap     map[common.Hash]lackBlock
 	rwlock           sync.RWMutex
+	addBlockLock     sync.RWMutex
 
 	maxQueueSize int
 
@@ -257,7 +258,10 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 
 		for len(currentList) > 0 {
 			for _, hash := range currentList { // process descendants by layer
-				isolated := p.IsolatedBlockMap[hash]
+				isolated, ok := p.IsolatedBlockMap[hash]
+				if !ok {
+					log.Error("IsolatedBlockMap[hash] Exception")
+				}
 				ancesotrs := make([]common.Hash, 0)
 				copy(ancesotrs, isolated.Links)
 				// pruning ancestors
@@ -341,7 +345,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 
 	ok := storage.HasBlock(p.db, block.GetHash())
 	if ok {
-		log.Error("the block has been added", "hash", block.GetHash().String())
+		//log.Error("the block has been added", "hash", block.GetHash().String())
 		return fmt.Errorf("the block has been added")
 	} else {
 		//log.Trace("Non-repeating block")
@@ -356,7 +360,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 
 	err = p.linkCheckAndSave(block)
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("linkCheckAndSave error" + err.Error())
 	}
 	//deleteIsolatedBlock(block)
 	//go pm.RelayBlock(block.GetRlp())
@@ -380,12 +384,12 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 					log.Error("links time error", "block time", block.GetTime(), "link time", linkBlockI.GetTime())
 					return fmt.Errorf("links time error")
 				} else {
-					info, err := storage.ReadBlockMutableInfo(p.db, hash)
-					if err != nil {
-						log.Error("ReadBlockMutableInfo error", "hash", hash)
-						return fmt.Errorf("ReadBlockMutableInfo error")
-					}
-					linkBlockI.SetMutableInfo(info)
+					//info, err := storage.ReadBlockMutableInfo(p.db, hash)
+					//if err != nil {
+					//	log.Error("ReadBlockMutableInfo error", "hash", hash)
+					//	return fmt.Errorf("ReadBlockMutableInfo error")
+					//}
+					//linkBlockI.SetMutableInfo(info)
 					linkBlockIs = append(linkBlockIs, linkBlockI)
 					//log.Trace("links time legal")
 				}
@@ -400,7 +404,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 	}
 
 	if isIsolated {
-		log.Warn("is a Isolated block", "hash", block.GetHash().String())
+		log.Info("is a Isolated block", "hash", block.GetHash().String())
 		if p.addIsolatedBlock(block, linksLackBlock) {
 			log.Debug("Request ancestor", "hash", block.GetHash().String())
 			event := &core.GetBlocksEvent{Hashes: linksLackBlock}
@@ -410,12 +414,14 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		//log.Trace("Verification passed")
 		p.verifyAncestors(linkBlockIs)
 		log.Debug("verifyAncestors finish", "hash", block.GetHash().String())
+		p.addBlockLock.Lock()
 		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
 		if err != nil {
 			return err
 		}
 		log.Debug("ComputeCumulativeDiff finish", "hash", block.GetHash().String())
 		p.saveBlock(block)
+		p.addBlockLock.Unlock()
 		if hasUpdateCumulativeDiff {
 			p.mainChainI.UpdateTail(block)
 		}
@@ -440,8 +446,8 @@ func (p *BlockPool) saveBlock(block types.Block) {
 }
 
 func (p *BlockPool) verifyAncestor(ancestor types.Block) {
-	ancestor.SetStatus(ancestor.GetStatus() | types.BlockVerify)
-	storage.WriteBlockMutableInfoRlp(p.db, ancestor.GetHash(), types.GetMutableRlp(ancestor.GetMutableInfo()))
+	//ancestor.SetStatus(ancestor.GetStatus() | types.BlockVerify)
+	//storage.WriteBlockMutableInfoRlp(p.db, ancestor.GetHash(), types.GetMutableRlp(ancestor.GetMutableInfo()))
 	p.deleteUnverifiedBlock(ancestor.GetHash())
 }
 

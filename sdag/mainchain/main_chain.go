@@ -220,7 +220,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf(hash.String() + " " + err.Error())
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
@@ -282,8 +282,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 }
 
 //Find the main block that can confirm other blocks
-func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types.Block, uint64, error) {
-	tail := mainChain.GetTail()
+func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(tail *types.TailMainBlockInfo) ([]types.Block, uint64, error) {
 	hash := tail.Hash
 	now := utils.GetTimeStamp()
 	var (
@@ -320,11 +319,11 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 }
 
 func (mainChain *MainChain) Confirm() error {
-	listMainBlock, lastMainTimeSlice, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks()
+	MainTail := mainChain.GetMainTail()
+	listMainBlock, lastMainTimeSlice, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks(MainTail)
 	if err != nil {
 		return err
 	}
-	MainTail := mainChain.GetMainTail()
 	number := MainTail.Number
 	for _, block := range listMainBlock {
 		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
@@ -332,7 +331,7 @@ func (mainChain *MainChain) Confirm() error {
 			mainChain.RollBackStatus(block.Hash)
 		}
 	}
-	number++
+
 	if len(listMainBlock) == 0 {
 		return nil
 	}
@@ -346,7 +345,7 @@ func (mainChain *MainChain) Confirm() error {
 		return fmt.Errorf("%s state.New fail [%s]", mainBlock.Root.String(), err.Error())
 	}
 
-	for _, block := range listMainBlock {
+	for index, block := range listMainBlock {
 		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block)
 		mainTimeSlice := utils.GetMainTime(block.GetTime())
 		info := block.GetMutableInfo()
@@ -379,7 +378,8 @@ func (mainChain *MainChain) Confirm() error {
 		if err != nil {
 			return err
 		}
-		if block == listMainBlock[len(listMainBlock)-1] {
+		number++
+		if index == (len(listMainBlock) - 1) {
 			mainChain.mainTailRWLock.Lock()
 			log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
 			mainChain.MainTail.Hash = block.GetHash()
@@ -392,7 +392,6 @@ func (mainChain *MainChain) Confirm() error {
 			log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
 			mainChain.mainTailRWLock.Unlock()
 		}
-		number++
 	}
 	return nil
 }
