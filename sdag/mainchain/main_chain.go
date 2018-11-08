@@ -104,7 +104,7 @@ func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
 			if lastTime+params.TimePeriod/1000 < currentTime {
 				err := mainChain.Confirm()
 				if err != nil {
-					log.Error(err.Error())
+					log.Error("confirm error:" + err.Error())
 				}
 				lastTime = currentTime
 			}
@@ -282,22 +282,23 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 }
 
 //Find the main block that can confirm other blocks
-func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(tail *types.TailMainBlockInfo) ([]types.Block, uint64, error) {
+func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types.Block, types.Block, error) {
+	tail := mainChain.GetTail()
 	hash := tail.Hash
 	now := utils.GetTimeStamp()
 	var (
-		canConfirm        bool
-		listBlock         []types.Block
-		lastMainTimeSlice uint64
+		canConfirm   bool
+		listBlock    []types.Block
+		locatorBlock types.Block
 	)
 	for {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
-			return nil, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlockMutableInfo Not found. hash=%s", hash.String())
+			return nil, nil, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlockMutableInfo Not found. hash=%s", hash.String())
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
 		if block == nil {
-			return nil, 0, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
+			return nil, nil, fmt.Errorf("findTheMainBlockThatCanConfirmOtherBlocks ReadBlock Not found. hash=%s", hash.String())
 		}
 		block.SetMutableInfo(mutableInfo)
 
@@ -307,7 +308,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(tail *type
 
 		if canConfirm {
 			if (block.GetStatus() & types.BlockMain) != 0 {
-				lastMainTimeSlice = utils.GetMainTime(block.GetTime())
+				locatorBlock = block
 				break
 			}
 			listBlock = append([]types.Block{block}, listBlock...)
@@ -315,16 +316,46 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(tail *type
 		}
 		hash = block.GetMutableInfo().MaxLinkHash
 	}
-	return listBlock, lastMainTimeSlice, nil
+	return listBlock, locatorBlock, nil
 }
 
 func (mainChain *MainChain) Confirm() error {
-	MainTail := mainChain.GetMainTail()
-	listMainBlock, lastMainTimeSlice, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks(MainTail)
+	listMainBlock, locatorBlock, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks()
 	if err != nil {
 		return err
 	}
+	locatorMainTimeSlice := utils.GetMainTime(locatorBlock.GetTime())
+	MainTail := mainChain.GetMainTail()
 	number := MainTail.Number
+
+	if locatorMainTimeSlice < utils.GetMainTime(MainTail.Time) {
+		hash := MainTail.Hash
+		for {
+			mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
+			if err != nil {
+				return fmt.Errorf("confirm ReadBlockMutableInfo Not found. hash=%s", hash.String())
+			}
+			block := storage.ReadBlock(mainChain.db, hash)
+			if block == nil {
+				return fmt.Errorf("confirm ReadBlock Not found. hash=%s", hash.String())
+			}
+			block.SetMutableInfo(mutableInfo)
+
+			if locatorMainTimeSlice <= utils.GetMainTime(block.GetTime()) {
+				break
+			}
+
+			if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
+				mainChain.RollBackStatus(block.Hash)
+			}
+			number--
+			hash = block.GetMaxLink()
+		}
+	}
+	if MainTail.Number > number {
+		log.Warn("branching", "RollBack count", MainTail.Number-number)
+	}
+
 	for _, block := range listMainBlock {
 		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
 			number--
@@ -336,9 +367,9 @@ func (mainChain *MainChain) Confirm() error {
 		return nil
 	}
 
-	mainBlock, err := storage.ReadMainBlock(mainChain.db, lastMainTimeSlice)
+	mainBlock, err := storage.ReadMainBlock(mainChain.db, locatorMainTimeSlice)
 	if err != nil {
-		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", lastMainTimeSlice)
+		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", locatorMainTimeSlice)
 	}
 	state, err := state.New(mainBlock.Root, mainChain.stateDb)
 	if err != nil {

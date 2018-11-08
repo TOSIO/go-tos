@@ -3,6 +3,7 @@ package statistics
 import (
 	"fmt"
 	"math/big"
+	"runtime"
 	"time"
 )
 
@@ -30,6 +31,7 @@ func (s *Statistics) Statistics(info string) bool {
 		fmt.Println("lastTotalCount=", s.lastTotalCount)
 		fmt.Println("10 s totalCount=", tempInt)
 		fmt.Println(tempInt/10, "/s")
+		fmt.Println("NumGoroutine:", runtime.NumGoroutine())
 		s.lastTotalCount.Set(s.totalCount)
 		s.lastTime = nowTime
 		return true
