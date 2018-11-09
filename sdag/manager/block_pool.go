@@ -107,13 +107,35 @@ func (p *BlockPool) SubscribeNewBlocksEvent(ev chan<- core.NewBlocksEvent) {
 	p.newblockFeed.Subscribe(ev)
 }
 
+func (p *BlockPool) BlockProcessing() {
+	FromNetGoroutineCount := 128
+	for i := 0; i < FromNetGoroutineCount; i++ {
+		go func() {
+			for ch := range p.newBlocksSub.Chan() {
+				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
+					for _, block := range ev.Blocks {
+						p.AddBlock(block)
+					}
+				}
+			}
+		}()
+	}
+
+	localGoroutineCount := 128
+	for i := 0; i < localGoroutineCount; i++ {
+		go func() {
+			for block := range p.blockChan {
+				p.AddBlock(block)
+			}
+		}()
+	}
+}
+
 func (p *BlockPool) loop() {
 	//UnverifiedBlockList = list.New()
 	//UnverifiedBlockList.PushFront(genesis)
 	p.unverifiedBlocks.Push(p.mainChainI.GetTail().Hash)
 	go func() {
-		var n int64 = 0
-		currentTime := time.Now().UnixNano()
 		for {
 			select {
 			case ch := <-p.newAnnounceSub.Chan():
@@ -126,31 +148,21 @@ func (p *BlockPool) loop() {
 						log.Debug("Post fetch block event", "hash", ev.Hash)
 					}
 				}
-			case ch := <-p.newBlocksSub.Chan():
-				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
-					go func(event *core.NewBlocksEvent) {
-						for _, block := range event.Blocks {
-							p.AddBlock(block)
-							if n == 2000 {
-								log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
-								currentTime = time.Now().UnixNano()
-								n = 0
-							}
-						}
-					}(ev)
-				}
+			//case ch := <-p.newBlocksSub.Chan():
+			//	if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
+			//		go func(event *core.NewBlocksEvent) {
+			//			for _, block := range event.Blocks {
+			//				p.AddBlock(block)
+			//			}
+			//		}(ev)
+			//	}
 			case ch := <-p.queryUnverifySub.Chan():
 				if ev, ok := ch.Data.(*core.GetUnverifyBlocksEvent); ok {
 					ev.Hashes = p.SelectUnverifiedBlock(4)
 					ev.Done <- struct{}{}
 				}
-			case block := <-p.blockChan:
-				go p.AddBlock(block)
-				if n == 2000 {
-					log.Warn("AddBlock Using time:" + fmt.Sprintf("%d", (time.Now().UnixNano()-currentTime)/n/1000))
-					currentTime = time.Now().UnixNano()
-					n = 0
-				}
+			//case block := <-p.blockChan:
+			//	go p.AddBlock(block)
 			case hash := <-p.unverifiedAddChan:
 				p.listLock.Lock()
 				p.unverifiedBlocks.Push(hash)
@@ -196,6 +208,8 @@ func (p *BlockPool) loop() {
 			time.Sleep(time.Second)
 		}
 	}()
+
+	p.BlockProcessing()
 }
 
 /* func SetDB(chainDb tosdb.Database) {
