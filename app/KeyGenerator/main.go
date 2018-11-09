@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 )
 
 var (
@@ -18,7 +20,8 @@ func main() {
 	fmt.Println("Enter the number (Default 10) of generated keys")
 	fmt.Scanf("%d", &count)
 	fmt.Printf("The number of keys that need to be generated is %d\n", count)
-	err := os.MkdirAll("./keyStore", 0777)
+	path := filepath.Join(node.DefaultDataDir(), "keystore")
+	err := os.MkdirAll(path, 0777)
 	if err != nil {
 		fmt.Println("MkdirAll fail", err)
 	}
@@ -46,7 +49,8 @@ func main() {
 		}
 
 		//Write to File
-		keyFilePath := fmt.Sprintf("./keyStore/keyFile%05d.json", i)
+		keyFile := fmt.Sprintf("keyFile%05d.json", i)
+		keyFilePath := filepath.Join(path, keyFile)
 		if err := ioutil.WriteFile(keyFilePath, keyjson, 0600); err != nil {
 			fmt.Printf("Failed to write keyfile to %s: %v\n", keyFilePath, err)
 		}

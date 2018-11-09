@@ -4,14 +4,17 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/node"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/TOSIO/go-tos/app/rpc/httpSend"
-	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 )
 
@@ -31,6 +34,7 @@ var (
 	lastTotalCount *big.Int = big.NewInt(0)
 	lastTime       int64
 	numberMinute   = 0
+	lock           sync.Mutex
 )
 
 type accountInfo struct {
@@ -52,10 +56,8 @@ type resultInfo struct {
 }
 
 type informations struct {
-	keyjson    []byte
-	Key        *keystore.Key
-	errRead    error
-	errDecrypt error
+	keyjson []byte
+	Key     *keystore.Key
 }
 
 func main() {
@@ -63,51 +65,55 @@ func main() {
 	haveBalanceAccountList := make([]accountInfo, 0, 10000)
 	haveBalanceAccountMap := map[string]bool{}
 
-	//noBalanceAccountList:=make([]accountInfo,0,10000)
-
 	var (
 		files []os.FileInfo
 		err   error
 	)
-	files, err = ioutil.ReadDir("./keyStore/")
+	filePath := filepath.Join(node.DefaultDataDir(), "keystore")
+	files, err = ioutil.ReadDir(filePath)
 
 	if err != nil {
 		fmt.Println("ReadDir error:", err)
 		return
 	}
 
-	ch := make(chan informations, len(files))
+	ch := make(chan informations)
 
+	count := 0
 	for _, file := range files {
-
 		go func(file os.FileInfo) {
+			defer func() {
+				lock.Lock()
+				count++
+				if count == len(files) {
+					close(ch)
+				}
+				lock.Unlock()
+			}()
 			var info informations
 			fileName := file.Name()
 			fmt.Println("ReadFile :", fileName)
-			info.keyjson, info.errRead = ioutil.ReadFile("./keyStore/" + fileName)
+			keyJson, err := ioutil.ReadFile(filepath.Join(filePath, fileName))
+			if err != nil {
+				fmt.Println("ReadFile :", fileName, " error")
+			}
 
-			info.Key, info.errDecrypt = keystore.DecryptKey(info.keyjson, passphrase)
+			info.Key, err = keystore.DecryptKey(keyJson, passphrase)
+			if err != nil {
+				fmt.Println("Parse File :", fileName, "DecryptKey error")
+				return
+			}
 
-			allAccountList = append(allAccountList, accountInfo{Address: info.Key.Address.Hex(),
-				PrivateKey: hex.EncodeToString(crypto.FromECDSA(info.Key.PrivateKey)),
-				Balance:    big.NewInt(0),
-			})
-			fmt.Println("Parse ReadFile :", fileName, "complete")
+			fmt.Println("Parse File :", fileName, "complete")
 			ch <- info
 		}(file)
+	}
 
-		it := <-ch
-
-		if it.errDecrypt != nil {
-			fmt.Println("DecryptKey error")
-			continue
-		}
-
-		if it.errRead != nil {
-			fmt.Println("Readfile error")
-			continue
-		}
-
+	for info := range ch {
+		allAccountList = append(allAccountList, accountInfo{Address: info.Key.Address.Hex(),
+			PrivateKey: hex.EncodeToString(crypto.FromECDSA(info.Key.PrivateKey)),
+			Balance:    big.NewInt(0),
+		})
 	}
 
 	fmt.Println("Parse all  ReadFile complete")
@@ -188,4 +194,3 @@ func main() {
 		//fmt.Println("----------------------------------------------", totalCount.String(), "-----------------------------------------------------")
 	}
 }
-
