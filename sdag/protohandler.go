@@ -376,7 +376,9 @@ func (pm *ProtocolManager) handle(p *peer) error {
 		})
 		p.Log().Debug("Post SYNCTask", "lastCumulatedDiff", p.lastCumulatedDiff, "lastMainBlockNum", p.lastMainBlockNum, "lastTS", p.lastTempMBTimeslice)
 	} else {
-		pm.stat.Status = STAT_WORKING
+		if pm.stat.Status != STAT_SYNCING {
+			pm.stat.Status = STAT_WORKING
+		}
 	}
 	// main loop. handle incoming messages.
 	for {
