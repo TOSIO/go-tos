@@ -356,13 +356,6 @@ func (mainChain *MainChain) Confirm() error {
 		log.Warn("branching", "RollBack count", MainTail.Number-number)
 	}
 
-	for _, block := range listMainBlock {
-		if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
-			number--
-			mainChain.RollBackStatus(block.Hash)
-		}
-	}
-
 	if len(listMainBlock) == 0 {
 		return nil
 	}
