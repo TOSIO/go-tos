@@ -139,10 +139,12 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 			currentTime = time.Now().Unix()
 			if lastTime+params.TimePeriod/1000 < currentTime {
 				var linksLackBlock []common.Hash
+				p.rwlock.RLock()
 				for key := range p.lackBlockMap {
 					log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
 					linksLackBlock = append(linksLackBlock, key)
 				}
+				p.rwlock.RUnlock()
 				if len(linksLackBlock) > 0 {
 					event := &core.GetBlocksEvent{Hashes: linksLackBlock}
 					p.blockEvent.Post(event)
