@@ -38,12 +38,12 @@ func WriteBlockRlp(db Writer, hash common.Hash, time uint64, blockRLP []byte) er
 
 	if err := db.Put(blockKey(utils.GetMainTime(time)), hash.Bytes()); err != nil {
 		//log.Error("Failed to store block index", "err", err)
-		return err
+		return fmt.Errorf("WriteBlockRlp db.Put(blockKey(utils.GetMainTime(time)) error:" + err.Error())
 	}
 
 	if err := db.Put(hash.Bytes(), blockRLP); err != nil {
 		//log.Error("Failed to store block", "err", err)
-		return err
+		return fmt.Errorf("WriteBlockRlp db.Put(hash.Bytes(), blockRLP) error:" + err.Error())
 	}
 
 	return nil
@@ -52,9 +52,12 @@ func WriteBlockRlp(db Writer, hash common.Hash, time uint64, blockRLP []byte) er
 func WriteBlock(db Writer, block types.Block) error {
 	err := WriteBlockRlp(db, block.GetHash(), block.GetTime(), block.GetRlp())
 	if err != nil {
-		return err
+		return fmt.Errorf("WriteBlock WriteBlockRlp error:" + err.Error())
 	}
 	err = WriteBlockMutableInfo(db, block.GetHash(), block.GetMutableInfo())
+	if err != nil {
+		return fmt.Errorf("WriteBlock WriteBlockMutableInfo error:" + err.Error())
+	}
 	return err
 }
 
@@ -108,21 +111,27 @@ func Update(db ReaderWrite, hash common.Hash, data interface{}, update func(bloc
 
 func ReadBlockMutableInfoRlp(db Reader, hash common.Hash) ([]byte, error) {
 	data, err := db.Get(blockInfoKey(hash))
+	if err != nil {
+		err = fmt.Errorf("ReadBlockMutableInfoRlp error:" + err.Error())
+	}
 	return data, err
 }
 
 func ReadBlockMutableInfo(db Reader, hash common.Hash) (*types.MutableInfo, error) {
 	data, err := db.Get(blockInfoKey(hash))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ReadBlockMutableInfo error:" + err.Error())
 	}
-	return types.UnMutableRlp(data)
+	mutableInfo, err := types.UnMutableRlp(data)
+	if err != nil {
+		err = fmt.Errorf("ReadBlockMutableInfo UnMutableRlp error:" + err.Error())
+	}
+	return mutableInfo, err
 }
 
 func WriteBlockMutableInfo(db Writer, hash common.Hash, info *types.MutableInfo) error {
 	if err := db.Put(blockInfoKey(hash), types.GetMutableRlp(info)); err != nil {
-		//log.Error("Failed to store block info", "err", err)
-		return err
+		return fmt.Errorf("WriteBlockMutableInfo error:" + err.Error())
 	}
 
 	return nil
@@ -130,8 +139,7 @@ func WriteBlockMutableInfo(db Writer, hash common.Hash, info *types.MutableInfo)
 
 func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP []byte) error {
 	if err := db.Put(blockInfoKey(hash), blockMutableInfoRLP); err != nil {
-		//log.Error("Failed to store block info", "err", err)
-		return err
+		return fmt.Errorf("WriteBlockMutableInfoRlp error:" + err.Error())
 	}
 
 	return nil
@@ -140,7 +148,7 @@ func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP [
 func ReadMainBlock(db Reader, slice uint64) (*types.MainBlockInfo, error) {
 	data, err := db.Get(mainBlockKey(slice))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
 	}
 
 	return new(types.MainBlockInfo).UnRlp(data)
@@ -148,8 +156,7 @@ func ReadMainBlock(db Reader, slice uint64) (*types.MainBlockInfo, error) {
 
 func WriteMainBlock(db Writer, mb *types.MainBlockInfo, slice uint64) error {
 	if err := db.Put(mainBlockKey(slice), mb.Rlp()); err != nil {
-		//log.Error("Failed to store main block", "err", err)
-		return err
+		return fmt.Errorf("WriteMainBlock error:" + err.Error())
 	}
 
 	return nil
@@ -158,8 +165,7 @@ func WriteMainBlock(db Writer, mb *types.MainBlockInfo, slice uint64) error {
 func ReadTailBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
 	data, err := db.Get(tailChainInfoKey())
 	if err != nil {
-		//log.Error("read tail temp main block info failed", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("ReadTailBlockInfo error:" + err.Error())
 	}
 
 	return new(types.TailMainBlockInfo).UnRlp(data)
@@ -167,8 +173,7 @@ func ReadTailBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
 
 func WriteTailBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
 	if err := db.Put(tailChainInfoKey(), tm.Rlp()); err != nil {
-		//log.Error("write tail temp main block info failed", "err", err)
-		return err
+		return fmt.Errorf("WriteTailBlockInfo error:" + err.Error())
 	}
 
 	return nil
@@ -177,8 +182,7 @@ func WriteTailBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
 func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
 	data, err := db.Get(tailMainChainInfoKey())
 	if err != nil {
-		//log.Error("read tail main block info failed", "err", err)
-		return nil, err
+		return nil, fmt.Errorf("ReadTailMainBlockInfo error:" + err.Error())
 	}
 
 	return new(types.TailMainBlockInfo).UnRlp(data)
@@ -186,8 +190,7 @@ func ReadTailMainBlockInfo(db Reader) (*types.TailMainBlockInfo, error) {
 
 func WriteTailMainBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
 	if err := db.Put(tailMainChainInfoKey(), tm.Rlp()); err != nil {
-		//log.Error("write tail main block info failed", "err", err)
-		return err
+		return fmt.Errorf("WriteTailMainBlockInfo error:" + err.Error())
 	}
 
 	return nil

@@ -282,7 +282,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 }
 
 //Find the main block that can confirm other blocks
-func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types.Block, types.Block, error) {
+func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(mainTail *types.TailMainBlockInfo) ([]types.Block, types.Block, error) {
 	tail := mainChain.GetTail()
 	hash := tail.Hash
 	now := utils.GetTimeStamp()
@@ -307,7 +307,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 		}
 
 		if canConfirm {
-			if (block.GetStatus() & types.BlockMain) != 0 {
+			if ((block.GetStatus() & types.BlockMain) != 0) && (block.GetTime() <= mainTail.Time) {
 				locatorBlock = block
 				break
 			}
@@ -320,16 +320,16 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks() ([]types
 }
 
 func (mainChain *MainChain) Confirm() error {
-	listMainBlock, locatorBlock, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks()
+	mainTail := mainChain.GetMainTail()
+	number := mainTail.Number
+	listMainBlock, locatorBlock, err := mainChain.findTheMainBlockThatCanConfirmOtherBlocks(mainTail)
 	if err != nil {
 		return err
 	}
 	locatorMainTimeSlice := utils.GetMainTime(locatorBlock.GetTime())
-	MainTail := mainChain.GetMainTail()
-	number := MainTail.Number
 
-	if locatorMainTimeSlice < utils.GetMainTime(MainTail.Time) {
-		hash := MainTail.Hash
+	if locatorBlock.GetTime() < mainTail.Time {
+		hash := mainTail.Hash
 		for {
 			mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 			if err != nil {
@@ -341,19 +341,19 @@ func (mainChain *MainChain) Confirm() error {
 			}
 			block.SetMutableInfo(mutableInfo)
 
-			if locatorMainTimeSlice <= utils.GetMainTime(block.GetTime()) {
+			if locatorBlock.GetTime() >= block.GetTime() {
 				break
 			}
 
-			if block, err := storage.ReadMainBlock(mainChain.db, utils.GetMainTime(block.GetTime())); err == nil {
-				mainChain.RollBackStatus(block.Hash)
+			if err = mainChain.RollBackStatus(block.GetHash()); err != nil {
+				return err
 			}
 			number--
 			hash = block.GetMaxLink()
 		}
 	}
-	if MainTail.Number > number {
-		log.Warn("branching", "RollBack count", MainTail.Number-number)
+	if mainTail.Number > number {
+		log.Warn("branching", "RollBack count", mainTail.Number-number)
 	}
 
 	if len(listMainBlock) == 0 {
@@ -386,7 +386,7 @@ func (mainChain *MainChain) Confirm() error {
 		log.Debug("the main block confirm finished", "confirmReward.userReward", confirmReward.userReward, "confirmReward.minerReward", confirmReward.minerReward)
 
 		if err := CalculatingMinerReward(block, number, confirmReward, state); err != nil {
-			log.Error(err.Error())
+			return err
 		}
 
 		root, err := state.Commit(false)
@@ -432,6 +432,11 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 	}
 	log.Debug("RollBackStatus main block", "block", block, "mutableInfo", mutableInfo)
 
+	mutableInfo.Status &= ^types.BlockMain
+	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo); err != nil {
+		return fmt.Errorf("RollBackStatus err:" + err.Error())
+	}
+
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -449,8 +454,6 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 			return err
 		}
 	}
-	mutableInfo.Status &= ^types.BlockMain
-	storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo)
 	return nil
 }
 

@@ -68,7 +68,7 @@ type BlockPool struct {
 
 	//UnverifiedBlockList *list.List
 	statisticsAddBlock            statistics.Statistics
-	statisticsdeleteIsolatedBlock statistics.Statistics
+	statisticsDeleteIsolatedBlock statistics.Statistics
 
 	mainChainI mainchain.MainChainI
 }
@@ -99,6 +99,8 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 	pool.newBlocksSub = pool.blockEvent.Subscribe(&core.NewBlocksEvent{})
 	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
 	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
+	pool.statisticsAddBlock.Init("add block")
+	pool.statisticsDeleteIsolatedBlock.Init("delete isolated block")
 	go pool.loop()
 	return pool
 }
@@ -339,7 +341,7 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 								p.mainChainI.UpdateTail(fullBlock)
 							}
 							log.Debug("Delete block from orphan graph", "hash", blockHash.String(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
-							p.statisticsdeleteIsolatedBlock.Statistics("delete isolated block")
+							p.statisticsDeleteIsolatedBlock.Statistics(true)
 							count++
 						} else {
 							log.Error("deleteIsolatedBlock ComputeCumulativeDiff failed", "block", hash.String(), "err", err)
@@ -398,7 +400,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 		return fmt.Errorf("the block linksNumber =%d", linksNumber)
 	}
 
-	err = p.linkCheckAndSave(block)
+	isIsolated, err := p.linkCheckAndSave(block)
 	if err != nil {
 		log.Error("linkCheckAndSave error" + err.Error())
 	}
@@ -407,11 +409,11 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 
 	log.Debug("addBlock finish", "hash", block.GetHash().String())
 
-	p.statisticsAddBlock.Statistics("add block")
+	p.statisticsAddBlock.Statistics((!isIsolated) && (err == nil))
 	return err
 }
 
-func (p *BlockPool) linkCheckAndSave(block types.Block) error {
+func (p *BlockPool) linkCheckAndSave(block types.Block) (bool, error) {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
@@ -422,7 +424,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
 				if linkBlockI.GetTime() > block.GetTime() {
 					log.Error("links time error", "block time", block.GetTime(), "link time", linkBlockI.GetTime())
-					return fmt.Errorf("links time error")
+					return false, fmt.Errorf("links time error")
 				} else {
 					//info, err := storage.ReadBlockMutableInfo(p.db, hash)
 					//if err != nil {
@@ -435,7 +437,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 				}
 			} else {
 				log.Error("linkBlockEI assertion failure", "hash", hash)
-				return fmt.Errorf("linkBlockEI assertion failure")
+				return false, fmt.Errorf("linkBlockEI assertion failure")
 			}
 		} else {
 			isIsolated = true
@@ -457,7 +459,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		p.addBlockLock.Lock()
 		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
 		if err != nil {
-			return err
+			return isIsolated, err
 		}
 		log.Debug("ComputeCumulativeDiff finish", "hash", block.GetHash().String())
 		p.saveBlock(block)
@@ -474,7 +476,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) error {
 		p.blockEvent.Post(event)
 	}
 
-	return nil
+	return isIsolated, nil
 }
 
 func (p *BlockPool) saveBlock(block types.Block) {
