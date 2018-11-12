@@ -27,10 +27,10 @@ type BolckTime struct {
 }
 
 type jsonInfo struct {
-	Jsonrpc string      `json:"jsonrpc"`
-	Method  string      `json:"method"`
-	Params  []BolckTime `json:"params"`
-	Id      int         `json:"id"`
+	Jsonrpc string        `json:"jsonrpc"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+	Id      int           `json:"id"`
 }
 
 func main() {
@@ -43,9 +43,10 @@ func main() {
 	tempJson := jsonInfo{
 		Jsonrpc: "2.0",
 		Method:  "sdag_getMainBlockInfo",
-		Params: []BolckTime{BolckTime{
-			Time: blockTime,
-		}},
+		Params: []interface{}{
+			BolckTime{
+				Time: blockTime,
+			}},
 		Id: 1,
 	}
 
