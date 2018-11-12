@@ -31,6 +31,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -86,11 +87,11 @@ type TransactionInfo struct {
 }
 
 type MainBlockInfo struct {
-	Time uint64
+	Time string
 }
 
-type BlockHash struct {
-	BlockHash common.Hash
+type BolckHashInfo struct {
+	BlockHash string
 }
 
 type WalletAdress struct {
@@ -106,43 +107,119 @@ type RpcGenerKeyStore struct {
 	Password string
 }
 
-func (api *PublicSdagAPI) GetBlockInfo(jsonString string) string {
+func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, error) {
 
-	var tempblockInfo BlockHash
-	if err := json.Unmarshal([]byte(jsonString), &tempblockInfo); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return err.Error()
-	}
-
+	var bolckHashInfo1 BolckHashInfo
 	db := api.s.chainDb
 
-	blockInfo := api.s.queryBlockInfo.GetBlockInfo(db, tempblockInfo.BlockHash)
+	f := reflect.TypeOf(bolckHash).Kind()
+	if f == reflect.Map {
+		jsonString, _ := json.Marshal(bolckHash)
 
-	return blockInfo
-}
+		if err := json.Unmarshal(jsonString, &bolckHashInfo1); err != nil {
+			log.Error("JSON unmarshaling failed: %s", err)
+			return "", err
+		}
 
-func (api *PublicSdagAPI) GetMainBlockInfo(jsonString string) string {
+		blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo1.BlockHash))
+		if err != nil {
+			return "", err
+		}
 
-	var RPCmainBlockInfo MainBlockInfo
-	if err := json.Unmarshal([]byte(jsonString), &RPCmainBlockInfo); err != nil {
-		log.Error("JSON unmarshaling failed", "error", err)
-		return err.Error()
+		return blockInfo, nil
 	}
 
-	tempQueryMainBlockInfo := api.s.queryBlockInfo.GetMainBlockInfo(api.s.chainDb, RPCmainBlockInfo.Time)
+	bolckHashInfo := BolckHashInfo{
+		BlockHash: reflect.ValueOf(bolckHash).String(),
+	}
+	temp := fmt.Sprintln(bolckHashInfo)
 
-	return tempQueryMainBlockInfo
+	if err := json.Unmarshal([]byte(temp), &bolckHashInfo1); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return "", err
+	}
+
+	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo1.BlockHash))
+	if err != nil {
+		return "", err
+	}
+
+	return blockInfo, nil
+
 }
 
-func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString string) string {
+func (api *PublicSdagAPI) GetMainBlockInfo(time interface{}) (interface{}, error) {
+
+	var MainBlockTime *MainBlockInfo
+	db := api.s.chainDb
+
+	Type := reflect.TypeOf(time).Kind()
+
+	if Type == reflect.Map {
+		jsonString, _ := json.Marshal(time)
+
+		if err := json.Unmarshal(jsonString, &MainBlockTime); err != nil {
+			log.Error("JSON unmarshaling failed: %s", err)
+			return "", err
+		}
+
+		blocktime, _ := strconv.ParseInt(MainBlockTime.Time, 10, 64)
+
+		tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, uint64(blocktime))
+		if err != nil {
+			return "", err
+		}
+
+		return tempQueryMainBlockInfo, nil
+	}
+
+	mainBolckTime := MainBlockInfo{
+		Time: reflect.ValueOf(time).String(),
+	}
+	temp := fmt.Sprintln(mainBolckTime)
+
+	if err := json.Unmarshal([]byte(temp), &mainBolckTime); err != nil {
+		log.Error("JSON unmarshaling failed: %s", err)
+		return "", err
+	}
+
+	blocktime, _ := strconv.ParseInt(mainBolckTime.Time, 10, 64)
+
+	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, uint64(blocktime))
+	if err != nil {
+		return "", err
+	}
+
+	return tempQueryMainBlockInfo, nil
+
+}
+
+func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString interface{}) (interface{}, error) {
+
+	if reflect.TypeOf(jsonString).Kind() == reflect.Map {
+
+		if reflect.ValueOf(jsonString).String() != "ok" {
+			fmt.Printf("accept params error")
+		}
+
+		mainBlockInfo, err := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
+		if err != nil {
+			return "", err
+		}
+
+		return mainBlockInfo, nil
+	}
 
 	if jsonString != "ok" {
 		fmt.Printf("accept params error")
 	}
 
-	mainBlockInfo := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
+	mainBlockInfo, err := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
+	if err != nil {
+		return "", err
+	}
 
-	return mainBlockInfo
+	return mainBlockInfo, nil
 }
 
 func (api *PublicSdagAPI) Transaction(jsonString string) string {

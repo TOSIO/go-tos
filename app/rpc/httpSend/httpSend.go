@@ -1,11 +1,11 @@
 package httpSend
 
 import (
+	//"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
-
 
 func SendHttp(urlString string, send string) ([]byte, error) {
 	resp, err := http.Post(urlString, "application/json", strings.NewReader(send))

@@ -1,7 +1,8 @@
 package manager
 
 import (
-	"encoding/json"
+	//"encoding/json"
+	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -14,70 +15,64 @@ import (
 type QueryBlockInfoInterface struct {
 }
 
-type BlockHeader struct {
-	Type     uint     //1 tx, 2 miner
-	Time     uint64   //ms  timestamp
-	GasPrice *big.Int //tls
-	GasLimit uint64   //gas max value
-}
-
 //type TxOut struct {
 //	Receiver common.Address
 //	Amount   *big.Int //tls
 //}
 
 type TxBlockInfo struct {
-	Status              string
-	ConfirmItsTimeSlice uint64   //Confirm its time slice
-	Difficulty          *big.Int //self difficulty
-	CumulativeDiff      *big.Int //cumulative difficulty
-	MaxLinkHash         common.Hash
-	Time                uint64
-	Links               []common.Hash
-	BlockHash           common.Hash
-	Amount              *big.Int //tls
-	Receiver            common.Address
-	Sender              common.Address
-	GasPrice            *big.Int
-	GasLimit            uint64
+	Status              string         `json:"status"`
+	ConfirmItsTimeSlice uint64         `json:"confirm_its_time_slice"`
+	Difficulty          *big.Int       `json:"difficulty"`
+	CumulativeDiff      *big.Int       `json:"cumulative_diff"`
+	MaxLinkHash         common.Hash    `json:"max_link_hash"`
+	Time                uint64         `json:"time"`
+	Links               []common.Hash  `json:"links"`
+	BlockHash           common.Hash    `json:"block_hash"`
+	Amount              *big.Int       `json:"amount"`
+	Receiver            common.Address `json:"receiver"`
+	Sender              common.Address `json:"sender"`
+	GasPrice            *big.Int       `json:"gas_price"`
+	GasLimit            uint64         `json:"gas_limit"`
 }
 
 type PublicBlockInfo struct {
-	Status              string
-	ConfirmItsTimeSlice uint64   //Confirm its time slice
-	Difficulty          *big.Int //self difficulty
-	CumulativeDiff      *big.Int //cumulative difficulty
-	MaxLinkHash         common.Hash
-	Time                uint64
-	Links               []common.Hash
-	BlockHash           common.Hash
-	Sender              common.Address
+	Status              string         `json:"status"`
+	ConfirmItsTimeSlice uint64         `json:"confirm_its_time_slice"`
+	Difficulty          *big.Int       `json:"difficulty"`
+	CumulativeDiff      *big.Int       `json:"cumulative_diff"`
+	MaxLinkHash         common.Hash    `json:"max_link_hash"`
+	Time                uint64         `json:"time"`
+	Links               []common.Hash  `json:"links"`
+	BlockHash           common.Hash    `json:"block_hash"`
+	Sender              common.Address `json:"sender"`
 }
 
 type TailMainBlockInfo struct {
-	Hash           common.Hash
-	CumulativeDiff *big.Int
-	Number         uint64
-	Time           uint64
+	Hash           common.Hash `json:"hash"`
+	CumulativeDiff *big.Int    `json:"cumulative_diff"`
+	Number         uint64      `json:"number"`
+	Time           uint64      `json:"time"`
 }
 
-func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) string {
+func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) (string, error) {
 
 	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
 
 	if err != nil {
 		log.Error("Read block stauts fail")
-		return "Query is not possible"
+		//return "Query is not possible"
+		return "", err
 	}
 
 	tempBlockStatus := mutableInfo.Status
 
 	blockStatus := types.GetBlockStatus(tempBlockStatus)
 
-	return blockStatus
+	return blockStatus, nil
 }
 
-func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) string {
+func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) (interface{}, error) {
 
 	//commonHash := common.HexToHash(hash)
 
@@ -86,7 +81,8 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		return "Query failure"
+		//return "Query failure"
+		return "", err
 	}
 
 	Block := storage.ReadBlock(h, hash)
@@ -94,14 +90,19 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	BlockSend, err := Block.GetSender()
 	if err != nil {
 		log.Error("Query failure")
+		return "", err
 	}
 
-	blockStatus := q.GetUserBlockStatus(h, hash)
+	blockStatus, err := q.GetUserBlockStatus(h, hash)
+	if err != nil {
+		return "", err
+	}
 
 	if Block.GetType() == types.BlockTypeTx {
 		TxBlock, ok := Block.(*types.TxBlock)
 		if !ok {
-			return ""
+			//return ""
+			return "", fmt.Errorf("db data type error")
 		}
 
 		var tempReceiver common.Address
@@ -127,13 +128,13 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 			GasPrice:            Block.GetGasPrice(),
 			GasLimit:            Block.GetGasLimit(),
 		}
-
-		jsonData, err := json.Marshal(Data0)
-		if err != nil {
-			return ""
-		}
-
-		return string(jsonData)
+		return Data0, nil
+		//jsonData, err := json.Marshal(Data0)
+		//if err != nil {
+		//	return "", err
+		//}
+		//
+		//return string(jsonData), nil
 	}
 
 	Data0 := PublicBlockInfo{
@@ -147,16 +148,17 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		BlockHash:           Block.GetHash(),
 		Sender:              BlockSend,
 	}
+	return Data0, nil
 
-	jsonData, err := json.Marshal(Data0)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonData)
+	//jsonData, err := json.Marshal(Data0)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//return string(jsonData), nil
 }
 
-func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) string {
+func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) (interface{}, error) {
 
 	//commonHash := common.HexToHash(hash)
 
@@ -165,7 +167,8 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		return "Query is not possible"
+		//return "Query is not possible"
+		return "", err
 	}
 
 	Block := storage.ReadBlock(h, hash)
@@ -173,14 +176,18 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 	BlockSend, err := Block.GetSender()
 	if err != nil {
 		log.Error("Query Block Sender Fail")
+		return "", err
 	}
 
-	blockStatus := q.GetUserBlockStatus(h, hash)
+	blockStatus, err := q.GetUserBlockStatus(h, hash)
+	if err != nil {
+		return "", err
+	}
 
 	if Block.GetType() == types.BlockTypeTx {
 		TxBlock, ok := Block.(*types.TxBlock)
 		if !ok {
-			return ""
+			return "", fmt.Errorf("db data type error")
 		}
 
 		var tempReceiver common.Address
@@ -212,13 +219,13 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 			},
 			*mainBlockInfo,
 		}
-
-		jsonData, err := json.Marshal(Data0)
-		if err != nil {
-			return ""
-		}
-
-		return string(jsonData)
+		return Data0, err
+		//jsonData, err := json.Marshal(Data0)
+		//if err != nil {
+		//	return "", err
+		//}
+		//
+		//return string(jsonData), nil
 	}
 
 	Data0 := struct {
@@ -238,36 +245,39 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 		},
 		*mainBlockInfo,
 	}
-
-	jsonData, err := json.Marshal(Data0)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonData)
+	return Data0, err
+	//jsonData, err := json.Marshal(Data0)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//return string(jsonData), nil
 }
 
-func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) string {
+func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) (interface{}, error) {
 
 	Slice := utils.GetMainTime(Time)
 
 	mainInfo, err := storage.ReadMainBlock(h, Slice)
 	if err != nil {
-		return ""
+		return "", err
 	}
 	mainHash := mainInfo.Hash
 
-	MainBlockInfo := q.GetBlockAndMainInfo(h, mainHash, mainInfo)
+	MainBlockInfo, err := q.GetBlockAndMainInfo(h, mainHash, mainInfo)
+	if err != nil {
+		return "", err
+	}
 
-	return MainBlockInfo
+	return MainBlockInfo, nil
 }
 
-func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string {
+func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) (interface{}, error) {
 
 	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(h)
 
 	if err != nil {
-		return "Query failure"
+		return "", err
 	}
 
 	MainBlickInfo := TailMainBlockInfo{
@@ -276,12 +286,12 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) string
 		Number:         finalMainBlockSlice.Number,
 		Time:           finalMainBlockSlice.Time,
 	}
-
-	jsonData, err := json.Marshal(MainBlickInfo)
-	if err != nil {
-		return ""
-	}
-
-	return string(jsonData)
+	return MainBlickInfo, err
+	//jsonData, err := json.Marshal(MainBlickInfo)
+	//if err != nil {
+	//	return "", err
+	//}
+	//
+	//return string(jsonData), nil
 
 }
