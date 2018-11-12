@@ -237,6 +237,8 @@ func (s *Synchroniser) loop() {
 
 		}
 	}
+	s.listenInbound()
+
 	idle := true
 	for {
 		s.schedule(queuedTask, &idle)
