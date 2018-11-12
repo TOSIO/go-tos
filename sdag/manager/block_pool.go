@@ -303,6 +303,7 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 				isolated, ok := p.IsolatedBlockMap[hash]
 				if !ok {
 					log.Error("IsolatedBlockMap[hash] Exception")
+					return
 				}
 				ancesotrs := make([]common.Hash, 0)
 				copy(ancesotrs, isolated.Links)
@@ -320,6 +321,7 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 				}
 
 				if len(isolated.Links) == 0 {
+					delete(p.IsolatedBlockMap, hash)
 					//verify ancestor
 					for _, ancestor := range ancesotrs {
 						if marker, ok := ancestorCache[ancestor]; ok && marker != nil {
@@ -332,7 +334,6 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 					// save block
 					if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
 						ancestorCache[hash] = &verifyMarker{fullBlock, false}
-						delete(p.IsolatedBlockMap, hash)
 						hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(fullBlock)
 						if err == nil {
 							log.Debug("ComputeCumulativeDiff finish", "hash", fullBlock.GetHash().String())
