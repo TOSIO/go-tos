@@ -116,7 +116,7 @@ func (p *BlockPool) BlockProcessing() {
 			for ch := range p.newBlocksSub.Chan() {
 				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block)
+						p.AddBlock(block, ev.IsSync)
 					}
 				}
 			}
@@ -127,7 +127,7 @@ func (p *BlockPool) BlockProcessing() {
 	for i := 0; i < localGoroutineCount; i++ {
 		go func() {
 			for block := range p.blockChan {
-				p.AddBlock(block)
+				p.AddBlock(block, false)
 			}
 		}()
 	}
@@ -378,7 +378,7 @@ func (p *BlockPool) SyncAddBlock(block types.Block) error {
 	return nil
 }
 
-func (p *BlockPool) AddBlock(block types.Block) error {
+func (p *BlockPool) AddBlock(block types.Block, isSync bool) error {
 	log.Debug("begin AddBlock", "hash", block.GetHash().String(), "block", block)
 	err := block.Validation()
 	if err != nil {
@@ -401,7 +401,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 		return fmt.Errorf("the block linksNumber =%d", linksNumber)
 	}
 
-	isIsolated, err := p.linkCheckAndSave(block)
+	isIsolated, err := p.linkCheckAndSave(block, isSync)
 	if err != nil {
 		log.Error("linkCheckAndSave error" + err.Error())
 	}
@@ -414,7 +414,7 @@ func (p *BlockPool) AddBlock(block types.Block) error {
 	return err
 }
 
-func (p *BlockPool) linkCheckAndSave(block types.Block) (bool, error) {
+func (p *BlockPool) linkCheckAndSave(block types.Block, isSync bool) (bool, error) {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
@@ -471,10 +471,12 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) (bool, error) {
 		log.Debug("saveBlock finish", "hash", block.GetHash().String())
 		p.deleteIsolatedBlock(block)
 
-		log.Debug("Relay block", "hash", block.GetHash().String())
-		event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
-		event.Blocks = append(event.Blocks, block)
-		p.blockEvent.Post(event)
+		if !isSync {
+			log.Debug("Relay block", "hash", block.GetHash().String())
+			event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
+			event.Blocks = append(event.Blocks, block)
+			p.blockEvent.Post(event)
+		}
 	}
 
 	return isIsolated, nil
