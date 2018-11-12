@@ -109,37 +109,10 @@ type RpcGenerKeyStore struct {
 
 func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, error) {
 
-	var bolckHashInfo1 BolckHashInfo
+	var bolckHashInfo BolckHashInfo
 	db := api.s.chainDb
-
-	f := reflect.TypeOf(bolckHash).Kind()
-	if f == reflect.Map {
-		jsonString, _ := json.Marshal(bolckHash)
-
-		if err := json.Unmarshal(jsonString, &bolckHashInfo1); err != nil {
-			log.Error("JSON unmarshaling failed: %s", err)
-			return "", err
-		}
-
-		blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo1.BlockHash))
-		if err != nil {
-			return "", err
-		}
-
-		return blockInfo, nil
-	}
-
-	bolckHashInfo := BolckHashInfo{
-		BlockHash: reflect.ValueOf(bolckHash).String(),
-	}
-	temp := fmt.Sprintln(bolckHashInfo)
-
-	if err := json.Unmarshal([]byte(temp), &bolckHashInfo1); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return "", err
-	}
-
-	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo1.BlockHash))
+	reflectMaptoJSON(bolckHash, &bolckHashInfo)
+	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
 	if err != nil {
 		return "", err
 	}
@@ -150,40 +123,12 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, erro
 
 func (api *PublicSdagAPI) GetMainBlockInfo(time interface{}) (interface{}, error) {
 
-	var MainBlockTime *MainBlockInfo
+	var MainBlockTime MainBlockInfo
 	db := api.s.chainDb
 
-	Type := reflect.TypeOf(time).Kind()
+	reflectMaptoJSON(time, &MainBlockTime)
 
-	if Type == reflect.Map {
-		jsonString, _ := json.Marshal(time)
-
-		if err := json.Unmarshal(jsonString, &MainBlockTime); err != nil {
-			log.Error("JSON unmarshaling failed: %s", err)
-			return "", err
-		}
-
-		blocktime, _ := strconv.ParseInt(MainBlockTime.Time, 10, 64)
-
-		tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, uint64(blocktime))
-		if err != nil {
-			return "", err
-		}
-
-		return tempQueryMainBlockInfo, nil
-	}
-
-	mainBolckTime := MainBlockInfo{
-		Time: reflect.ValueOf(time).String(),
-	}
-	temp := fmt.Sprintln(mainBolckTime)
-
-	if err := json.Unmarshal([]byte(temp), &mainBolckTime); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return "", err
-	}
-
-	blocktime, _ := strconv.ParseInt(mainBolckTime.Time, 10, 64)
+	blocktime, _ := strconv.ParseInt(MainBlockTime.Time, 10, 64)
 
 	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, uint64(blocktime))
 	if err != nil {
@@ -196,22 +141,9 @@ func (api *PublicSdagAPI) GetMainBlockInfo(time interface{}) (interface{}, error
 
 func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString interface{}) (interface{}, error) {
 
-	if reflect.TypeOf(jsonString).Kind() == reflect.Map {
-
-		if reflect.ValueOf(jsonString).String() != "ok" {
-			fmt.Printf("accept params error")
-		}
-
-		mainBlockInfo, err := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
-		if err != nil {
-			return "", err
-		}
-
-		return mainBlockInfo, nil
-	}
-
-	if jsonString != "ok" {
+	if reflect.ValueOf(jsonString).String() != "ok" {
 		fmt.Printf("accept params error")
+		return "", nil
 	}
 
 	mainBlockInfo, err := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
@@ -336,7 +268,7 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 func (api *PublicSdagAPI) GeneraterKeyStore(param interface{}) interface{} {
 	//Unmarshal json
 	var rpcGenerKeyStore RpcGenerKeyStore
-	reflectMaptoJSON(param,&rpcGenerKeyStore)
+	reflectMaptoJSON(param, &rpcGenerKeyStore)
 	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -382,7 +314,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(param interface{}) interface{} {
 // block numbers are also allowed.
 func (api *PublicSdagAPI) GetBalance(param interface{}) (interface{}, error) {
 	var walletadress WalletAdress
-	reflectMaptoJSON(param,&walletadress)
+	reflectMaptoJSON(param, &walletadress)
 	address := common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
@@ -512,9 +444,10 @@ func (api *PrivateAdminAPI) Do(data int) int {
 	return data
 }
 
-func (api *PublicSdagAPI) QueryWallet(jsonstring string) string {
-	if jsonstring != "ok" {
+func (api *PublicSdagAPI) QueryWallet(jsonstring interface{}) (string, error) {
+	if reflect.ValueOf(jsonstring).String() != "ok" {
 		fmt.Printf("accept params error")
+		return "", nil
 	}
 
 	var wallet = make([]string, 0)
@@ -530,12 +463,12 @@ func (api *PublicSdagAPI) QueryWallet(jsonstring string) string {
 
 	walletsMsg, err := json.Marshal(wallet)
 	if err != nil {
-		fmt.Println("error:", err)
+		return "", err
 	}
-	return string(walletsMsg)
+	return string(walletsMsg), nil
 }
 
-func reflectMaptoJSON(param interface{},pStruct interface{}) (interface{})  {
+func reflectMaptoJSON(param interface{}, pStruct interface{}) interface{} {
 	pType := reflect.TypeOf(param)
 	switch pType.Kind() {
 	case reflect.Map:
