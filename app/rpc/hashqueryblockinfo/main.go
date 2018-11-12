@@ -29,7 +29,7 @@ type BolckPrams struct {
 type jsonInfo struct {
 	Jsonrpc string       `json:"jsonrpc"`
 	Method  string       `json:"method"`
-	Params  []BolckPrams `json:"params"`
+	Params  []interface{} `json:"params"`
 	Id      int          `json:"id"`
 }
 
@@ -43,9 +43,11 @@ func main() {
 	tempJson := jsonInfo{
 		Jsonrpc: "2.0",
 		Method:  "sdag_getBlockInfo",
-		Params: []BolckPrams{BolckPrams{
-			BlockHash: blockHash,
-		}},
+		Params: []interface{}{
+			BolckPrams{
+				BlockHash: blockHash,
+			},
+		},
 		Id: 1,
 	}
 
