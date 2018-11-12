@@ -333,16 +333,10 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 }
 
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
+func (api *PublicSdagAPI) GeneraterKeyStore(param interface{}) interface{} {
 	//Unmarshal json
 	var rpcGenerKeyStore RpcGenerKeyStore
-	if err := json.Unmarshal([]byte(jsonString), &rpcGenerKeyStore); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return err.Error()
-	}
-	if rpcGenerKeyStore.Password == "" {
-		return "password is empty"
-	}
+	reflectMaptoJSON(param,&rpcGenerKeyStore)
 	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -386,14 +380,9 @@ func (api *PublicSdagAPI) GeneraterKeyStore(jsonString string) string {
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(jsonString string) (string, error) {
-
-	//Unmarshal json
+func (api *PublicSdagAPI) GetBalance(param interface{}) (interface{}, error) {
 	var walletadress WalletAdress
-	if err := json.Unmarshal([]byte(jsonString), &walletadress); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return "", err
-	}
+	reflectMaptoJSON(param,&walletadress)
 	address := common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
@@ -544,4 +533,31 @@ func (api *PublicSdagAPI) QueryWallet(jsonstring string) string {
 		fmt.Println("error:", err)
 	}
 	return string(walletsMsg)
+}
+
+func reflectMaptoJSON(param interface{},pStruct interface{}) (interface{})  {
+	pType := reflect.TypeOf(param)
+	switch pType.Kind() {
+	case reflect.Map:
+		b, errMap := json.Marshal(param)
+		if errMap != nil {
+			fmt.Println("json.Marshal failed:", errMap)
+			return nil
+		}
+
+		errUnjson := json.Unmarshal(b, pStruct)
+		if errUnjson != nil {
+
+			fmt.Println("Umarshal failed:", errUnjson)
+			return nil
+		}
+	case reflect.String:
+		errString := json.Unmarshal([]byte(param.(string)), pStruct)
+		if errString != nil {
+
+			fmt.Println("Umarshal failed:", errString)
+			return nil
+		}
+	}
+	return pStruct
 }
