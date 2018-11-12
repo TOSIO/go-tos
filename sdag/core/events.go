@@ -60,12 +60,12 @@ type NewSYNCTask struct {
 }
 
 type SYNCStatusEvent struct {
-	Progress SYNCProgress `json:"progress"`
-	BeginTS  uint64       `json:"begin_timeslice"`
-	EndTS    uint64       `json:"end_timeslice"`
-	CurTS    uint64       `json:"cur_timeslice"`
-
-	AccumulateSYNCNum uint64 `json:"cumulated_sync_block_num"`
+	Progress          SYNCProgress `json:"progress"`
+	BeginTS           uint64       `json:"begin_timeslice"`
+	EndTS             uint64       `json:"end_timeslice"`
+	CurTS             uint64       `json:"cur_timeslice"`
+	Index             uint         `json:"cur_timeslice_index"`
+	AccumulateSYNCNum uint64       `json:"cumulated_sync_block_num"`
 
 	BeginTime time.Time `json:"begin_time"`
 	EndTime   time.Time `json:"end_time"`
