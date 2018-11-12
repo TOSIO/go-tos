@@ -1,6 +1,7 @@
 package synchronise
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -16,11 +17,13 @@ type fetchTask struct {
 	beginTime time.Time
 	nodes     []string
 	launch    int
+	orphan    bool
 }
 
 type Fetcher struct {
-	reqCh chan common.Hash
-	resCh chan core.Response
+	reqCh       chan common.Hash
+	reqOrphanCh chan common.Hash
+	resCh       chan core.Response
 
 	flighting map[common.Hash]*fetchTask // key : hash, value : the peer who has been asked for fetch
 
@@ -42,8 +45,9 @@ type Fetcher struct {
 
 func NewFetcher(peers core.PeerSet, poolEvent *event.TypeMux) *Fetcher {
 	fetcher := &Fetcher{
-		reqCh: make(chan common.Hash, 8),
-		resCh: make(chan core.Response, 8),
+		reqCh:       make(chan common.Hash, 100),
+		reqOrphanCh: make(chan common.Hash, 100),
+		resCh:       make(chan core.Response, 100),
 
 		flighting:      make(map[common.Hash]*fetchTask),
 		announced:      make(map[common.Hash]mapset.Set),
@@ -63,13 +67,21 @@ func (f *Fetcher) loop() {
 		go func(fetcher *Fetcher, ID int) {
 			fetcher.wg.Add(1)
 			defer fetcher.wg.Done()
+
 		workloop:
 			for {
 				select {
 				case hash, ok := <-f.reqCh:
 					log.Debug(">> Fetching block", "hash", hash.String())
 					if ok {
-						f.fetch(hash)
+						f.fetch(hash, false)
+					} else {
+						break workloop
+					}
+				case hash, ok := <-f.reqOrphanCh:
+					log.Debug(">> Fetching block", "hash", hash.String())
+					if ok {
+						f.fetch(hash, true)
 					} else {
 						break workloop
 					}
@@ -79,20 +91,24 @@ func (f *Fetcher) loop() {
 					} else {
 						break workloop
 					}
+
 				}
 			}
 			log.Debug("Fetch worker exited", "ID", ID)
 			return
 		}(f, i)
 	}
-
+	detect := time.After(f.requestTTL())
 	for {
 		select {
 		/* 		case hash := <-f.reqCh:
 		   			log.Debug(">> Fetching block", "hash", hash.String())
 		   			go f.fetch(hash)
 		   		case hash := <-f.resCh:
-		   			go f.done(hash) */
+					   go f.done(hash) */
+		case <-detect:
+			f.detectTimeout()
+			detect = time.After(f.requestTTL())
 		case <-f.quit:
 			close(f.reqCh)
 			close(f.resCh)
@@ -107,7 +123,11 @@ func (f *Fetcher) stop() {
 	f.wg.Wait()
 }
 
-func (f *Fetcher) fetch(hash common.Hash) {
+func (f *Fetcher) requestTTL() time.Duration {
+	return time.Duration(60 * time.Second)
+}
+
+func (f *Fetcher) fetch(hash common.Hash, orphan bool) {
 	f.flightLock.RLock()
 	if _, ok := f.flighting[hash]; ok {
 		f.flightLock.RUnlock()
@@ -128,6 +148,7 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	task.launch = 0
 	task.nodes = make([]string, 0)
 	task.beginTime = time.Now()
+	task.orphan = orphan
 
 	if len(origins) <= 0 {
 		log.Trace("Not found data source")
@@ -140,6 +161,25 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	f.flightLock.Lock()
 	f.flighting[hash] = &task
 	f.flightLock.Unlock()
+}
+
+func (f *Fetcher) detectTimeout() {
+	event := &core.ErrorGetBlocksEvent{Requests: make([]core.BlockReq, 0, 100), Err: fmt.Errorf("timeout")}
+	//del := make([]core.BlockReq, 0, 100)
+	f.flightLock.Lock()
+	for hash, task := range f.flighting {
+		if time.Since(task.beginTime) >= f.requestTTL() {
+			delete(f.flighting, hash)
+			event.Requests = append(event.Requests, core.BlockReq{Hash: hash, Isolated: task.orphan})
+		}
+	}
+	f.flightLock.Unlock()
+
+	if len(event.Requests) > 0 {
+		log.Debug("Post error event", "size", len(event.Requests))
+		f.blockPoolEvent.Post(event)
+		log.Debug("Post error event completed", "size", len(event.Requests))
+	}
 }
 
 func (f *Fetcher) whoAnnounced(hash common.Hash) mapset.Set {
@@ -225,29 +265,58 @@ func (f *Fetcher) processResponse(response core.Response) {
 
 	/* f.flightLock.Lock()
 	defer f.flightLock.Lock() */
-	delHashes := make([]common.Hash, 0)
-	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0), IsSync: false}
+	//delHashes := make([]common.Hash, 0)
+	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0, 1)}
+	isolateEvent := &core.IsolateResponseEvet{Blocks: make([]types.Block, 0, 1)}
 	if packet, ok := response.(*NewBlockPacket); ok {
+		f.flightLock.Lock()
 		for _, item := range packet.blocks {
 			if block, err := types.BlockDecode(item); err == nil {
-				newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+				if task, ok := f.flighting[block.GetHash()]; ok {
+					if task.orphan {
+						isolateEvent.Blocks = append(isolateEvent.Blocks, block)
+					} else {
+						newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+					}
+					delete(f.flighting, block.GetHash())
+					log.Debug("Post block event to mempool", "hash", block.GetHash().String())
+				} else {
+					log.Debug("Found block response is not in flighting", "hash", block.GetHash())
+				}
 				//f.remove(block.GetHash())
-				delHashes = append(delHashes, block.GetHash())
-				log.Debug("Add block to mempool", "hash", block.GetHash().String())
+				//delHashes = append(delHashes, block.GetHash())
+
 			} else {
-				log.Error("Error Add block to mempool", "err", err, "packet", item)
+				log.Error("Error post block event to mempool", "err", err, "packet", item)
 			}
 		}
+		f.flightLock.Unlock()
 	}
-	f.UnMarkFlighting(delHashes)
+	//f.UnMarkFlighting(delHashes)
 	if len(newblockEvent.Blocks) > 0 {
 		f.blockPoolEvent.Post(newblockEvent)
+	}
+	if len(isolateEvent.Blocks) > 0 {
+		f.blockPoolEvent.Post(isolateEvent)
 	}
 }
 
 func (f *Fetcher) AsyncRequestBlock(hash common.Hash) error {
 	select {
 	case f.reqCh <- hash:
+		return nil
+	}
+	return nil
+	//s.blockQueueLock.Lock()
+	//s.blockReqQueue[hash] = ""
+	//s.blockQueueLock.Unlock()
+
+	//s.blockReqCh <- struct{}{}
+}
+
+func (f *Fetcher) AsyncRequestOrphanBlock(hash common.Hash) error {
+	select {
+	case f.reqOrphanCh <- hash:
 		return nil
 	}
 	return nil

@@ -41,7 +41,14 @@ type AnnounceEvent struct {
 
 type NewBlocksEvent struct {
 	Blocks []types.Block
-	IsSync bool
+}
+
+type IsolateResponseEvet struct {
+	Blocks []types.Block
+}
+
+type SYNCResponseEvent struct {
+	Blocks []types.Block
 }
 
 type RelayBlocksEvent struct {
@@ -50,6 +57,17 @@ type RelayBlocksEvent struct {
 
 type GetBlocksEvent struct {
 	Hashes []common.Hash
+	//IsOrphan bool
+}
+
+type BlockReq struct {
+	Hash     common.Hash
+	Isolated bool
+}
+
+type ErrorGetBlocksEvent struct {
+	Requests []BlockReq
+	Err      error
 }
 
 type NewSYNCTask struct {

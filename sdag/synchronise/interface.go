@@ -40,6 +40,8 @@ type SynchroniserI interface {
 	Clear(nodeID string)
 
 	RequestBlock(hash common.Hash) error
+	RequestIsolatedBlock(hash common.Hash) error
+
 	Broadcast(hash common.Hash) error
 	MarkAnnounced(hash common.Hash, nodeID string)
 

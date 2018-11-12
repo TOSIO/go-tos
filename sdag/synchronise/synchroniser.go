@@ -378,7 +378,7 @@ func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.
 		if res.response != nil {
 			end = res.response.End
 			stat.EndTS = res.response.CurEndTimeslice
-			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0), IsSync: true}
+			newblockEvent := &core.SYNCResponseEvent{Blocks: make([]types.Block, 0)}
 			log.Debug("Response dump", "end", end, "curEndPoint", stat.EndTS)
 			for _, tsblocks := range res.response.TSBlocks {
 				if maxTSIndex.Timeslice < tsblocks.TSIndex.Timeslice {
@@ -702,21 +702,21 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 				if blks.timeslice != ts {
 					continue
 				}
-				newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+				syncResoponseEvent := &core.SYNCResponseEvent{Blocks: make([]types.Block, 0)}
 				hashes := make([]common.Hash, 0)
 				for _, blk := range blks.blocks {
 					//s.mempool.EnQueue(blk)
 					if block, err := types.BlockDecode(blk); err == nil {
-						newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+						syncResoponseEvent.Blocks = append(syncResoponseEvent.Blocks, block)
 						hashes = append(hashes, block.GetHash())
 					}
 				}
 				//log.Debug("process response 1")
 				s.fetcher.UnMarkFlighting(hashes)
 				//log.Debug("process response 2")
-				stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
-				if len(newblockEvent.Blocks) > 0 {
-					s.blockPoolEvent.Post(newblockEvent)
+				stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(syncResoponseEvent.Blocks))
+				if len(syncResoponseEvent.Blocks) > 0 {
+					s.blockPoolEvent.Post(syncResoponseEvent)
 				}
 			}
 			log.Debug("timeslice done", "timeslice", ts)
@@ -743,6 +743,10 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 
 func (s *Synchroniser) RequestBlock(hash common.Hash) error {
 	return s.fetcher.AsyncRequestBlock(hash)
+}
+
+func (s *Synchroniser) RequestIsolatedBlock(hash common.Hash) error {
+	return s.fetcher.AsyncRequestOrphanBlock(hash)
 }
 
 func (s *Synchroniser) Broadcast(hash common.Hash) error {
