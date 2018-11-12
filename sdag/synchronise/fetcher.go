@@ -305,8 +305,10 @@ func (f *Fetcher) AsyncRequestBlock(hash common.Hash) error {
 	select {
 	case f.reqCh <- hash:
 		return nil
+	default:
+		log.Debug("Error push to queue,drop it", "hash", hash, "err", errQueueFull)
+		return errQueueFull
 	}
-	return nil
 	//s.blockQueueLock.Lock()
 	//s.blockReqQueue[hash] = ""
 	//s.blockQueueLock.Unlock()
@@ -318,8 +320,10 @@ func (f *Fetcher) AsyncRequestOrphanBlock(hash common.Hash) error {
 	select {
 	case f.reqOrphanCh <- hash:
 		return nil
+	default:
+		log.Debug("Error push to queue,drop it", "hash", hash, "err", errQueueFull)
+		return errQueueFull
 	}
-	return nil
 	//s.blockQueueLock.Lock()
 	//s.blockReqQueue[hash] = ""
 	//s.blockQueueLock.Unlock()

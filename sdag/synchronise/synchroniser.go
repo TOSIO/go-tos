@@ -28,6 +28,7 @@ var (
 	errNoSyncActive   = errors.New("no sync active")
 	errInternal       = errors.New("internal error")
 	errSendMsgTimeout = errors.New("send message timeout")
+	errQueueFull      = errors.New("queue is full")
 )
 
 type timesliceHash struct {
