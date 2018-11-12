@@ -156,31 +156,37 @@ func (pm *ProtocolManager) loop() {
 	for {
 		select {
 		case ev := <-pm.relaySub.Chan():
+			log.Trace("pm.relaySub.Chan 1")
 			if event, ok := ev.Data.(*core.RelayBlocksEvent); ok {
 				for _, block := range event.Blocks {
 					pm.synchroniser.Broadcast(block.GetHash())
 				}
 			}
+			log.Trace("pm.relaySub.Chan 2")
 		case ev := <-pm.getSub.Chan():
+			log.Trace("pm.getSub.Chan 1")
 			if event, ok := ev.Data.(*core.GetBlocksEvent); ok {
 				for _, block := range event.Hashes {
 					//log.Debug("Request", "peer.id", peer.NodeID)
 					pm.synchroniser.RequestBlock(block)
 				}
 			}
+			log.Trace("pm.getSub.Chan 2")
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
 			log.Debug("Accept a new peer,", "peer.id", peer.NodeID())
 		case <-pm.noMorePeers:
+			log.Debug("Exist for NO-MORE-PEERS")
 			return
 		case ev := <-pm.syncstatSub.Chan():
+			log.Trace("pm.syncstatSub.Chan 1")
 			if event, ok := ev.Data.(core.SYNCStatusEvent); ok {
 				if event.Progress == core.SYNC_END && event.Err == nil {
 					pm.stat.Status = STAT_WORKING
 					pm.stat.Syncstat = core.SYNCStatusEvent{}
 				}
 				pm.stat.Syncstat = event
-				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS,
+				log.Debug("Synchronizing", "progress", event.Progress.String(), "curorigin", event.CurOrigin, "curTS", event.CurTS, "curIndex(TS)", event.Index,
 					"startTS", event.BeginTS,
 					"endTS(cur)", event.EndTS,
 					"beginTime", event.BeginTime,
@@ -190,6 +196,7 @@ func (pm *ProtocolManager) loop() {
 					"err", event.Err)
 
 			}
+			log.Trace("pm.syncstatSub.Chan 2")
 		}
 	}
 }

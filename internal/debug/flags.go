@@ -136,7 +136,8 @@ func Setup(ctx *cli.Context, logdir string) error {
 			logdir,
 			//262144,
 			2097152,
-			log.JSONFormatOrderedEx(false, true),
+			//log.JSONFormatOrderedEx(false, true),
+			log.TerminalFormat(false),
 		)
 
 		if err != nil {

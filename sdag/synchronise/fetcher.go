@@ -58,14 +58,44 @@ func NewFetcher(peers core.PeerSet, poolEvent *event.TypeMux) *Fetcher {
 func (f *Fetcher) loop() {
 	f.wg.Add(1)
 	defer f.wg.Done()
+
+	for i := 0; i < maxRoutineCount; i++ {
+		go func(fetcher *Fetcher, ID int) {
+			fetcher.wg.Add(1)
+			defer fetcher.wg.Done()
+		workloop:
+			for {
+				select {
+				case hash, ok := <-f.reqCh:
+					log.Debug(">> Fetching block", "hash", hash.String())
+					if ok {
+						f.fetch(hash)
+					} else {
+						break workloop
+					}
+				case hash, ok := <-f.resCh:
+					if ok {
+						f.done(hash)
+					} else {
+						break workloop
+					}
+				}
+			}
+			log.Debug("Fetch worker exited", "ID", ID)
+			return
+		}(f, i)
+	}
+
 	for {
 		select {
-		case hash := <-f.reqCh:
-			log.Debug(">> Fetching block", "hash", hash.String())
-			go f.fetch(hash)
-		case hash := <-f.resCh:
-			go f.done(hash)
+		/* 		case hash := <-f.reqCh:
+		   			log.Debug(">> Fetching block", "hash", hash.String())
+		   			go f.fetch(hash)
+		   		case hash := <-f.resCh:
+		   			go f.done(hash) */
 		case <-f.quit:
+			close(f.reqCh)
+			close(f.resCh)
 			log.Info("Fetcher was stopped")
 			break
 		}
@@ -89,7 +119,7 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	if len(origins) <= 0 {
 		origins = f.randomSelectOrigins()
 		if origins == nil {
-			log.Warn("Not found data source")
+			log.Trace("Not found data source")
 			return
 		}
 	}
@@ -100,7 +130,7 @@ func (f *Fetcher) fetch(hash common.Hash) {
 	task.beginTime = time.Now()
 
 	if len(origins) <= 0 {
-		log.Warn("Not found data source")
+		log.Trace("Not found data source")
 		return
 	}
 	for _, peer := range origins {

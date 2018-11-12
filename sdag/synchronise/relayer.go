@@ -36,11 +36,32 @@ func (r *Relayer) stop() {
 func (r *Relayer) loop() {
 	r.wg.Add(1)
 	defer r.wg.Done()
+
+	for i := 0; i < maxRoutineCount; i++ {
+		go func(ralayer *Relayer, ID int) {
+			ralayer.wg.Add(1)
+			defer ralayer.wg.Done()
+		workloop:
+			for {
+				select {
+				case hash, ok := <-r.relayCh:
+					if ok {
+						ralayer.relay(hash)
+					} else {
+						break workloop
+					}
+				}
+			}
+			log.Debug("Relay worker exited", "ID", ID)
+			return
+		}(r, i)
+	}
 	for {
 		select {
-		case hash := <-r.relayCh:
-			go r.relay(hash)
+		/* 		case hash := <-r.relayCh:
+		go r.relay(hash) */
 		case <-r.quit:
+			close(r.relayCh)
 			return
 		}
 	}
