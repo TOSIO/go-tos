@@ -448,9 +448,9 @@ func (p *BlockPool) linkCheckAndSave(block types.Block) (bool, error) {
 	if isIsolated {
 		log.Info("is a Isolated block", "hash", block.GetHash().String())
 		if p.addIsolatedBlock(block, linksLackBlock) {
-			log.Debug("Request ancestor", "hash", block.GetHash().String())
-			event := &core.GetBlocksEvent{Hashes: linksLackBlock}
-			p.blockEvent.Post(event)
+			//log.Debug("Request ancestor", "hash", block.GetHash().String())
+			//event := &core.GetBlocksEvent{Hashes: linksLackBlock}
+			//p.blockEvent.Post(event)
 		}
 	} else {
 		//log.Trace("Verification passed")
