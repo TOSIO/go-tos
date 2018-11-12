@@ -21,7 +21,7 @@ import (
 )
 
 var maxRoutineCount int = 100
-var maxSYNCCapLimit = 3000
+var maxSYNCCapLimit = 6000
 var maxRetryCount = 3
 
 var (
@@ -378,7 +378,7 @@ func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.
 		if res.response != nil {
 			end = res.response.End
 			stat.EndTS = res.response.CurEndTimeslice
-			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+			newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0), IsSync: true}
 			log.Debug("Response dump", "end", end, "curEndPoint", stat.EndTS)
 			for _, tsblocks := range res.response.TSBlocks {
 				if maxTSIndex.Timeslice < tsblocks.TSIndex.Timeslice {

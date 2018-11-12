@@ -226,7 +226,7 @@ func (f *Fetcher) processResponse(response core.Response) {
 	/* f.flightLock.Lock()
 	defer f.flightLock.Lock() */
 	delHashes := make([]common.Hash, 0)
-	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0), IsSync: false}
 	if packet, ok := response.(*NewBlockPacket); ok {
 		for _, item := range packet.blocks {
 			if block, err := types.BlockDecode(item); err == nil {

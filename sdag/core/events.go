@@ -41,6 +41,7 @@ type AnnounceEvent struct {
 
 type NewBlocksEvent struct {
 	Blocks []types.Block
+	IsSync bool
 }
 
 type RelayBlocksEvent struct {
