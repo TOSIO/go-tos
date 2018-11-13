@@ -39,11 +39,15 @@ type AnnounceEvent struct {
 	Hash common.Hash
 }
 
-type NewBlocksEvent struct {
+type NetworkNewBlocksEvent struct {
 	Blocks []types.Block
 }
 
-type IsolateResponseEvet struct {
+type LocalNewBlocksEvent struct {
+	Blocks []types.Block
+}
+
+type IsolateResponseEvent struct {
 	Blocks []types.Block
 }
 

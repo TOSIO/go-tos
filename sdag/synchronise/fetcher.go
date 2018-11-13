@@ -266,8 +266,8 @@ func (f *Fetcher) processResponse(response core.Response) {
 	/* f.flightLock.Lock()
 	defer f.flightLock.Lock() */
 	//delHashes := make([]common.Hash, 0)
-	newblockEvent := &core.NewBlocksEvent{Blocks: make([]types.Block, 0, 1)}
-	isolateEvent := &core.IsolateResponseEvet{Blocks: make([]types.Block, 0, 1)}
+	newblockEvent := &core.NetworkNewBlocksEvent{Blocks: make([]types.Block, 0, 1)}
+	isolateEvent := &core.IsolateResponseEvent{Blocks: make([]types.Block, 0, 1)}
 	if packet, ok := response.(*NewBlockPacket); ok {
 		f.flightLock.Lock()
 		for _, item := range packet.blocks {

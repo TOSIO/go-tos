@@ -55,9 +55,12 @@ type BlockPool struct {
 	newblockFeed *event.Feed
 	blockEvent   *event.TypeMux
 
-	newAnnounceSub   *event.TypeMuxSubscription
-	newBlocksSub     *event.TypeMuxSubscription
-	queryUnverifySub *event.TypeMuxSubscription
+	newAnnounceSub      *event.TypeMuxSubscription
+	localNewBlocksSub   *event.TypeMuxSubscription
+	networkNewBlocksSub *event.TypeMuxSubscription
+	syncResponseSub     *event.TypeMuxSubscription
+	isolateResponseSub  *event.TypeMuxSubscription
+	queryUnverifySub    *event.TypeMuxSubscription
 
 	newBlockAddChan   chan types.Block
 	unverifiedAddChan chan common.Hash
@@ -96,7 +99,10 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 		//unverifiedGetChan: make(chan unverifiedReq),
 	}
 	pool.newAnnounceSub = pool.blockEvent.Subscribe(&core.AnnounceEvent{})
-	pool.newBlocksSub = pool.blockEvent.Subscribe(&core.NewBlocksEvent{})
+	pool.localNewBlocksSub = pool.blockEvent.Subscribe(&core.LocalNewBlocksEvent{})
+	pool.networkNewBlocksSub = pool.blockEvent.Subscribe(&core.NetworkNewBlocksEvent{})
+	pool.syncResponseSub = pool.blockEvent.Subscribe(&core.SYNCResponseEvent{})
+	pool.isolateResponseSub = pool.blockEvent.Subscribe(&core.IsolateResponseEvent{})
 	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
 	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
 	pool.statisticsAddBlock.Init("add block")
@@ -105,29 +111,39 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 	return pool
 }
 
-func (p *BlockPool) SubscribeNewBlocksEvent(ev chan<- core.NewBlocksEvent) {
-	p.newblockFeed.Subscribe(ev)
-}
-
 func (p *BlockPool) BlockProcessing() {
 	FromNetGoroutineCount := 128
 	for i := 0; i < FromNetGoroutineCount; i++ {
 		go func() {
-			for ch := range p.newBlocksSub.Chan() {
-				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
+			select {
+			case ch := <-p.localNewBlocksSub.Chan():
+				if ev, ok := ch.Data.(*core.LocalNewBlocksEvent); ok {
+					for _, block := range ev.Blocks {
+						p.AddBlock(block, true)
+					}
+				}
+				break
+			case ch := <-p.isolateResponseSub.Chan():
+				if ev, ok := ch.Data.(*core.IsolateResponseEvent); ok {
 					for _, block := range ev.Blocks {
 						p.AddBlock(block, false)
 					}
 				}
-			}
-		}()
-	}
-
-	localGoroutineCount := 128
-	for i := 0; i < localGoroutineCount; i++ {
-		go func() {
-			for block := range p.blockChan {
-				p.AddBlock(block, false)
+				break
+			case ch := <-p.networkNewBlocksSub.Chan():
+				if ev, ok := ch.Data.(*core.NetworkNewBlocksEvent); ok {
+					for _, block := range ev.Blocks {
+						p.AddBlock(block, true)
+					}
+				}
+				break
+			case ch := <-p.syncResponseSub.Chan():
+				if ev, ok := ch.Data.(*core.SYNCResponseEvent); ok {
+					for _, block := range ev.Blocks {
+						p.AddBlock(block, true)
+					}
+				}
+				break
 			}
 		}()
 	}
@@ -362,7 +378,7 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 }
 
 func (p *BlockPool) EnQueue(block types.Block) error {
-	event := core.NewBlocksEvent{Blocks: make([]types.Block, 0)}
+	event := core.LocalNewBlocksEvent{Blocks: make([]types.Block, 0)}
 	event.Blocks = append(event.Blocks, block)
 
 	p.blockEvent.Post(&event)
@@ -378,7 +394,7 @@ func (p *BlockPool) SyncAddBlock(block types.Block) error {
 	return nil
 }
 
-func (p *BlockPool) AddBlock(block types.Block, isSync bool) error {
+func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
 	log.Debug("begin AddBlock", "hash", block.GetHash().String(), "block", block)
 	err := block.Validation()
 	if err != nil {
@@ -401,7 +417,7 @@ func (p *BlockPool) AddBlock(block types.Block, isSync bool) error {
 		return fmt.Errorf("the block linksNumber =%d", linksNumber)
 	}
 
-	isIsolated, err := p.linkCheckAndSave(block, isSync)
+	isIsolated, err := p.linkCheckAndSave(block, isRelay)
 	if err != nil {
 		log.Error("linkCheckAndSave error" + err.Error())
 	}
@@ -414,7 +430,7 @@ func (p *BlockPool) AddBlock(block types.Block, isSync bool) error {
 	return err
 }
 
-func (p *BlockPool) linkCheckAndSave(block types.Block, isSync bool) (bool, error) {
+func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, error) {
 	var isIsolated bool
 	var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
@@ -471,7 +487,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isSync bool) (bool, erro
 		log.Debug("saveBlock finish", "hash", block.GetHash().String())
 		p.deleteIsolatedBlock(block)
 
-		if !isSync {
+		if isRelay {
 			log.Debug("Relay block", "hash", block.GetHash().String())
 			event := &core.RelayBlocksEvent{Blocks: make([]types.Block, 0)}
 			event.Blocks = append(event.Blocks, block)
