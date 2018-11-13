@@ -4,7 +4,7 @@ import "math/big"
 
 const (
 	TimePeriod   = 10000 // 60000 毫秒
-	MaxLinksNum  = 4     //最大链接次数
+	MaxLinksNum  = 3     //最大链接次数
 	ConfirmBlock = 8     //最大确定个数
 )
 

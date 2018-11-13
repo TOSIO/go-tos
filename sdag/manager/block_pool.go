@@ -116,7 +116,7 @@ func (p *BlockPool) BlockProcessing() {
 			for ch := range p.newBlocksSub.Chan() {
 				if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block, ev.IsSync)
+						p.AddBlock(block, false)
 					}
 				}
 			}
