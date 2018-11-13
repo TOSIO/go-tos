@@ -112,38 +112,91 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 }
 
 func (p *BlockPool) BlockProcessing() {
-	FromNetGoroutineCount := 128
-	for i := 0; i < FromNetGoroutineCount; i++ {
-		go func() {
+	localNewBlocks := make(chan types.Block, 10000)
+	isolateResponse := make(chan types.Block, 10000)
+	networkNewBlocks := make(chan types.Block, 10000)
+	syncResponse := make(chan types.Block, 10000)
+	go func() {
+		for {
 			select {
 			case ch := <-p.localNewBlocksSub.Chan():
 				if ev, ok := ch.Data.(*core.LocalNewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block, true)
+						localNewBlocks <- block
 					}
 				}
-				break
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
 			case ch := <-p.isolateResponseSub.Chan():
 				if ev, ok := ch.Data.(*core.IsolateResponseEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block, false)
+						isolateResponse <- block
 					}
 				}
-				break
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
 			case ch := <-p.networkNewBlocksSub.Chan():
 				if ev, ok := ch.Data.(*core.NetworkNewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block, true)
+						networkNewBlocks <- block
 					}
 				}
-				break
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
 			case ch := <-p.syncResponseSub.Chan():
 				if ev, ok := ch.Data.(*core.SYNCResponseEvent); ok {
 					for _, block := range ev.Blocks {
-						p.AddBlock(block, true)
+						syncResponse <- block
 					}
 				}
-				break
+			}
+		}
+	}()
+
+	FromNetGoroutineCount := 128
+	for i := 0; i < FromNetGoroutineCount; i++ {
+		go func() {
+			for {
+				select {
+				case block := <-localNewBlocks:
+					p.AddBlock(block, true)
+					continue
+				default:
+				}
+				select {
+				case block := <-isolateResponse:
+					p.AddBlock(block, false)
+					continue
+				default:
+				}
+				select {
+				case block := <-networkNewBlocks:
+					p.AddBlock(block, true)
+					continue
+				default:
+				}
+				select {
+				case block := <-syncResponse:
+					p.AddBlock(block, false)
+					continue
+				default:
+				}
+				time.Sleep(time.Millisecond)
 			}
 		}()
 	}
