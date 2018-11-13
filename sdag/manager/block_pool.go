@@ -164,7 +164,7 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 				}
 				p.rwlock.RUnlock()
 				if len(linksLackBlock) > 0 {
-					event := &core.GetBlocksEvent{Hashes: linksLackBlock}
+					event := &core.GetIsolateBlocksEvent{Hashes: linksLackBlock}
 					p.blockEvent.Post(event)
 				}
 				lastTime = currentTime
@@ -186,7 +186,7 @@ func (p *BlockPool) loop() {
 					if inlocal := storage.HasBlock(p.db, ev.Hash); !inlocal {
 						hashes := make([]common.Hash, 0)
 						hashes = append(hashes, ev.Hash)
-						event := &core.GetBlocksEvent{Hashes: hashes}
+						event := &core.GetNetworkNewBlocksEvent{Hashes: hashes}
 						p.blockEvent.Post(event)
 						log.Debug("Post fetch block event", "hash", ev.Hash)
 					}

@@ -48,6 +48,7 @@ type ProtocolManager struct {
 	blockPoolEvent *event.TypeMux
 	relaySub       *event.TypeMuxSubscription
 	getSub         *event.TypeMuxSubscription
+	getIsolateSub  *event.TypeMuxSubscription
 
 	syncEvent   *event.TypeMux
 	syncstatSub *event.TypeMuxSubscription
@@ -122,7 +123,8 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	}
 
 	manager.relaySub = manager.blockPoolEvent.Subscribe(&core.RelayBlocksEvent{})
-	manager.getSub = manager.blockPoolEvent.Subscribe(&core.GetBlocksEvent{})
+	manager.getSub = manager.blockPoolEvent.Subscribe(&core.GetNetworkNewBlocksEvent{})
+	manager.getIsolateSub = manager.blockPoolEvent.Subscribe(&core.GetIsolateBlocksEvent{})
 
 	manager.syncEvent = &event.TypeMux{}
 	manager.syncstatSub = manager.syncEvent.Subscribe(core.SYNCStatusEvent{})
@@ -165,13 +167,22 @@ func (pm *ProtocolManager) loop() {
 			log.Debug("pm.relaySub.Chan 2")
 		case ev := <-pm.getSub.Chan():
 			log.Debug("pm.getSub.Chan 1")
-			if event, ok := ev.Data.(*core.GetBlocksEvent); ok {
+			if event, ok := ev.Data.(*core.GetNetworkNewBlocksEvent); ok {
 				for _, block := range event.Hashes {
 					//log.Debug("Request", "peer.id", peer.NodeID)
 					pm.synchroniser.RequestBlock(block)
 				}
 			}
 			log.Debug("pm.getSub.Chan 2")
+		case ev := <-pm.getIsolateSub.Chan():
+			log.Debug("pm.getIsolateSub.Chan 1")
+			if event, ok := ev.Data.(*core.GetIsolateBlocksEvent); ok {
+				for _, block := range event.Hashes {
+					//log.Debug("Request", "peer.id", peer.NodeID)
+					pm.synchroniser.RequestIsolatedBlock(block)
+				}
+			}
+			log.Debug("pm.getIsolateSub.Chan 2")
 		case peer := <-pm.newPeerCh:
 			// Make sure we have peers to select from, then sync
 			log.Debug("Accept a new peer,", "peer.id", peer.NodeID())

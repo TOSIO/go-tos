@@ -59,7 +59,12 @@ type RelayBlocksEvent struct {
 	Blocks []types.Block
 }
 
-type GetBlocksEvent struct {
+type GetNetworkNewBlocksEvent struct {
+	Hashes []common.Hash
+	//IsOrphan bool
+}
+
+type GetIsolateBlocksEvent struct {
 	Hashes []common.Hash
 	//IsOrphan bool
 }
