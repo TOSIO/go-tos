@@ -591,6 +591,11 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	if len(blocks) <= 0 {
+		//forward
+		for _, hash := range req {
+			pm.synchroniser.RequestBlock(hash)
+		}
+		log.Debug("Forward request block", "size", len(req))
 		return nil
 	}
 	// 将结果回复给对方
