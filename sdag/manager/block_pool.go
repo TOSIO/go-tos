@@ -45,8 +45,8 @@ type BlockPool struct {
 	emptyC    chan struct{}
 	blockChan chan types.Block
 
-	IsolatedBlockMap map[common.Hash]IsolatedBlock
-	lackBlockMap     map[common.Hash]lackBlock
+	IsolatedBlockMap map[common.Hash]*IsolatedBlock
+	lackBlockMap     map[common.Hash]*lackBlock
 	rwlock           sync.RWMutex
 	addBlockLock     sync.RWMutex
 
@@ -85,8 +85,8 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 		emptyC:       make(chan struct{}, 1),
 		blockChan:    make(chan types.Block, 8),
 
-		IsolatedBlockMap: make(map[common.Hash]IsolatedBlock),
-		lackBlockMap:     make(map[common.Hash]lackBlock),
+		IsolatedBlockMap: make(map[common.Hash]*IsolatedBlock),
+		lackBlockMap:     make(map[common.Hash]*lackBlock),
 
 		maxQueueSize: 10000,
 
@@ -318,30 +318,30 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 		return false
 	}
 
-	p.IsolatedBlockMap[isolated] = IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
+	newIsolatedBlock := &IsolatedBlock{links, []common.Hash{}, uint32(time.Now().Unix()), block.GetRlp()}
+	needMeBlock, ok := p.lackBlockMap[isolated]
+	if ok {
+		newIsolatedBlock.LinkIt = append(newIsolatedBlock.LinkIt, needMeBlock.LinkIt...)
+		delete(p.lackBlockMap, isolated)
+	}
+
+	p.IsolatedBlockMap[isolated] = newIsolatedBlock
 	for _, link := range links {
 		v, ok := p.IsolatedBlockMap[link] //if the ancestor of the block has already existed in orphan graph
 		if ok {
 			v.LinkIt = append(v.LinkIt, isolated) //update the ancestor's desendant list who is directly reference it
-			p.IsolatedBlockMap[link] = v
+			//p.IsolatedBlockMap[link] = v
 		} else { //marker the parent
 			v, ok := p.lackBlockMap[link]
 			if ok {
 				v.LinkIt = append(v.LinkIt, isolated)
-				p.lackBlockMap[link] = v
+				//p.lackBlockMap[link] = v
 			} else {
-				p.lackBlockMap[link] = lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
+				p.lackBlockMap[link] = &lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
 			}
 		}
 	}
 
-	lackBlock, ok := p.lackBlockMap[isolated]
-	if ok {
-		v := p.IsolatedBlockMap[isolated]
-		v.LinkIt = append(v.LinkIt, lackBlock.LinkIt...)
-		p.IsolatedBlockMap[isolated] = v
-		delete(p.lackBlockMap, isolated)
-	}
 	log.Debug("end addIsolatedBlock", "hash", block.GetHash(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
 	return true
 }
@@ -355,75 +355,69 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
 
+	type DeleteIsolated struct {
+		block  types.Block
+		LinkIt []common.Hash
+	}
+
 	log.Debug("begin deleteIsolatedBlock", "hash", block.GetHash().String())
 	count := 0
 	blockHash := block.GetHash()
 	v, ok := p.lackBlockMap[blockHash]
 	if ok {
 		delete(p.lackBlockMap, blockHash)
-		//save blcok
-		currentList := v.LinkIt // descendants
-		nextLayerList := []common.Hash{}
-		ancestorCache := make(map[common.Hash]*verifyMarker)
-		ancestorCache[blockHash] = &verifyMarker{block, false}
+		currentList := []*DeleteIsolated{&DeleteIsolated{block, v.LinkIt}} // descendants
+		var nextLayerList []*DeleteIsolated
 
 		for len(currentList) > 0 {
-			for _, hash := range currentList { // process descendants by layer
-				isolated, ok := p.IsolatedBlockMap[hash]
-				if !ok {
-					log.Error("IsolatedBlockMap[hash] Exception")
-					return
-				}
-				ancesotrs := make([]common.Hash, 0)
-				copy(ancesotrs, isolated.Links)
-				// pruning ancestors
-				for i := 0; i < len(isolated.Links); {
-					if _, ok := ancestorCache[isolated.Links[i]]; ok /* && marker != nil */ {
-						/* if !marker.verified {
-							p.verifyAncestor(marker.block)
-							marker.verified = true
-						} */
-						isolated.Links = append(isolated.Links[:i], isolated.Links[i+1:]...)
-					} else {
-						i++
+			for _, deleteIsolated := range currentList { // process descendants by layer
+				for _, hash := range deleteIsolated.LinkIt {
+					isolated, ok := p.IsolatedBlockMap[hash]
+					if !ok {
+						log.Error("IsolatedBlockMap[hash] Exception")
+						continue
 					}
-				}
-
-				if len(isolated.Links) == 0 {
-					delete(p.IsolatedBlockMap, hash)
-					//verify ancestor
-					for _, ancestor := range ancesotrs {
-						if marker, ok := ancestorCache[ancestor]; ok && marker != nil {
-							if !marker.verified {
-								p.verifyAncestor(marker.block)
-								marker.verified = true
-							}
-						}
-					}
-					// save block
-					if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
-						ancestorCache[hash] = &verifyMarker{fullBlock, false}
-						hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(fullBlock)
-						if err == nil {
-							log.Debug("ComputeCumulativeDiff finish", "hash", fullBlock.GetHash().String())
-							p.saveBlock(fullBlock)
-							if hasUpdateCumulativeDiff {
-								p.mainChainI.UpdateTail(fullBlock)
-							}
-							log.Debug("Delete block from orphan graph", "hash", blockHash.String(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
-							p.statisticsDeleteIsolatedBlock.Statistics(true)
-							count++
+					var isFound bool
+					for i := 0; i < len(isolated.Links); {
+						if isolated.Links[i] == deleteIsolated.block.GetHash() {
+							isolated.Links = append(isolated.Links[:i], isolated.Links[i+1:]...)
+							isFound = true
 						} else {
-							log.Error("deleteIsolatedBlock ComputeCumulativeDiff failed", "block", hash.String(), "err", err)
+							i++
 						}
-					} else {
-						log.Error("Unserialize(UnRLP) failed", "block", hash.String(), "err", err)
+					}
+
+					if !isFound {
+						log.Error("IsolatedBlockMap[hash] Links not found self")
+					}
+					if len(isolated.Links) == 0 {
+						delete(p.IsolatedBlockMap, hash)
+						// save block
+						if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
+							p.deleteUnverifiedBlocks(fullBlock.GetLinks())
+							hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(fullBlock)
+							if err == nil {
+								log.Debug("ComputeCumulativeDiff finish", "hash", fullBlock.GetHash().String())
+								p.saveBlock(fullBlock)
+								if hasUpdateCumulativeDiff {
+									p.mainChainI.UpdateTail(fullBlock)
+								}
+								nextLayerList = append(nextLayerList, &DeleteIsolated{fullBlock, isolated.LinkIt})
+
+								log.Debug("Delete block from orphan graph", "hash", hash.String(), "IsolatedBlockMap len", len(p.IsolatedBlockMap), "lackBlockMap len", len(p.lackBlockMap))
+								p.statisticsDeleteIsolatedBlock.Statistics(true)
+								count++
+							} else {
+								log.Error("deleteIsolatedBlock ComputeCumulativeDiff failed", "block", hash.String(), "err", err)
+							}
+						} else {
+							log.Error("Unserialize(UnRLP) failed", "block", hash.String(), "err", err)
+						}
 					}
 				}
-				nextLayerList = append(nextLayerList, isolated.LinkIt...)
 			}
 			currentList = nextLayerList
-			nextLayerList = []common.Hash{}
+			nextLayerList = []*DeleteIsolated{}
 		}
 	}
 
@@ -457,7 +451,8 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
 
 	ok := storage.HasBlock(p.db, block.GetHash())
 	if ok {
-		//log.Error("the block has been added", "hash", block.GetHash().String())
+		log.Debug("the block has been added", "hash", block.GetHash().String())
+		p.deleteIsolatedBlock(block)
 		return fmt.Errorf("the block has been added")
 	} else {
 		//log.Trace("Non-repeating block")
@@ -485,7 +480,7 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
 
 func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, error) {
 	var isIsolated bool
-	var linkBlockIs []types.Block
+	//var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
@@ -496,14 +491,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, err
 					log.Error("links time error", "block time", block.GetTime(), "link time", linkBlockI.GetTime())
 					return false, fmt.Errorf("links time error")
 				} else {
-					//info, err := storage.ReadBlockMutableInfo(p.db, hash)
-					//if err != nil {
-					//	log.Error("ReadBlockMutableInfo error", "hash", hash)
-					//	return fmt.Errorf("ReadBlockMutableInfo error")
-					//}
-					//linkBlockI.SetMutableInfo(info)
-					linkBlockIs = append(linkBlockIs, linkBlockI)
-					//log.Trace("links time legal")
+					//linkBlockIs = append(linkBlockIs, linkBlockI)
 				}
 			} else {
 				log.Error("linkBlockEI assertion failure", "hash", hash)
@@ -524,8 +512,8 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, err
 		}
 	} else {
 		//log.Trace("Verification passed")
-		p.verifyAncestors(linkBlockIs)
-		log.Debug("verifyAncestors finish", "hash", block.GetHash().String())
+		p.deleteUnverifiedBlocks(block.GetLinks())
+		log.Debug("deleteUnverifiedBlocks finish", "hash", block.GetHash().String())
 		p.addBlockLock.Lock()
 		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
 		if err != nil {
@@ -568,6 +556,12 @@ func (p *BlockPool) verifyAncestor(ancestor types.Block) {
 func (p *BlockPool) verifyAncestors(ancestors []types.Block) {
 	for _, ancestor := range ancestors {
 		p.verifyAncestor(ancestor)
+	}
+}
+
+func (p *BlockPool) deleteUnverifiedBlocks(hashSlice []common.Hash) {
+	for _, hash := range hashSlice {
+		p.deleteUnverifiedBlock(hash)
 	}
 }
 

@@ -25,24 +25,23 @@ var (
 	sendFormat3 = `{
 "jsonrpc":"2.0",
 "method":"sdag_getMainBlockInfo",
-"params":["{\"Time\" :%d}"],
+"params":[{"Time" :%d}],
 "id":1
 }
 `
 
 	addr1 = `http://10.10.20.13:8545`
 	addr2 = `http://10.10.10.37:8545`
-	addr  = addr1
+	addr3 = `http://10.10.10.34:8545`
+	addr  = addr3
 )
 
-type RPCResultStr struct {
-	Result string
-}
 type ResultTail struct {
-	Hash string
+	Result struct{ Hash string }
 }
+
 type ResultBlock struct {
-	MaxLinkHash string
+	Result struct{ Max_link_hash string }
 }
 
 func main() {
@@ -52,21 +51,15 @@ func main() {
 		return
 	}
 	//fmt.Println(string(body))
-	var RPCResult RPCResultStr
-	err = json.Unmarshal(body, &RPCResult)
+	var resultTail ResultTail
+	err = json.Unmarshal(body, &resultTail)
 	if err != nil {
 		fmt.Println(string(body))
 		fmt.Println(err)
 		return
 	}
 
-	var result ResultTail
-	err = json.Unmarshal([]byte(RPCResult.Result), &result)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	Hash := result.Hash
+	Hash := resultTail.Result.Hash
 	var perHash string
 	fmt.Println(Hash)
 
@@ -79,26 +72,21 @@ func main() {
 			fmt.Printf("sendString1 error %s", err.Error())
 			break
 		}
-		var RPCResult RPCResultStr
-		err = json.Unmarshal(body, &RPCResult)
+		//fmt.Println(string(body))
+		var resultBlock ResultBlock
+		err = json.Unmarshal(body, &resultBlock)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		var result ResultBlock
-		err = json.Unmarshal([]byte(RPCResult.Result), &result)
-		if err != nil {
-			fmt.Println(err)
-			break
-		}
-		if common.HexToHash(result.MaxLinkHash) == (common.Hash{}) {
-			fmt.Printf("MaxLinkHash:%s\n", result.MaxLinkHash)
+		if common.HexToHash(resultBlock.Result.Max_link_hash) == (common.Hash{}) {
+			fmt.Printf("MaxLinkHash:%s\n", resultBlock.Result.Max_link_hash)
 			fmt.Printf("hash:%v\n", common.HexToHash(Hash))
 			fmt.Printf("hash:%v\n", Hash)
 			break
 		}
 		perHash = Hash
-		Hash = result.MaxLinkHash
+		Hash = resultBlock.Result.Max_link_hash
 	}
 	fmt.Println(count)
 	fmt.Println(perHash)
