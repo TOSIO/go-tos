@@ -488,7 +488,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					endTimeslice = ack.response.ConfirmPoint.Timeslice
 					for pos++; count < maxSYNCCapLimit && pos < len(cache.hashes); pos++ {
 						block := s.blkstorage.GetBlock(cache.hashes[pos])
-						log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
+
 						if block != nil {
 							tsblocks.TSIndex.Index = uint(pos)
 							tsblocks.Blocks = append(tsblocks.Blocks, block.GetRlp())
@@ -497,11 +497,13 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 							log.Debug("Error load block", "nodeID", nodeID, "timeslice", cache.timeslice, "hash", cache.hashes[pos].String())
 						}
 					}
+					log.Debug("Handle packing(remain)", "nodeID", nodeID, "timeslice", cache.timeslice,
+						"total", len(cache.hashes), "curPos", pos-1, "curPacking", len(tsblocks.Blocks), "remain", len(cache.hashes)-pos-1)
+
+					//log.Debug("Make SYNC-BLOCK-RESPONSE(remain)", "nodeID", nodeID, "timeslice", cache.timeslice, "size", len(tsblocks.Blocks))
 					if pos < len(cache.hashes) {
 						remain = true
 					}
-					log.Debug("Handle packing(remain)", "nodeID", nodeID, "timeslice", cache.timeslice,
-						"total", len(cache.hashes), "curPos", pos-1, "curPacking", len(tsblocks.Blocks), "remain", len(cache.hashes)-pos-1)
 
 					response.TSBlocks = append(response.TSBlocks, tsblocks)
 				} /*  else {
@@ -524,10 +526,10 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					}
 
 					if len(hashes) <= maxSYNCCapLimit-count {
-						for _, hash := range hashes {
-							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hash.String())
+						/* for _, hash := range hashes {
+							log.Trace(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hash.String())
 						}
-
+						*/
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(len(hashes))
@@ -535,15 +537,17 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 							count += len(hashes)
 							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
+							//log.Debug("Make SYNC-BLOCK-RESPONSE(full)", "nodeID", nodeID, "timeslice", endTimeslice, "size", maxSYNCCapLimit-count)
 							continue
 						}
 					} else {
 						s.cachelock.Lock()
 						s.sliceCache[nodeID] = &timesliceHash{timeslice: endTimeslice, hashes: hashes}
 						s.cachelock.Unlock()
-						for i := 0; i < maxSYNCCapLimit-count; i++ {
-							log.Debug(">> SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "timeslice", endTimeslice, "hash", hashes[i].String())
-						}
+						/* for i := 0; i < maxSYNCCapLimit-count; i++ {
+
+						} */
+
 						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
 							tsblocks.Blocks = blocks
 							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
@@ -551,6 +555,8 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 
 							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPos", len(blocks), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
+
+							//log.Debug("Make SYNC-BLOCK-RESPONSE(portion)", "nodeID", nodeID, "timeslice", endTimeslice, "size", maxSYNCCapLimit-count)
 						} else {
 							log.Debug("Error load block", "nodeID", nodeID, "timeslice", endTimeslice)
 						}
@@ -574,7 +580,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 				}
 				// send new syn-blocks-response message
 			} else {
-				log.Debug("Error to find peer", "nodeID", nodeID)
+				log.Debug("Error find peer", "nodeID", nodeID)
 				return fmt.Errorf("peer offline")
 			}
 		}

@@ -2,6 +2,7 @@ package synchronise
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -79,7 +80,7 @@ func (f *Fetcher) loop() {
 						break workloop
 					}
 				case hash, ok := <-f.reqOrphanCh:
-					log.Debug(">> Fetching block", "hash", hash.String())
+					log.Debug(">> Fetching isolated block", "hash", hash.String())
 					if ok {
 						f.fetch(hash, true)
 					} else {
@@ -131,6 +132,7 @@ func (f *Fetcher) fetch(hash common.Hash, orphan bool) {
 	f.flightLock.RLock()
 	if _, ok := f.flighting[hash]; ok {
 		f.flightLock.RUnlock()
+		log.Trace("Already in fetching", "hash", hash.String(), "isolated", orphan)
 		return
 	}
 	f.flightLock.RUnlock()
@@ -139,7 +141,7 @@ func (f *Fetcher) fetch(hash common.Hash, orphan bool) {
 	if len(origins) <= 0 {
 		origins = f.randomSelectOrigins()
 		if origins == nil {
-			log.Trace("Not found data source")
+			log.Trace("Not found data source(by random select)", "hash", hash.String(), "isolated", orphan)
 			return
 		}
 	}
@@ -151,7 +153,7 @@ func (f *Fetcher) fetch(hash common.Hash, orphan bool) {
 	task.orphan = orphan
 
 	if len(origins) <= 0 {
-		log.Trace("Not found data source")
+		log.Trace("Not found data source", "hash", hash.String(), "isolated", orphan)
 		return
 	}
 	for _, peer := range origins {
@@ -195,6 +197,23 @@ func (f *Fetcher) whoAnnounced(hash common.Hash) mapset.Set {
 }
 
 func (f *Fetcher) randomSelectOrigins() []core.Peer {
+	if f.peerset != nil {
+		peers := f.peerset.Peers()
+		if len(peers) <= 0 {
+			return nil
+		}
+
+		num := rand.Intn(len(peers))
+		result := make([]core.Peer, 0, num)
+		for _, peer := range peers {
+			if peer != nil {
+				result = append(result, peer)
+				if len(result) >= num {
+					return result
+				}
+			}
+		}
+	}
 	return nil
 }
 
