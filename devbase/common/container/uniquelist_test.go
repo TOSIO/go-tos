@@ -9,7 +9,7 @@ import (
 )
 
 func TestLinkedList(t *testing.T) {
-	list := container.NewUniqueList()
+	list := container.NewUniqueList(100)
 
 	err := list.Push(12)
 	if err != nil {

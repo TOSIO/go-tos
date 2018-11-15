@@ -20,13 +20,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/devbase/utils"
-	"github.com/TOSIO/go-tos/params"
-	"github.com/TOSIO/go-tos/sdag/core/state"
-	"github.com/TOSIO/go-tos/sdag/core/storage"
-	"github.com/TOSIO/go-tos/services/accounts/keystore"
-	"github.com/pborman/uuid"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -34,6 +27,14 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/TOSIO/go-tos/devbase/statistics"
+	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
+	"github.com/TOSIO/go-tos/services/accounts/keystore"
+	"github.com/pborman/uuid"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
@@ -63,13 +64,14 @@ func (api *PublicSdagAPI) DoRequest(data string) string {
 	log.Trace("func PublicSdagAPI.DoRequest | receive request,", "param", data)
 	return ""
 }
-func (api *PublicSdagAPI) Status() string {
-	data, err := json.Marshal(api.s.Status())
-	if err != nil {
-		return ""
-	} else {
-		return string(data)
-	}
+func (api *PublicSdagAPI) Status() (interface{}, error) {
+	/* 	data, err := json.Marshal(api.s.Status())
+	   	if err != nil {
+	   		return ""
+	   	} else {
+	   		return string(data)
+	   	} */
+	return api.s.Status(), nil
 }
 
 type accountInfo struct {
