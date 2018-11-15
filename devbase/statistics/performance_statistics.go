@@ -36,6 +36,7 @@ func (s *Statistics) Init(info string) {
 				fmt.Printf("%ds totalCount = %d\n", actualIntervalS, count)
 				fmt.Printf("%d/s\n", count/actualIntervalS)
 				fmt.Println("NumGoroutine:", runtime.NumGoroutine())
+				fmt.Println("nowTime:", nowTime/int64(time.Second))
 				s.lastTotalCount.Set(totalCount)
 				s.lastTime = nowTime
 			}

@@ -599,6 +599,7 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	for itr, _ := p.unverifiedBlocks.Front(); itr != nil && i < number; itr = itr.Next() {
 		if hash, ok := itr.Data().(common.Hash); ok {
 			links = append(links, hash)
+			//p.unverifiedBlocks.Remove(hash)
 			i++
 		} else {
 			log.Error("error hash.(common.Hash): ", hash)

@@ -24,7 +24,7 @@ var (
 	sendFormat3 = `{
 "jsonrpc":"2.0",
 "method":"sdag_getMainBlockInfo",
-"params":["{\"Time\" :%d}"],
+"params":[{"Time" :"%d"}],
 "id":1
 }
 `
@@ -33,19 +33,24 @@ var (
 	addr2 = `http://10.10.20.13:8545`
 )
 
-type RPCResultStr struct {
-	Result string
-}
-type ResultTail struct {
-	Hash string
-	Time uint64
-}
 type ResultBlockInfo struct {
-	Time uint64
+	Result struct {
+		Time uint64
+	}
 }
+
+type ResultTail struct {
+	Result struct {
+		Hash string
+		Time uint64
+	}
+}
+
 type ResultMainInfo struct {
-	Root        string
-	MaxLinkHash string
+	Result struct {
+		Root          string
+		Max_link_hash string
+	}
 }
 
 func getTail(addr string) (*ResultTail, error) {
@@ -54,24 +59,17 @@ func getTail(addr string) (*ResultTail, error) {
 		fmt.Printf("sendString1 error %s", err.Error())
 		return nil, err
 	}
-	fmt.Println(string(body))
-	var RPCResult RPCResultStr
-	err = json.Unmarshal(body, &RPCResult)
+	fmt.Println(addr + " :" + string(body))
+	var resultTail ResultTail
+	err = json.Unmarshal(body, &resultTail)
 	if err != nil {
 		fmt.Println(string(body))
 		fmt.Println(err)
 		return nil, err
 	}
-
-	var result ResultTail
-	err = json.Unmarshal([]byte(RPCResult.Result), &result)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	Time := result.Time
+	Time := resultTail.Result.Time
 	fmt.Printf("%d\n", Time)
-	return &result, nil
+	return &resultTail, nil
 }
 
 func GetBlockInfoByHash(addr string, hash string) (*ResultBlockInfo, error) {
@@ -81,19 +79,13 @@ func GetBlockInfoByHash(addr string, hash string) (*ResultBlockInfo, error) {
 		fmt.Printf("sendString1 error %s", err.Error())
 		return nil, err
 	}
-	var RPCResult RPCResultStr
-	err = json.Unmarshal(body, &RPCResult)
+	var resultBlockInfo ResultBlockInfo
+	err = json.Unmarshal(body, &resultBlockInfo)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
-	var result ResultBlockInfo
-	err = json.Unmarshal([]byte(RPCResult.Result), &result)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	return &result, nil
+	return &resultBlockInfo, nil
 }
 
 func GetMainInfoByTime(addr string, time uint64) (*ResultMainInfo, error) {
@@ -103,19 +95,13 @@ func GetMainInfoByTime(addr string, time uint64) (*ResultMainInfo, error) {
 		fmt.Printf("sendString1 error %s", err.Error())
 		return nil, err
 	}
-	var RPCResult RPCResultStr
-	err = json.Unmarshal(body, &RPCResult)
+	var resultMainInfo ResultMainInfo
+	err = json.Unmarshal(body, &resultMainInfo)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
-	var result ResultMainInfo
-	err = json.Unmarshal([]byte(RPCResult.Result), &result)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-	return &result, err
+	return &resultMainInfo, err
 }
 
 func main() {
@@ -124,13 +110,13 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	hash1 := tail1.Hash
+	hash1 := tail1.Result.Hash
 	tail2, err := getTail(addr2)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	hash2 := tail2.Hash
+	hash2 := tail2.Result.Hash
 	count := 0
 	for {
 		block1, err := GetBlockInfoByHash(addr1, hash1)
@@ -138,30 +124,30 @@ func main() {
 			fmt.Println(err)
 			return
 		}
-		mainBlock1, err := GetMainInfoByTime(addr1, block1.Time)
+		mainBlock1, err := GetMainInfoByTime(addr1, block1.Result.Time)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		hash1 = mainBlock1.MaxLinkHash
+		hash1 = mainBlock1.Result.Max_link_hash
 
 		block2, err := GetBlockInfoByHash(addr2, hash2)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		mainBlock2, err := GetMainInfoByTime(addr2, block2.Time)
+		mainBlock2, err := GetMainInfoByTime(addr2, block2.Result.Time)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		hash2 = mainBlock2.MaxLinkHash
+		hash2 = mainBlock2.Result.Max_link_hash
 
+		count++
 		fmt.Printf("count=%d\n", count)
-		fmt.Println(mainBlock1.Root, mainBlock2.Root)
-		if mainBlock1.Root == mainBlock2.Root {
+		fmt.Println(mainBlock1.Result.Root, mainBlock2.Result.Root)
+		if mainBlock1.Result.Root == mainBlock2.Result.Root {
 			return
 		}
-		count++
 	}
 }

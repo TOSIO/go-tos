@@ -442,7 +442,7 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 		if err != nil {
 			return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 		}
-		if mutableInfo.ConfirmItsTimeSlice != block.GetTime() {
+		if (mutableInfo.ConfirmItsTimeSlice != utils.GetMainTime(block.GetTime())) && (mutableInfo.ConfirmItsTimeSlice != 0) {
 			continue
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
@@ -464,7 +464,7 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block) error {
 		if err != nil {
 			return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 		}
-		if (mutableInfo.ConfirmItsTimeSlice != block.GetTime()) && (mutableInfo.ConfirmItsTimeSlice != 0) {
+		if (mutableInfo.ConfirmItsTimeSlice != utils.GetMainTime(block.GetTime())) && (mutableInfo.ConfirmItsTimeSlice != 0) {
 			continue
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
