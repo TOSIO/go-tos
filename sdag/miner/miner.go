@@ -241,6 +241,8 @@ newMinerTash:
 					//compare diff value
 					if diff.Cmp(fDiff) > 0 {
 						mineBlock.Links[0] = hash
+						//去重
+						mineBlock.Links = RemoveRepeatedElement(mineBlock.Links)
 					}
 					count = 0
 				}
