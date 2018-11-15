@@ -137,18 +137,14 @@ func (m *Miner) listen() {
 			switch ev {
 			case core.NETWORK_CONNECTED: //net ok
 				schedule(m, true)
-			log.Debug("miner netstatus core.NETWORK_CONNECTED")
 			case core.NETWORK_CLOSED: //net closed
 				schedule(m, false)
-				log.Debug("miner netstatus core.NETWORK_CLOSED")
 			case core.SDAGSYNC_SYNCING:
 				m.SyncState = core.SDAGSYNC_SYNCING
 				schedule(m, false)
-				log.Debug("miner netstatus core.SDAGSYNC_SYNCING")
 			case core.SDAGSYNC_COMPLETED:
 				m.SyncState = core.SDAGSYNC_COMPLETED
 				schedule(m, true)
-				log.Debug("miner netstatus core.SDAGSYNC_COMPLETED")
 			}
 		case ismining, ok := <-m.miningCh:
 			log.Debug("miner netstatus ","m.miningCh",ismining)
@@ -188,8 +184,6 @@ func work(m *Miner) {
 	}
 	defer clean()
 
-	//log.Debug("miner work")
-	//get random nonce
 
 newMinerTash:
 	for {
@@ -213,14 +207,13 @@ newMinerTash:
 		mineBlock.Links = append(mineBlock.Links, fhash)
 		//select params.MaxLinksNum-1 unverifiedblock to links
 		mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
+		//去重
+		mineBlock.Links = RemoveRepeatedElement(mineBlock.Links)
 		// search nonce
 
 		for {
 			select {
 			case <-m.stopMiningCh:
-				log.Debug("Stop mining work")
-				return
-			case <-m.poststopMiningCh:
 				log.Debug("Stop mining work")
 				return
 			default:
@@ -297,3 +290,22 @@ func (m *Miner) CanMiner() bool{
 	}
 	return false
 }
+
+//数组去重
+func RemoveRepeatedElement(arr []common.Hash) (newArr []common.Hash) {
+	newArr = make([]common.Hash, 0)
+	for i := 0; i < len(arr); i++ {
+		repeat := false
+		for j := i + 1; j < len(arr); j++ {
+			if arr[i] == arr[j] {
+				repeat = true
+				break
+			}
+		}
+		if !repeat {
+			newArr = append(newArr, arr[i])
+		}
+	}
+	return
+}
+
