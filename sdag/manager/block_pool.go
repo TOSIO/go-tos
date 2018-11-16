@@ -55,6 +55,8 @@ type BlockPool struct {
 	syncStatusFeed *event.Feed
 	blockEvent     *event.TypeMux
 
+	syncSub event.Subscription
+
 	newAnnounceSub      *event.TypeMuxSubscription
 	localNewBlocksSub   *event.TypeMuxSubscription
 	networkNewBlocksSub *event.TypeMuxSubscription
@@ -107,7 +109,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 	pool.syncResponseSub = pool.blockEvent.Subscribe(&core.SYNCResponseEvent{})
 	pool.isolateResponseSub = pool.blockEvent.Subscribe(&core.IsolateResponseEvent{})
 	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
-	//pool.syncStatusFeed.Subscribe(pool.syncStatusSub)
+	pool.syncSub = pool.syncStatusFeed.Subscribe(pool.syncStatusSub)
 	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
 	pool.statisticsAddBlock.Init("add block")
 	pool.statisticsDeleteIsolatedBlock.Init("delete isolated block")
@@ -238,6 +240,7 @@ func (p *BlockPool) loop() {
 	//UnverifiedBlockList.PushFront(genesis)
 	p.unverifiedBlocks.Push(p.mainChainI.GetTail().Hash)
 	go func() {
+		//defer p.syncSub.Unsubscribe()
 		for {
 			select {
 			case ch := <-p.newAnnounceSub.Chan():
@@ -286,18 +289,12 @@ func (p *BlockPool) loop() {
 					}
 					req.done <- struct{}{}
 				} */
+			case p.syncStatus = <-p.syncStatusSub:
+				log.Debug("Handle sync-status")
 			}
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case p.syncStatus = <-p.syncStatusSub:
-				fmt.Println("syncStatus:", p.syncStatus)
-			}
-		}
-	}()
 	p.TimedRequestForIsolatedBlocks()
 	p.BlockProcessing()
 }
