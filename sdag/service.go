@@ -16,6 +16,8 @@ import (
 
 	"github.com/TOSIO/go-tos/sdag/synchronise"
 
+	"net"
+
 	"github.com/TOSIO/go-tos/devbase/event"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -25,7 +27,6 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
-	"net"
 )
 
 /*
@@ -101,7 +102,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
-	pool := manager.New(chain, chainDB, event)
+	pool := manager.New(chain, chainDB, netFeed, event)
 	minerParam := miner.MinerInfo{}
 
 	sdag := &Sdag{

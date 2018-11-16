@@ -76,12 +76,12 @@ type BlockPool struct {
 	mainChainI mainchain.MainChainI
 }
 
-func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.TypeMux) *BlockPool {
+func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Feed, blockEvent *event.TypeMux) *BlockPool {
 	pool := &BlockPool{
 		mainChainI: mainChain,
 		db:         chainDb,
 
-		newblockFeed: &event.Feed{},
+		newblockFeed: feed,
 		emptyC:       make(chan struct{}, 1),
 		blockChan:    make(chan types.Block, 8),
 
@@ -94,7 +94,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Typ
 		unverifiedAddChan: make(chan common.Hash, 1000),
 		unverifiedDelChan: make(chan common.Hash, 2000),
 
-		blockEvent: feed,
+		blockEvent: blockEvent,
 		//newBlocksEvent: make(chan core.NewBlocksEvent, 8),
 		//unverifiedGetChan: make(chan unverifiedReq),
 	}
