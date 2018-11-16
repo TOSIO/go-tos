@@ -52,8 +52,8 @@ type BlockPool struct {
 
 	maxQueueSize int
 
-	newblockFeed *event.Feed
-	blockEvent   *event.TypeMux
+	syncStatusFeed *event.Feed
+	blockEvent     *event.TypeMux
 
 	newAnnounceSub      *event.TypeMuxSubscription
 	localNewBlocksSub   *event.TypeMuxSubscription
@@ -61,7 +61,9 @@ type BlockPool struct {
 	syncResponseSub     *event.TypeMuxSubscription
 	isolateResponseSub  *event.TypeMuxSubscription
 	queryUnverifySub    *event.TypeMuxSubscription
+	syncStatusSub       chan int
 
+	syncStatus        int
 	newBlockAddChan   chan types.Block
 	unverifiedAddChan chan common.Hash
 	unverifiedDelChan chan common.Hash
@@ -81,9 +83,9 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 		mainChainI: mainChain,
 		db:         chainDb,
 
-		newblockFeed: feed,
-		emptyC:       make(chan struct{}, 1),
-		blockChan:    make(chan types.Block, 8),
+		syncStatusFeed: feed,
+		emptyC:         make(chan struct{}, 1),
+		blockChan:      make(chan types.Block, 8),
 
 		IsolatedBlockMap: make(map[common.Hash]*IsolatedBlock),
 		lackBlockMap:     make(map[common.Hash]*lackBlock),
@@ -93,6 +95,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 		newBlockAddChan:   make(chan types.Block, 1000),
 		unverifiedAddChan: make(chan common.Hash, 1000),
 		unverifiedDelChan: make(chan common.Hash, 2000),
+		syncStatusSub:     make(chan int),
 
 		blockEvent: blockEvent,
 		//newBlocksEvent: make(chan core.NewBlocksEvent, 8),
@@ -104,6 +107,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 	pool.syncResponseSub = pool.blockEvent.Subscribe(&core.SYNCResponseEvent{})
 	pool.isolateResponseSub = pool.blockEvent.Subscribe(&core.IsolateResponseEvent{})
 	pool.queryUnverifySub = pool.blockEvent.Subscribe(&core.GetUnverifyBlocksEvent{})
+	//pool.syncStatusFeed.Subscribe(pool.syncStatusSub)
 	pool.unverifiedBlocks = container.NewUniqueList(pool.maxQueueSize * 3)
 	pool.statisticsAddBlock.Init("add block")
 	pool.statisticsDeleteIsolatedBlock.Init("delete isolated block")
@@ -207,22 +211,24 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 		currentTime := time.Now().Unix()
 		lastTime := currentTime
 		for {
-			currentTime = time.Now().Unix()
-			if lastTime+params.TimePeriod/1000 < currentTime {
-				var linksLackBlock []common.Hash
-				p.rwlock.RLock()
-				for key := range p.lackBlockMap {
-					log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
-					linksLackBlock = append(linksLackBlock, key)
+			if p.syncStatus != core.SDAGSYNC_SYNCING {
+				currentTime = time.Now().Unix()
+				if lastTime+params.TimePeriod/1000 < currentTime {
+					var linksLackBlock []common.Hash
+					p.rwlock.RLock()
+					for key := range p.lackBlockMap {
+						log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
+						linksLackBlock = append(linksLackBlock, key)
+					}
+					p.rwlock.RUnlock()
+					if len(linksLackBlock) > 0 {
+						event := &core.GetIsolateBlocksEvent{Hashes: linksLackBlock}
+						p.blockEvent.Post(event)
+					}
+					lastTime = currentTime
 				}
-				p.rwlock.RUnlock()
-				if len(linksLackBlock) > 0 {
-					event := &core.GetIsolateBlocksEvent{Hashes: linksLackBlock}
-					p.blockEvent.Post(event)
-				}
-				lastTime = currentTime
+				time.Sleep(time.Second)
 			}
-			time.Sleep(time.Second)
 		}
 	}()
 }
@@ -284,6 +290,14 @@ func (p *BlockPool) loop() {
 		}
 	}()
 
+	go func() {
+		for {
+			select {
+			case p.syncStatus = <-p.syncStatusSub:
+				fmt.Println("syncStatus:", p.syncStatus)
+			}
+		}
+	}()
 	p.TimedRequestForIsolatedBlocks()
 	p.BlockProcessing()
 }
