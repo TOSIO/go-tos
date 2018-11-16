@@ -213,6 +213,10 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 		currentTime := time.Now().Unix()
 		lastTime := currentTime
 		for {
+			select {
+			case p.syncStatus = <-p.syncStatusSub:
+			default:
+			}
 			if p.syncStatus != core.SDAGSYNC_SYNCING {
 				currentTime = time.Now().Unix()
 				if lastTime+params.TimePeriod/1000 < currentTime {
@@ -289,8 +293,6 @@ func (p *BlockPool) loop() {
 					}
 					req.done <- struct{}{}
 				} */
-			case p.syncStatus = <-p.syncStatusSub:
-				log.Debug("Handle sync-status")
 			}
 		}
 	}()
