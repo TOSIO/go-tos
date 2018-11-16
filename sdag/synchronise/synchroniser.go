@@ -184,7 +184,9 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
 		}
 		*idle = false
+		log.Debug("Post SYNC-SYNCING feed")
 		s.netFeed.Send(core.SDAGSYNC_SYNCING)
+		log.Debug("Post SYNC-SYNCING feed End")
 		//go s.synchroinise(peer, beginTimeslice, origin.LastTempMBTimeslice, origin.LastMainBlockNum)
 		go s.synchroiniseV2(peer, beginTimeslice)
 	} else {
@@ -316,7 +318,9 @@ loop:
 					stat.EndTime = time.Now()
 					stat.Progress = core.SYNC_END
 					s.syncEvent.Post(stat)
+					log.Debug("Post SYNC-COMPLETED feed")
 					s.netFeed.Send(core.SDAGSYNC_COMPLETED)
+					log.Debug("Post SYNC-COMPLETED feed End")
 					break loop
 				} else {
 					//lastAck = lastTSIndex.Timeslice
