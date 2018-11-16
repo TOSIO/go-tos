@@ -22,7 +22,7 @@ var (
 "params":["{\"address\" :\"%s\"}"],
 "id":1
 }`
-	urlString = urlString1
+	urlString = urlString2
 )
 
 type KeyInfo struct {

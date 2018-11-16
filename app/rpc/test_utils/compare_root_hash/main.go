@@ -41,8 +41,9 @@ type ResultBlockInfo struct {
 
 type ResultTail struct {
 	Result struct {
-		Hash string
-		Time uint64
+		Hash   string
+		Time   uint64
+		Number uint64
 	}
 }
 
@@ -117,7 +118,14 @@ func main() {
 		return
 	}
 	hash2 := tail2.Result.Hash
-	count := 0
+	var count uint64
+	if tail1.Result.Number == tail2.Result.Number {
+		count = tail1.Result.Number
+	} else {
+		fmt.Printf("Number1:%d Number2:%d\n", tail1.Result.Number, tail2.Result.Number)
+		return
+	}
+
 	for {
 		block1, err := GetBlockInfoByHash(addr1, hash1)
 		if err != nil {
@@ -143,7 +151,7 @@ func main() {
 		}
 		hash2 = mainBlock2.Result.Max_link_hash
 
-		count++
+		count--
 		fmt.Printf("count=%d\n", count)
 		fmt.Println(mainBlock1.Result.Root, mainBlock2.Result.Root)
 		if mainBlock1.Result.Root == mainBlock2.Result.Root {

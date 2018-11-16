@@ -191,6 +191,7 @@ func main() {
 				//return
 			}
 		}
+		time.Sleep(time.Millisecond * 10)
 		//fmt.Println("----------------------------------------------", totalCount.String(), "-----------------------------------------------------")
 	}
 }
