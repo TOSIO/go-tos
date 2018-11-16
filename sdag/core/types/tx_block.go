@@ -171,6 +171,13 @@ func (tx *TxBlock) Validation() error {
 		}
 	}
 
+	for i := 0; i < len(tx.Links); i++ {
+		for j := i + 1; j < len(tx.Links); j++ {
+			if tx.Links[i] == tx.Links[j] {
+				return fmt.Errorf("links repeat")
+			}
+		}
+	}
 	//4
 	if _, err := tx.GetSender(); err != nil {
 		return err

@@ -306,7 +306,16 @@ func SetMainChain(mainChain mainchain.MainChainI) {
 func SetMemPool(mp *MemPool) {
 	//mempool = mp
 } */
-
+func IsRepeat(hashList []common.Hash) error {
+	for i := 0; i < len(hashList); i++ {
+		for j := i + 1; j < len(hashList); j++ {
+			if hashList[i] == hashList[j] {
+				return fmt.Errorf("links repeat")
+			}
+		}
+	}
+	return nil
+}
 func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) bool {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
@@ -322,6 +331,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 	needMeBlock, ok := p.lackBlockMap[isolated]
 	if ok {
 		newIsolatedBlock.LinkIt = append(newIsolatedBlock.LinkIt, needMeBlock.LinkIt...)
+		IsRepeat(newIsolatedBlock.LinkIt)
 		delete(p.lackBlockMap, isolated)
 	}
 
@@ -330,11 +340,13 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 		v, ok := p.IsolatedBlockMap[link] //if the ancestor of the block has already existed in orphan graph
 		if ok {
 			v.LinkIt = append(v.LinkIt, isolated) //update the ancestor's desendant list who is directly reference it
+			IsRepeat(v.LinkIt)
 			//p.IsolatedBlockMap[link] = v
 		} else { //marker the parent
 			v, ok := p.lackBlockMap[link]
 			if ok {
 				v.LinkIt = append(v.LinkIt, isolated)
+				IsRepeat(v.LinkIt)
 				//p.lackBlockMap[link] = v
 			} else {
 				p.lackBlockMap[link] = &lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
