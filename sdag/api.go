@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
@@ -89,7 +88,7 @@ type TransactionInfo struct {
 }
 
 type MainBlockInfo struct {
-	Time string
+	Number uint64
 }
 
 type BolckHashInfo struct {
@@ -130,9 +129,7 @@ func (api *PublicSdagAPI) GetMainBlockInfo(time interface{}) (interface{}, error
 
 	reflectMaptoJSON(time, &MainBlockTime)
 
-	blocktime, _ := strconv.ParseInt(MainBlockTime.Time, 10, 64)
-
-	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, uint64(blocktime))
+	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, MainBlockTime.Number)
 	if err != nil {
 		return "", err
 	}
@@ -321,9 +318,9 @@ func (api *PublicSdagAPI) GetBalance(param interface{}) (interface{}, error) {
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
 	//find the main timeslice
-	sTime := utils.GetMainTime(tailMainBlockInfo.Time)
+	//sTime := utils.GetMainTime(tailMainBlockInfo.Time)
 	//get mainblock info
-	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, sTime)
+	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
 	if err != nil {
 		return "", err
 	}

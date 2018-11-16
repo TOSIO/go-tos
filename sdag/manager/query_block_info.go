@@ -6,7 +6,6 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
-	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"math/big"
@@ -21,31 +20,31 @@ type QueryBlockInfoInterface struct {
 //}
 
 type TxBlockInfo struct {
-	Status              string         `json:"status"`
-	ConfirmItsTimeSlice uint64         `json:"confirm_its_time_slice"`
-	Difficulty          *big.Int       `json:"difficulty"`
-	CumulativeDiff      *big.Int       `json:"cumulative_diff"`
-	MaxLinkHash         common.Hash    `json:"max_link_hash"`
-	Time                uint64         `json:"time"`
-	Links               []common.Hash  `json:"links"`
-	BlockHash           common.Hash    `json:"block_hash"`
-	Amount              *big.Int       `json:"amount"`
-	Receiver            common.Address `json:"receiver"`
-	Sender              common.Address `json:"sender"`
-	GasPrice            *big.Int       `json:"gas_price"`
-	GasLimit            uint64         `json:"gas_limit"`
+	Status           string         `json:"status"`
+	ConfirmItsNumber uint64         `json:"confirm_its_number"`
+	Difficulty       *big.Int       `json:"difficulty"`
+	CumulativeDiff   *big.Int       `json:"cumulative_diff"`
+	MaxLinkHash      common.Hash    `json:"max_link_hash"`
+	Time             uint64         `json:"time"`
+	Links            []common.Hash  `json:"links"`
+	BlockHash        common.Hash    `json:"block_hash"`
+	Amount           *big.Int       `json:"amount"`
+	Receiver         common.Address `json:"receiver"`
+	Sender           common.Address `json:"sender"`
+	GasPrice         *big.Int       `json:"gas_price"`
+	GasLimit         uint64         `json:"gas_limit"`
 }
 
 type PublicBlockInfo struct {
-	Status              string         `json:"status"`
-	ConfirmItsTimeSlice uint64         `json:"confirm_its_time_slice"`
-	Difficulty          *big.Int       `json:"difficulty"`
-	CumulativeDiff      *big.Int       `json:"cumulative_diff"`
-	MaxLinkHash         common.Hash    `json:"max_link_hash"`
-	Time                uint64         `json:"time"`
-	Links               []common.Hash  `json:"links"`
-	BlockHash           common.Hash    `json:"block_hash"`
-	Sender              common.Address `json:"sender"`
+	Status           string         `json:"status"`
+	ConfirmItsNumber uint64         `json:"confirm_its_number"`
+	Difficulty       *big.Int       `json:"difficulty"`
+	CumulativeDiff   *big.Int       `json:"cumulative_diff"`
+	MaxLinkHash      common.Hash    `json:"max_link_hash"`
+	Time             uint64         `json:"time"`
+	Links            []common.Hash  `json:"links"`
+	BlockHash        common.Hash    `json:"block_hash"`
+	Sender           common.Address `json:"sender"`
 }
 
 type TailMainBlockInfo struct {
@@ -114,19 +113,19 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		}
 
 		Data0 := TxBlockInfo{
-			Status:              blockStatus,
-			ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
-			Difficulty:          mutableInfo.Difficulty,
-			CumulativeDiff:      mutableInfo.CumulativeDiff,
-			MaxLinkHash:         mutableInfo.MaxLinkHash,
-			Links:               Block.GetLinks(),
-			Time:                Block.GetTime(),
-			BlockHash:           Block.GetHash(),
-			Amount:              tempAmount,
-			Receiver:            tempReceiver,
-			Sender:              BlockSend,
-			GasPrice:            Block.GetGasPrice(),
-			GasLimit:            Block.GetGasLimit(),
+			Status:           blockStatus,
+			ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+			Difficulty:       mutableInfo.Difficulty,
+			CumulativeDiff:   mutableInfo.CumulativeDiff,
+			MaxLinkHash:      mutableInfo.MaxLinkHash,
+			Links:            Block.GetLinks(),
+			Time:             Block.GetTime(),
+			BlockHash:        Block.GetHash(),
+			Amount:           tempAmount,
+			Receiver:         tempReceiver,
+			Sender:           BlockSend,
+			GasPrice:         Block.GetGasPrice(),
+			GasLimit:         Block.GetGasLimit(),
 		}
 		return Data0, nil
 		//jsonData, err := json.Marshal(Data0)
@@ -138,15 +137,15 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	}
 
 	Data0 := PublicBlockInfo{
-		Status:              blockStatus,
-		ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
-		Difficulty:          mutableInfo.Difficulty,
-		CumulativeDiff:      mutableInfo.CumulativeDiff,
-		MaxLinkHash:         mutableInfo.MaxLinkHash,
-		Links:               Block.GetLinks(),
-		Time:                Block.GetTime(),
-		BlockHash:           Block.GetHash(),
-		Sender:              BlockSend,
+		Status:           blockStatus,
+		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+		Difficulty:       mutableInfo.Difficulty,
+		CumulativeDiff:   mutableInfo.CumulativeDiff,
+		MaxLinkHash:      mutableInfo.MaxLinkHash,
+		Links:            Block.GetLinks(),
+		Time:             Block.GetTime(),
+		BlockHash:        Block.GetHash(),
+		Sender:           BlockSend,
 	}
 	return Data0, nil
 
@@ -203,19 +202,19 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 			types.MainBlockInfo
 		}{
 			TxBlockInfo{
-				Status:              blockStatus,
-				ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
-				Difficulty:          mutableInfo.Difficulty,
-				CumulativeDiff:      mutableInfo.CumulativeDiff,
-				MaxLinkHash:         mutableInfo.MaxLinkHash,
-				Links:               Block.GetLinks(),
-				Time:                Block.GetTime(),
-				BlockHash:           Block.GetHash(),
-				Amount:              tempAmount,
-				Receiver:            tempReceiver,
-				Sender:              BlockSend,
-				GasPrice:            Block.GetGasPrice(),
-				GasLimit:            Block.GetGasLimit(),
+				Status:           blockStatus,
+				ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+				Difficulty:       mutableInfo.Difficulty,
+				CumulativeDiff:   mutableInfo.CumulativeDiff,
+				MaxLinkHash:      mutableInfo.MaxLinkHash,
+				Links:            Block.GetLinks(),
+				Time:             Block.GetTime(),
+				BlockHash:        Block.GetHash(),
+				Amount:           tempAmount,
+				Receiver:         tempReceiver,
+				Sender:           BlockSend,
+				GasPrice:         Block.GetGasPrice(),
+				GasLimit:         Block.GetGasLimit(),
 			},
 			*mainBlockInfo,
 		}
@@ -233,15 +232,15 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 		types.MainBlockInfo
 	}{
 		PublicBlockInfo{
-			Status:              blockStatus,
-			ConfirmItsTimeSlice: mutableInfo.ConfirmItsTimeSlice,
-			Difficulty:          mutableInfo.Difficulty,
-			CumulativeDiff:      mutableInfo.CumulativeDiff,
-			MaxLinkHash:         mutableInfo.MaxLinkHash,
-			Links:               Block.GetLinks(),
-			Time:                Block.GetTime(),
-			BlockHash:           Block.GetHash(),
-			Sender:              BlockSend,
+			Status:           blockStatus,
+			ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+			Difficulty:       mutableInfo.Difficulty,
+			CumulativeDiff:   mutableInfo.CumulativeDiff,
+			MaxLinkHash:      mutableInfo.MaxLinkHash,
+			Links:            Block.GetLinks(),
+			Time:             Block.GetTime(),
+			BlockHash:        Block.GetHash(),
+			Sender:           BlockSend,
 		},
 		*mainBlockInfo,
 	}
@@ -254,11 +253,8 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 	//return string(jsonData), nil
 }
 
-func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, Time uint64) (interface{}, error) {
-
-	Slice := utils.GetMainTime(Time)
-
-	mainInfo, err := storage.ReadMainBlock(h, Slice)
+func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, number uint64) (interface{}, error) {
+	mainInfo, err := storage.ReadMainBlock(h, number)
 	if err != nil {
 		return "", err
 	}

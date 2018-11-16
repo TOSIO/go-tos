@@ -2,7 +2,6 @@ package core
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 )
 
@@ -19,7 +18,7 @@ func (genesis *Genesis) GetGenesisHash() (common.Hash, error) {
 		if err := genesis.ReadGenesisConfiguration(); err != nil {
 			return genesis.genesisHash, err
 		}
-		mainBlock, err := storage.ReadMainBlock(genesis.db, utils.GetMainTime(genesis.Time))
+		mainBlock, err := storage.ReadMainBlock(genesis.db, 0)
 		if err != nil {
 			return genesis.genesisHash, err
 		}

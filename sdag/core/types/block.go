@@ -99,10 +99,10 @@ type BlockHeader struct {
 }
 
 type MutableInfo struct {
-	Status              BlockStatus //status
-	ConfirmItsTimeSlice uint64      //Confirm its time slice
-	Difficulty          *big.Int    //self difficulty
-	CumulativeDiff      *big.Int    //cumulative difficulty
+	Status           BlockStatus //status
+	ConfirmItsNumber uint64      //Confirm its time slice
+	Difficulty       *big.Int    //self difficulty
+	CumulativeDiff   *big.Int    //cumulative difficulty
 	//MaxLink             uint8
 	MaxLinkHash common.Hash
 }

@@ -191,7 +191,7 @@ func main() {
 				//return
 			}
 		}
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Nanosecond)
 		//fmt.Println("----------------------------------------------", totalCount.String(), "-----------------------------------------------------")
 	}
 }

@@ -145,8 +145,8 @@ func WriteBlockMutableInfoRlp(db Writer, hash common.Hash, blockMutableInfoRLP [
 	return nil
 }
 
-func ReadMainBlock(db Reader, slice uint64) (*types.MainBlockInfo, error) {
-	data, err := db.Get(mainBlockKey(slice))
+func ReadMainBlock(db Reader, number uint64) (*types.MainBlockInfo, error) {
+	data, err := db.Get(mainBlockKey(number))
 	if err != nil {
 		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
 	}
@@ -154,8 +154,8 @@ func ReadMainBlock(db Reader, slice uint64) (*types.MainBlockInfo, error) {
 	return new(types.MainBlockInfo).UnRlp(data)
 }
 
-func WriteMainBlock(db Writer, mb *types.MainBlockInfo, slice uint64) error {
-	if err := db.Put(mainBlockKey(slice), mb.Rlp()); err != nil {
+func WriteMainBlock(db Writer, mb *types.MainBlockInfo, number uint64) error {
+	if err := db.Put(mainBlockKey(number), mb.Rlp()); err != nil {
 		return fmt.Errorf("WriteMainBlock error:" + err.Error())
 	}
 

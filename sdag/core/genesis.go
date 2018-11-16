@@ -113,7 +113,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	info := genesisBlock.GetMutableInfo()
 	info.Difficulty = genesisBlock.GetDiff()
 	info.CumulativeDiff = genesisBlock.GetDiff()
-	info.ConfirmItsTimeSlice = utils.GetMainTime(genesis.Time)
+	info.ConfirmItsNumber = 0
 	info.Status = types.BlockMain | types.BlockTmpMaxDiff | types.BlockApply
 	genesisBlock.SetMutableInfo(info)
 
@@ -123,7 +123,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	mainBlock.Hash = genesisBlock.GetHash()
 	mainBlock.Root = root
 
-	err = storage.WriteMainBlock(genesis.db, &mainBlock, info.ConfirmItsTimeSlice)
+	err = storage.WriteMainBlock(genesis.db, &mainBlock, 0)
 	if err != nil {
 		log.Error(err.Error())
 		return nil, err
@@ -133,7 +133,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	tailMainBlockInfo.Hash = genesisBlock.GetHash()
 	tailMainBlockInfo.CumulativeDiff = genesisBlock.GetCumulativeDiff()
 	tailMainBlockInfo.Time = genesisBlock.GetTime()
-	tailMainBlockInfo.Number = 1
+	tailMainBlockInfo.Number = 0
 	err = storage.WriteTailMainBlockInfo(genesis.db, &tailMainBlockInfo)
 	if err != nil {
 		log.Error(err.Error())
