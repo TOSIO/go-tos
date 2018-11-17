@@ -590,7 +590,9 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 	case cfg.BootstrapNodes != nil:
 		return // already set, don't apply defaults.
 	}
-
+	if len(cfg.Bootnode) > 0 {
+		urls = append(urls, cfg.Bootnode...)
+	}
 	cfg.BootstrapNodes = make([]*discover.Node, 0, len(urls))
 	for _, url := range urls {
 		node, err := discover.ParseNode(url)
@@ -599,6 +601,7 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		}
 		cfg.BootstrapNodes = append(cfg.BootstrapNodes, node)
 	}
+
 }
 
 // setBootstrapNodesV5 creates a list of bootstrap nodes from the command line

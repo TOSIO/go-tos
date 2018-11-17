@@ -236,3 +236,15 @@ func (p *peer) SendSYNCBlockResponseACK(timeslice uint64, index uint) error {
 	p.Log().Debug(">> SYNC-BLOCK-RESPONSE-ACK", "timeslice", timeslice, "index", index, "err", err)
 	return err
 }
+
+func (p *peer) SendGetlocatorRequest() error {
+	err := p2p.Send(p.rw, protocol.GetlocatorRequestMsg, protocol.GetLocatorRequest{})
+	p.Log().Debug(">>LOCATER-REQUEST ", "err", err)
+	return err
+}
+
+func (p *peer) SendLocatorPackge(sBlockMsg []protocol.MainChainSample) error {
+	err := p2p.Send(p.rw, protocol.LocatorResponseMsg, sBlockMsg)
+	p.Log().Debug(">>LOCATER-RESPONSE ", "err", err)
+	return err
+}

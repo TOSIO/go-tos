@@ -28,7 +28,7 @@ import (
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/services/dashboard"
 
-	cli "gopkg.in/urfave/cli.v1"
+	"gopkg.in/urfave/cli.v1"
 
 	//"github.com/TOSIO/go-ethereum/dashboard"
 	"github.com/TOSIO/go-tos/app/utils"
@@ -100,6 +100,19 @@ func loadConfig(file string, cfg *tosConfig) error {
 	return err
 }
 
+/*func loadConfigtest(filePath string, cfg *tosConfig) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	err = tomlSettings.NewDecoder(bufio.NewReader(f)).Decode(cfg)
+	if _, ok := err.(*toml.LineError); ok {
+		err = errors.New(filePath + ", " + err.Error())
+	}
+	return err
+}
+*/
 /*
 func defaultNodeConfig() node.Config {
 	cfg := node.DefaultConfig

@@ -1,0 +1,13 @@
+#This is a TOML document.
+#
+[Sdag]
+
+[Node]
+
+  [Node.P2P]
+  bootnode=["enode://81d01d2c0a3414758d04299425abbacecb340c7beddda3c99ec41789008d8a3660d8cbff58a716a2078550ddd684c5347458682f86294f5fe648d8782efd6001@10.10.10.36:30301",
+            "enode://56548c0fdaed3f480b69ae0cfecd07b41d2490c2fa5d117a8c7dfbf53547192ca8ee9bd1beecec7647a4db2a61fc234b3bf59e34b5f163245770edd7d84c745b@10.10.10.32:40401"]
+
+[TOSstats]
+
+[Dashboard]

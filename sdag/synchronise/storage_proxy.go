@@ -2,7 +2,6 @@ package synchronise
 
 import (
 	"errors"
-
 	"github.com/deckarep/golang-set"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -65,4 +64,13 @@ func (s *StorageProxy) GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]
 
 func (s *StorageProxy) GetBlock(hash common.Hash) types.Block {
 	return storage.ReadBlock(s.db, hash)
+}
+
+func (s *StorageProxy) GetMainBlock(number uint64) (common.Hash, error) {
+	mainblockInfo, err := storage.ReadMainBlock(s.db, number)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	mainblockHash := mainblockInfo.Hash
+	return mainblockHash, nil
 }

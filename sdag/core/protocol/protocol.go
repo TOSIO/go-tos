@@ -41,6 +41,8 @@ const (
 	SYNCBlockRequestMsg     = 0x0A
 	SYNCBlockResponseMsg    = 0x0B
 	SYNCBlockResponseACKMsg = 0x0C
+	GetlocatorRequestMsg    = 0x0D
+	LocatorResponseMsg      = 0x0E
 	//MSG_SYNCBlockEndMsg     = 0x0D
 
 	// Protocol messages belonging to tos/63
@@ -66,6 +68,9 @@ var msgcodeToString = map[int]string{
 	SYNCBlockRequestMsg:     "SYNC-BLOCK-REQUEST",
 	SYNCBlockResponseMsg:    "SYNC-BLOCK-RESPONSE",
 	SYNCBlockResponseACKMsg: "SYNC-BLOCK-RESPONSE-ACK",
+
+	GetlocatorRequestMsg: "LOCATOR-REQUEST",
+	LocatorResponseMsg:   "LOCATOR-RESPONSE",
 	//MSG_SYNCBlockEndMsg:     "SYNC-BLOCK-END",
 	// Protocol messages belonging to tos/63
 	/* 	GetNodeDataMsg: "GET-NODEDATA",
@@ -105,6 +110,11 @@ type GetBlockDataBySliceReq struct {
 	Hashes    []common.Hash
 }
 
+type MainChainSample struct {
+	Number uint64
+	Hash   common.Hash
+}
+
 type GetBlockDataBySliceResp struct {
 	Timeslice uint64
 	Blocks    [][]byte
@@ -129,14 +139,23 @@ type SYNCBlockResponse struct {
 	CurEndTimeslice uint64
 	End             bool
 }
+type SYNCBlockResponseACK struct {
+	ConfirmPoint TimesliceIndex
+}
+
+/*type SampleBlockMsg struct {
+	SampleBlock []MainChainSample
+}*/
+/*type SampleBlockResponseMsg struct {
+	BeginPoint uint64
+}*/
+
+type GetLocatorRequest struct {
+}
 
 /* type SYNCBlockEnd struct {
 	EndPoint TimesliceIndex
 } */
-
-type SYNCBlockResponseACK struct {
-	ConfirmPoint TimesliceIndex
-}
 
 type ErrCode int
 

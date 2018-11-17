@@ -89,6 +89,8 @@ type Config struct {
 	// with the rest of the network.
 	BootstrapNodes []*discover.Node
 
+	Bootnode []string `toml:"bootnode"`
+
 	// BootstrapNodesV5 are used to establish connectivity
 	// with the rest of the network using the V5 discovery
 	// protocol.

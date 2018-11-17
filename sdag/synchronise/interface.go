@@ -29,6 +29,8 @@ type BlockStorageI interface {
 	GetBlock(hash common.Hash) types.Block
 
 	GetBlocksDiffSet(timeslice uint64, all []common.Hash) ([]common.Hash, error)
+
+	GetMainBlock(number uint64) (common.Hash, error)
 }
 
 type SynchroniserI interface {
@@ -54,6 +56,8 @@ type SynchroniserI interface {
 	DeliverSYNCBlockRequest(id string, beginPoint *protocol.TimesliceIndex) error
 	DeliverSYNCBlockResponse(id string, response *protocol.SYNCBlockResponse) error
 	DeliverSYNCBlockACKResponse(id string, response *protocol.SYNCBlockResponseACK) error
+
+	DeliverLocatorResponse(id string, response []protocol.MainChainSample) error
 
 	//DeliverBlockHashesResp(id string, resp *SliceBlkHashesResp) error
 	//DeliverBlockHashesResp(id string, resp RespPacketI) error

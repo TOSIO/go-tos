@@ -3,6 +3,8 @@ package sdag
 import (
 	"errors"
 	"fmt"
+
+	//"github.com/TOSIO/go-tos/sdag/core/storage"
 	"math/big"
 	"sync"
 
@@ -205,7 +207,6 @@ func (pm *ProtocolManager) loop() {
 					"accumlatedNum", event.AccumulateSYNCNum,
 					//"tiredOrigins", event.TriedOrigin,
 					"err", event.Err)
-
 			}
 			log.Debug("pm.syncstatSub.Chan 2")
 		}
@@ -459,8 +460,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleNewBlockAnnounce(p, msg)
 	case protocol.NewBlockMsg:
 		return pm.handleNewBlocks(p, msg)
-
+	case protocol.GetlocatorRequestMsg: //接收到getlocater的请求，在这里处理
+		return pm.handleGetlocatorRequest(p, msg)
+	case protocol.LocatorResponseMsg:
+		return pm.handleLocatorResponse(p, msg)
 	}
+
 	return nil
 }
 
@@ -655,6 +660,74 @@ func (pm *ProtocolManager) handleSYNCblockResponseACK(p *peer, msg p2p.Msg) erro
 	}
 	p.Log().Debug("<< SYNC-BLOCK-RESPONSE-ACK", "timeslice", response.ConfirmPoint.Timeslice, "index", response.ConfirmPoint.Index)
 	return pm.synchroniser.DeliverSYNCBlockACKResponse(p.id, &response)
+}
+
+func (pm *ProtocolManager) handleGetlocatorRequest(p *peer, msg p2p.Msg) error {
+	var request protocol.GetLocatorRequest
+	err := msg.Decode(&request)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	fmt.Printf("handle get locator request")
+	var samples []protocol.MainChainSample //define a sample block slice
+	sample := protocol.MainChainSample{}
+	numberEnd := pm.mainChain.GetMainTail().Number
+
+	var count uint64 = 1
+	var interval uint64 = 0
+	log.Debug("Endnumber", "number", numberEnd)
+	for i := 1; numberEnd-interval > 0; i++ {
+		log.Debug("Handling", "interval", interval)
+		locatorNumber := numberEnd - interval
+		numberEnd = locatorNumber
+		interval = uint64(count << uint64(i))
+		log.Debug("Handling next", "interval", interval)
+		sample.Number = locatorNumber
+		if sample.Hash, err = pm.blkstorage.GetMainBlock(locatorNumber); err != nil {
+			log.Warn("get block hash by slice is error")
+
+		} else {
+			log.Debug("Ouput locator-sample", "number", sample.Number, "hash", sample.Hash.String())
+			samples = append(samples, sample)
+		}
+	}
+	var genesis common.Hash
+	if genesis, err = pm.mainChain.GetGenesisHash(); err != nil {
+		log.Warn("get genesis hash is error")
+	}
+	samples = append(samples, protocol.MainChainSample{Number: uint64(0), Hash: genesis})
+	log.Debug("Ouput locator-sample", "number", uint64(0), "hash", genesis.String())
+
+	//回复给对方 打包的采样内容
+	p.Log().Debug(">> response-locator-msg", "locator-size", len(samples))
+	return p.SendLocatorPackge(samples)
+}
+
+func (pm *ProtocolManager) handleLocatorResponse(p *peer, msg p2p.Msg) error {
+	var response []protocol.MainChainSample
+	err := msg.Decode(&response)
+	if err != nil {
+		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
+	}
+	p.Log().Debug("<< locator-response", "size", len(response))
+	return pm.synchroniser.DeliverLocatorResponse(p.id, response)
+	/*var beginTimeslice protocol.SampleBlockResponseMsg
+	beginTimeslice.BeginPoint = 0
+	for i := len(response) - 1; i >= 0; i-- {
+		block := pm.blkstorage.GetBlock(response[i].Hash)
+		if block != nil {
+			timeslice := uint64(utils.GetMainTime(block.GetTime()))
+			if timeslice == response[i].Timeslice {
+				beginTimeslice.BeginPoint = timeslice
+			}
+		}
+	}
+	if beginTimeslice.BeginPoint == 0 {
+		log.Debug("beginpoint msg", "beginpoint", beginTimeslice.BeginPoint)
+		fmt.Printf("not locate begintimeslice")
+	}
+	log.Debug("handled response", "begintimeslice", beginTimeslice.BeginPoint)*/
+
 }
 
 /* func (pm *ProtocolManager) relayBlock(event *core.RelayBlocksEvent) error {

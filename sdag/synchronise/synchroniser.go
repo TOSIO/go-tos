@@ -60,10 +60,10 @@ type Synchroniser struct {
 	blockhashesCh chan core.Response
 	blocksCh      chan core.Response
 
-	syncreqCh     chan core.Request
-	blockresCh    chan core.Response
-	blockresAckCh chan core.Response
-
+	syncreqCh         chan core.Request
+	blockresCh        chan core.Response
+	blockresAckCh     chan core.Response
+	locatorBlockresCh chan core.Response
 	//newTask chan core.NewSYNCTask
 
 	blockReqCh chan struct{}
@@ -104,6 +104,8 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 
 	syncer.blockresCh = make(chan core.Response, 100)
 	syncer.blockresAckCh = make(chan core.Response, 100)
+	syncer.locatorBlockresCh = make(chan core.Response, 100)
+
 	syncer.syncreqCh = make(chan core.Request)
 	syncer.sliceCache = make(map[string]*timesliceHash)
 
@@ -178,17 +180,17 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 	if target != "" && s.mainChain.GetMainTail().CumulativeDiff.Cmp(&origin.LastCumulatedDiff) < 0 &&
 		/* origin.LastMainBlockNum > s.mainChain.GetMainTail().Number && */
 		origin.LastTempMBTimeslice > s.mainChain.GetLastTempMainBlkSlice()+3 {
-		beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
+		/* 	beginTimeslice := s.mainChain.GetLastTempMainBlkSlice() - 32
 		if beginTimeslice < 0 || beginTimeslice < s.genesisTimeslice {
 			beginTimeslice = s.genesisTimeslice
 			log.Debug("Adjust the begin timeslice", "begin", beginTimeslice)
-		}
+		} */
 		*idle = false
 		log.Debug("Post SYNC-SYNCING feed")
 		s.netFeed.Send(core.SDAGSYNC_SYNCING)
 		log.Debug("Post SYNC-SYNCING feed End")
 		//go s.synchroinise(peer, beginTimeslice, origin.LastTempMBTimeslice, origin.LastMainBlockNum)
-		go s.synchroiniseV2(peer, beginTimeslice)
+		go s.synchroiniseV2(peer)
 	} else {
 		for key, _ := range tasks {
 			delete(tasks, key)
@@ -264,14 +266,18 @@ func (s *Synchroniser) loop() {
 	}
 }
 
-func (s *Synchroniser) synchroiniseV2(peer core.Peer, beginTimeslice uint64) {
+func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 	s.wg.Add(1)
 	defer s.wg.Done()
-
-	atomic.StoreInt32(&s.syncing, 1)
-	stat := core.SYNCStatusEvent{
+	var (
+		waitTimeout    <-chan time.Time
+		stat           core.SYNCStatusEvent
+		beginTimeslice uint64
+		lastAck        *protocol.TimesliceIndex
+	)
+	stat = core.SYNCStatusEvent{
 		Progress:          core.SYNC_READY,
-		BeginTS:           beginTimeslice,
+		BeginTS:           0,
 		EndTS:             0,
 		CurTS:             0,
 		AccumulateSYNCNum: 0,
@@ -279,34 +285,91 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer, beginTimeslice uint64) {
 		CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
 		//TriedOrigin:       make([]string, 0)
 	}
-
 	s.syncEvent.Post(stat)
-
-	if err := peer.SendSYNCBlockRequest(beginTimeslice, 0); err != nil {
-		log.Debug("Error send SYNC-request-message", "beginTS", beginTimeslice, "err", err)
+	if err := peer.SendGetlocatorRequest(); err != nil {
+		log.Debug("Error send get-locator-request-message", "nodeid ", peer.NodeID(), "err", err)
 		return
 	} else {
-		log.Debug("Send request-message OK", "timeslice", beginTimeslice)
+		log.Debug("Send get-locator-request-message OK")
+
 	}
-	waitTimeout := time.After(s.requestTTL())
 
-	stat.CurTS = beginTimeslice
-	stat.Err = nil
-	stat.Progress = core.SYNC_SYNCING
-	s.syncEvent.Post(stat)
-
+	ticker := time.NewTicker(60 * time.Second)
+	retry := 0
+	retryGetlocator := 0
 	postErrStat := func(status *core.SYNCStatusEvent, err error) {
 		status.Err = err
 		status.EndTime = time.Now()
 		status.Progress = core.SYNC_ERROR
 		s.syncEvent.Post(stat)
 	}
-	var lastAck *protocol.TimesliceIndex
-	retry := 0
 
 loop:
 	for {
 		select {
+		case response := <-s.locatorBlockresCh:
+			//var locatorResp []protocol.MainChainSample
+			forkTimeslice := uint64(0)
+			if locatorPacket, ok := response.(*LocatorPacket); ok {
+				log.Debug("decode response msg", "locatorPacket", locatorPacket.response, "size", len(locatorPacket.response))
+				numberEnd := s.mainChain.GetMainTail().Number
+				log.Debug("Local current end", "tailnumber", numberEnd)
+
+			internalloop:
+				for _, sample := range locatorPacket.response {
+					if sample.Number > numberEnd {
+						continue
+					}
+					if hash, err := s.blkstorage.GetMainBlock(sample.Number); err == nil {
+						if hash == sample.Hash {
+							block := s.blkstorage.GetBlock(sample.Hash)
+							if block != nil {
+								forkTimeslice = utils.GetMainTime(block.GetTime())
+								break internalloop
+							}
+						}
+					}
+				}
+				ticker.Stop()
+				retryGetlocator = 0
+				log.Debug("Reset retryGetlocator")
+
+				forkTimeslice = forkTimeslice - 32
+				if forkTimeslice < s.genesisTimeslice {
+					forkTimeslice = s.genesisTimeslice
+					log.Debug("Adjust the begin timeslice", "begin", forkTimeslice)
+				}
+				atomic.StoreInt32(&s.syncing, 1)
+				stat = core.SYNCStatusEvent{
+					Progress:          core.SYNC_READY,
+					BeginTS:           forkTimeslice,
+					EndTS:             0,
+					CurTS:             0,
+					AccumulateSYNCNum: 0,
+					BeginTime:         time.Now(),
+					CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
+					//TriedOrigin:       make([]string, 0)
+				}
+
+				s.syncEvent.Post(stat)
+
+				if err := peer.SendSYNCBlockRequest(forkTimeslice, 0); err != nil {
+					log.Debug("Error send SYNC-request-message", "beginTS", forkTimeslice, "err", err)
+					return
+				} else {
+					log.Debug("Send SYNC-request-message OK", "timeslice", forkTimeslice)
+				}
+				waitTimeout = time.After(s.requestTTL())
+
+				stat.CurTS = forkTimeslice
+				stat.Err = nil
+				stat.Progress = core.SYNC_SYNCING
+				s.syncEvent.Post(stat)
+				break
+			} else {
+				fmt.Printf("not locate begintimeslice")
+			}
+
 		case packet := <-s.blockresCh:
 			log.Debug("Reset retry")
 			if lastTSIndex, end, err := s.handleSYNCBlockResponse(packet, &stat); err == nil {
@@ -326,7 +389,6 @@ loop:
 					//lastAck = lastTSIndex.Timeslice
 					log.Debug("Post progress", "nodeID", packet.NodeID(), "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
 					lastAck = lastTSIndex
-
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
 					stat.Err = nil
@@ -344,7 +406,7 @@ loop:
 				log.Debug("Error hanlde SYNC-BLOCK-RESPONSE", "nodeID", packet.NodeID())
 			}
 		case <-waitTimeout:
-			if retry > maxRetryCount {
+			if retry >= maxRetryCount {
 				postErrStat(&stat, fmt.Errorf("timeout"))
 				log.Debug("Stop to retry send SYNC-BLOCK-*** request")
 				break loop
@@ -369,6 +431,22 @@ loop:
 			waitTimeout = time.After(s.requestTTL())
 		case <-s.cancelCh:
 			break loop
+
+		case <-ticker.C:
+			log.Debug("Get lcoator Packege is time out")
+			if retryGetlocator >= maxRetryCount {
+				postErrStat(&stat, fmt.Errorf("timeout"))
+				log.Debug("Stop to retry send-get-locator  request")
+				break loop
+			}
+			retryGetlocator++
+			log.Debug("Retry send get-locator-request", "retry", retryGetlocator)
+			if err := peer.SendGetlocatorRequest(); err != nil {
+				log.Debug("Error send get-locator-request-message", "nodeid ", peer.NodeID(), "err", err)
+			} else {
+				log.Debug("Send get-locator-request-message OK")
+			}
+			ticker = time.NewTicker(60 * time.Second)
 		}
 	}
 	s.done <- struct{}{}
@@ -461,6 +539,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 		}
 		return timeslice
 	} */
+	//	log.Debug("handleSYNCBlockResponseACK 1")
 	if ack, ok := packet.(*SYNCBlockResACKPacket); ok {
 		curEndPoint := utils.GetMainTime(s.mainChain.GetMainTail().Time)
 		//maxCap := 3000
@@ -524,6 +603,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 				tsblocks := &protocol.TimesliceBlocks{}
 				tsblocks.TSIndex.Index = 0
 				if hashes, err := s.blkstorage.GetBlockHashByTmSlice(endTimeslice); err == nil {
+					//log.Debug("handleSYNCBlockResponseACK 5")
 					tsblocks.TSIndex.Timeslice = endTimeslice
 					if len(hashes) == 0 {
 						continue
@@ -581,6 +661,8 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 			if peer := s.peerset.FindPeer(nodeID); peer != nil {
 				if err := peer.SendSYNCBlockResponse(&response); err != nil {
 					log.Debug("Error send SYNC-BLOCK-RESPONSE", "nodeID", nodeID, "curTS", ack.response.ConfirmPoint.Timeslice, "err", err)
+				} else {
+					log.Debug("handleSYNCBlockResponseACK 6")
 				}
 				// send new syn-blocks-response message
 			} else {
@@ -798,7 +880,13 @@ func (s *Synchroniser) DeliverSYNCBlockResponse(id string, response *protocol.SY
 }
 
 func (s *Synchroniser) DeliverSYNCBlockACKResponse(id string, response *protocol.SYNCBlockResponseACK) error {
-	return s.deliverResponse(id, s.blockresAckCh, &SYNCBlockResACKPacket{peerID: id, response: response})
+	err := s.deliverResponse(id, s.blockresAckCh, &SYNCBlockResACKPacket{peerID: id, response: response})
+	log.Debug("deliver ok")
+	return err
+}
+
+func (s *Synchroniser) DeliverLocatorResponse(id string, response []protocol.MainChainSample) error {
+	return s.deliverResponse(id, s.locatorBlockresCh, &LocatorPacket{peerID: id, response: response})
 }
 
 // deliver injects a new batch of data received from a remote node.

@@ -49,6 +49,11 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 			utils.Fatalf("%v", err)
 		}
 	}
+	/*file:="github.com/TOSIO/go-tos/app/config.toml"
+		if err := loadConfigtest(file, &cfg); err != nil {
+			utils.Fatalf("%v", err)
+		}
+	}*/
 
 	// Apply flags.应用命令行传递进来的参数（参数封装在ctx中）
 	utils.ApplyNodeFlags(ctx, &cfg.Node)

@@ -3,6 +3,10 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"time"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -11,9 +15,6 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
-	"io/ioutil"
-	"math/big"
-	"time"
 )
 
 func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string) (*Genesis, error) {

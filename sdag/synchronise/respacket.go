@@ -42,6 +42,11 @@ type SYNCBlockResACKPacket struct {
 	response *protocol.SYNCBlockResponseACK
 }
 
+type LocatorPacket struct {
+	peerID   string
+	response []protocol.MainChainSample
+}
+
 /* type SYNCBlockEndPacket struct {
 	peerID   string
 	response *protocol.SYNCBlockEnd
@@ -103,6 +108,13 @@ func (p *SYNCBlockReqPacket) NodeID() string {
 }
 
 func (p *SYNCBlockReqPacket) ItemCount() int {
+	return 0
+}
+
+func (p *LocatorPacket) NodeID() string {
+	return p.peerID
+}
+func (p *LocatorPacket) ItemCount() int {
 	return 0
 }
 

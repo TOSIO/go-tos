@@ -28,6 +28,9 @@ type Peer interface {
 	SendSYNCBlockRequest(timeslice uint64, index uint) error
 	SendSYNCBlockResponse(packet *protocol.SYNCBlockResponse) error
 	SendSYNCBlockResponseACK(timeslice uint64, index uint) error
+
+	SendGetlocatorRequest() error
+	SendLocatorPackge(sBlockMsg []protocol.MainChainSample) error
 }
 
 type PeerSet interface {
