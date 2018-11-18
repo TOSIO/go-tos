@@ -370,7 +370,7 @@ func (mainChain *MainChain) Confirm() error {
 	}
 
 	for index, block := range listMainBlock {
-		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block)
+		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block, "index", index)
 		mainTimeSlice := utils.GetMainTime(block.GetTime())
 		info := block.GetMutableInfo()
 		info.Status |= types.BlockMain
@@ -403,19 +403,17 @@ func (mainChain *MainChain) Confirm() error {
 			return err
 		}
 		number++
-		if index == (len(listMainBlock) - 1) {
-			mainChain.mainTailRWLock.Lock()
-			log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
-			mainChain.MainTail.Hash = block.GetHash()
-			mainChain.MainTail.Time = block.GetTime()
-			mainChain.MainTail.Number = number
-			mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
-			if err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.MainTail); err != nil {
-				log.Error("Confirm WriteTailMainBlockInfo", "error", err)
-			}
-			log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
-			mainChain.mainTailRWLock.Unlock()
+		mainChain.mainTailRWLock.Lock()
+		log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
+		mainChain.MainTail.Hash = block.GetHash()
+		mainChain.MainTail.Time = block.GetTime()
+		mainChain.MainTail.Number = number
+		mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
+		if err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.MainTail); err != nil {
+			log.Error("Confirm WriteTailMainBlockInfo", "error", err)
 		}
+		log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
+		mainChain.mainTailRWLock.Unlock()
 	}
 	return nil
 }
@@ -432,17 +430,12 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 	}
 	log.Debug("RollBackStatus main block", "block", block, "mutableInfo", mutableInfo)
 
-	mutableInfo.Status &= ^types.BlockMain
-	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo); err != nil {
-		return fmt.Errorf("RollBackStatus err:" + err.Error())
-	}
-
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
 			return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 		}
-		if (mutableInfo.ConfirmItsTimeSlice != utils.GetMainTime(block.GetTime())) && (mutableInfo.ConfirmItsTimeSlice != 0) {
+		if mutableInfo.ConfirmItsTimeSlice != block.GetMutableInfo().ConfirmItsTimeSlice {
 			continue
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
@@ -454,6 +447,12 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash) error {
 			return err
 		}
 	}
+
+	mutableInfo.Status &= ^(types.BlockMain | types.BlockConfirm | types.BlockApply)
+	mutableInfo.ConfirmItsTimeSlice = 0
+	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo); err != nil {
+		return fmt.Errorf("RollBackStatus err:" + err.Error())
+	}
 	return nil
 }
 
@@ -464,7 +463,7 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block) error {
 		if err != nil {
 			return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 		}
-		if (mutableInfo.ConfirmItsTimeSlice != utils.GetMainTime(block.GetTime())) && (mutableInfo.ConfirmItsTimeSlice != 0) {
+		if mutableInfo.ConfirmItsTimeSlice != block.GetMutableInfo().ConfirmItsTimeSlice {
 			continue
 		}
 		block := storage.ReadBlock(mainChain.db, hash)
@@ -477,7 +476,7 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block) error {
 		}
 	}
 	mutableInfo := block.GetMutableInfo()
-	mutableInfo.Status &= ^types.BlockConfirm
+	mutableInfo.Status &= ^(types.BlockConfirm | types.BlockApply)
 	mutableInfo.ConfirmItsTimeSlice = 0
 	storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo)
 	return nil
