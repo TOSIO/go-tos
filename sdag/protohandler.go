@@ -676,7 +676,7 @@ func (pm *ProtocolManager) handleGetlocatorRequest(p *peer, msg p2p.Msg) error {
 	var count uint64 = 1
 	var interval uint64 = 0
 	log.Debug("Endnumber", "number", numberEnd)
-	for i := 1; numberEnd-interval > 0; i++ {
+	for i := 1; numberEnd > interval; i++ {
 		log.Debug("Handling", "interval", interval)
 		locatorNumber := numberEnd - interval
 		numberEnd = locatorNumber
