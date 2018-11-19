@@ -5,5 +5,5 @@
 *.exe
 *.stackdump
 settings.json
-bootnode.key
+*.key
 launch.json
