@@ -23,7 +23,7 @@ import (
 var maxRoutineCount int = 100
 var maxSYNCCapLimit = 6000
 var maxRetryCount = 3
-
+var maxOringinPeersLimit = 25
 var (
 	errNoSyncActive   = errors.New("no sync active")
 	errInternal       = errors.New("internal error")

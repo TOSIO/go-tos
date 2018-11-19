@@ -2,7 +2,6 @@ package synchronise
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -47,7 +46,7 @@ type Fetcher struct {
 func NewFetcher(peers core.PeerSet, poolEvent *event.TypeMux) *Fetcher {
 	fetcher := &Fetcher{
 		reqCh:       make(chan common.Hash, 100),
-		reqOrphanCh: make(chan common.Hash, 100),
+		reqOrphanCh: make(chan common.Hash, 50000),
 		resCh:       make(chan core.Response, 100),
 
 		flighting:      make(map[common.Hash]*fetchTask),
@@ -202,8 +201,10 @@ func (f *Fetcher) randomSelectOrigins() []core.Peer {
 		if len(peers) <= 0 {
 			return nil
 		}
-
-		num := rand.Intn(len(peers))
+		num := maxOringinPeersLimit
+		if num > len(peers) {
+			num = len(peers)
+		}
 		result := make([]core.Peer, 0, num)
 		for _, peer := range peers {
 			if peer != nil {
