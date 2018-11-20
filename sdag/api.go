@@ -122,14 +122,13 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, erro
 
 }
 
-func (api *PublicSdagAPI) GetMainBlockInfo(time interface{}) (interface{}, error) {
-
-	var MainBlockTime MainBlockInfo
+func (api *PublicSdagAPI) GetMainBlockInfo(Number interface{}) (interface{}, error) {
+	var mainBlockTime MainBlockInfo
 	db := api.s.chainDb
 
-	reflectMaptoJSON(time, &MainBlockTime)
+	reflectMaptoJSON(Number, &mainBlockTime)
 
-	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, MainBlockTime.Number)
+	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, mainBlockTime.Number)
 	if err != nil {
 		return "", err
 	}
@@ -479,7 +478,6 @@ func reflectMaptoJSON(param interface{}, pStruct interface{}) interface{} {
 
 		errUnjson := json.Unmarshal(b, pStruct)
 		if errUnjson != nil {
-
 			fmt.Println("Umarshal failed:", errUnjson)
 			return nil
 		}

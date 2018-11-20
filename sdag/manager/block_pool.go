@@ -92,9 +92,9 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 		IsolatedBlockMap: make(map[common.Hash]*IsolatedBlock),
 		lackBlockMap:     make(map[common.Hash]*lackBlock),
 
-		maxQueueSize: 10000,
+		maxQueueSize: 50000,
 
-		newBlockAddChan:   make(chan types.Block, 1000),
+		newBlockAddChan:   make(chan types.Block, 50000),
 		unverifiedAddChan: make(chan common.Hash, 1000),
 		unverifiedDelChan: make(chan common.Hash, 2000),
 		syncStatusSub:     make(chan int),
@@ -118,10 +118,10 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 }
 
 func (p *BlockPool) BlockProcessing() {
-	localNewBlocks := make(chan types.Block, 10000)
-	isolateResponse := make(chan types.Block, 10000)
-	networkNewBlocks := make(chan types.Block, 10000)
-	syncResponse := make(chan types.Block, 10000)
+	localNewBlocks := make(chan types.Block, 50000)
+	isolateResponse := make(chan types.Block, 50000)
+	networkNewBlocks := make(chan types.Block, 50000)
+	syncResponse := make(chan types.Block, 50000)
 	go func() {
 		for {
 			select {

@@ -24,18 +24,18 @@ var (
 	sendFormat3 = `{
 "jsonrpc":"2.0",
 "method":"sdag_getMainBlockInfo",
-"params":[{"Time" :"%d"}],
+"params":[{"Number" :%d}],
 "id":1
 }
 `
 
 	addr1 = `http://10.10.10.37:8545`
-	addr2 = `http://10.10.20.13:8545`
+	addr2 = `http://10.10.10.32:8545`
 )
 
 type ResultBlockInfo struct {
 	Result struct {
-		Time uint64
+		Number uint64
 	}
 }
 
@@ -89,7 +89,7 @@ func GetBlockInfoByHash(addr string, hash string) (*ResultBlockInfo, error) {
 	return &resultBlockInfo, nil
 }
 
-func GetMainInfoByTime(addr string, time uint64) (*ResultMainInfo, error) {
+func GetMainInfoByNumber(addr string, time uint64) (*ResultMainInfo, error) {
 	sendString2 := fmt.Sprintf(sendFormat3, time)
 	body, err := httpSend.SendHttp(addr, sendString2)
 	if err != nil {
@@ -111,13 +111,13 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	hash1 := tail1.Result.Hash
+
 	tail2, err := getTail(addr2)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	hash2 := tail2.Result.Hash
+
 	var count uint64
 	if tail1.Result.Number == tail2.Result.Number {
 		count = tail1.Result.Number
@@ -127,33 +127,20 @@ func main() {
 	}
 
 	for {
-		block1, err := GetBlockInfoByHash(addr1, hash1)
+		mainBlock1, err := GetMainInfoByNumber(addr1, count)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		mainBlock1, err := GetMainInfoByTime(addr1, block1.Result.Time)
+		mainBlock2, err := GetMainInfoByNumber(addr2, count)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
-		hash1 = mainBlock1.Result.Max_link_hash
 
-		block2, err := GetBlockInfoByHash(addr2, hash2)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		mainBlock2, err := GetMainInfoByTime(addr2, block2.Result.Time)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		hash2 = mainBlock2.Result.Max_link_hash
-
-		count--
 		fmt.Printf("count=%d\n", count)
 		fmt.Println(mainBlock1.Result.Root, mainBlock2.Result.Root)
+		count--
 		if mainBlock1.Result.Root == mainBlock2.Result.Root {
 			return
 		}

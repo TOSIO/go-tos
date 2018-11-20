@@ -15,6 +15,7 @@ var (
 	//8545
 	urlString1       = "http://10.10.10.37:8545"
 	urlString2       = "http://10.10.20.13:8545"
+	urlString3       = "http://10.10.10.32:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -22,7 +23,7 @@ var (
 "params":["{\"address\" :\"%s\"}"],
 "id":1
 }`
-	urlString = urlString2
+	urlString = urlString3
 )
 
 type KeyInfo struct {
