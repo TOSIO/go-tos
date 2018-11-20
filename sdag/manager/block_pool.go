@@ -464,13 +464,6 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
 	} else {
 		//log.Trace("Non-repeating block")
 	}
-	linksNumber := len(block.GetLinks())
-
-	//log.Trace("links", "number", linksNumber)
-	if linksNumber < 1 || linksNumber > params.MaxLinksNum {
-		log.Error("the block linksNumber Exception.", "linksNumber", linksNumber)
-		return fmt.Errorf("the block linksNumber =%d", linksNumber)
-	}
 
 	isIsolated, err := p.linkCheckAndSave(block, isRelay)
 	if err != nil {
@@ -524,6 +517,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, err
 		p.addBlockLock.Lock()
 		hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(block)
 		if err != nil {
+			p.addBlockLock.Unlock()
 			return isIsolated, err
 		}
 		log.Debug("ComputeCumulativeDiff finish", "hash", block.GetHash().String())

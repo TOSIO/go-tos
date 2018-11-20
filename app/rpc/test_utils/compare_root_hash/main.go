@@ -30,7 +30,7 @@ var (
 `
 
 	addr1 = `http://10.10.10.37:8545`
-	addr2 = `http://10.10.10.32:8545`
+	addr2 = `http://10.10.10.42:8551`
 )
 
 type ResultBlockInfo struct {

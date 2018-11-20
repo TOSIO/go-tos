@@ -155,6 +155,11 @@ func (tx *TxBlock) Validation() error {
 		return fmt.Errorf("block time no less than current time")
 	}
 
+	linksNumber := len(tx.Links)
+	if linksNumber < 1 || linksNumber > params.MaxLinksNum {
+		return fmt.Errorf("the block linksNumber =%d", linksNumber)
+	}
+
 	//3
 	amount := big.NewInt(0)
 	for _, out := range tx.Outs {

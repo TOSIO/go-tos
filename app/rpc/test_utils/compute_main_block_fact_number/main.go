@@ -34,7 +34,8 @@ var (
 	addr2 = `http://10.10.10.37:8545`
 	addr3 = `http://10.10.10.34:8545`
 	addr4 = `http://10.10.10.32:8545`
-	addr  = addr4
+	addr5 = `http://10.10.10.42:8551`
+	addr  = addr2
 )
 
 type ResultTail struct {
