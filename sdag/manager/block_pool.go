@@ -217,24 +217,24 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 			case p.syncStatus = <-p.syncStatusSub:
 			default:
 			}
-			if p.syncStatus != core.SDAGSYNC_SYNCING {
-				currentTime = time.Now().Unix()
-				if lastTime+params.TimePeriod/1000 < currentTime {
-					var linksLackBlock []common.Hash
-					p.rwlock.RLock()
-					for key := range p.lackBlockMap {
-						log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
-						linksLackBlock = append(linksLackBlock, key)
-					}
-					p.rwlock.RUnlock()
-					if len(linksLackBlock) > 0 {
-						event := &core.GetIsolateBlocksEvent{Hashes: linksLackBlock}
-						p.blockEvent.Post(event)
-					}
-					lastTime = currentTime
+			//if p.syncStatus != core.SDAGSYNC_SYNCING {
+			currentTime = time.Now().Unix()
+			if lastTime+params.TimePeriod/1000 < currentTime {
+				var linksLackBlock []common.Hash
+				p.rwlock.RLock()
+				for key := range p.lackBlockMap {
+					log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
+					linksLackBlock = append(linksLackBlock, key)
 				}
-				time.Sleep(time.Second)
+				p.rwlock.RUnlock()
+				if len(linksLackBlock) > 0 {
+					event := &core.GetIsolateBlocksEvent{Hashes: linksLackBlock}
+					p.blockEvent.Post(event)
+				}
+				lastTime = currentTime
 			}
+			time.Sleep(time.Second)
+			//}
 		}
 	}()
 }
