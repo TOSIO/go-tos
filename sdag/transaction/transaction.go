@@ -92,7 +92,7 @@ func (transaction *Transaction) txBlockConstruction(txRequestInfo *TransInfo) (*
 }
 
 type BlockConstructionParameter struct {
-	links []common.Hash
+	Links []common.Hash
 	Nonce uint64
 }
 
@@ -107,7 +107,7 @@ func (transaction *Transaction) GetBlockConstructionParameter() *BlockConstructi
 	transaction.currentAccountNonce++
 	transaction.lock.Unlock()
 	return &BlockConstructionParameter{
-		links: Links,
+		Links: Links,
 		Nonce: AccountNonce,
 	}
 }
