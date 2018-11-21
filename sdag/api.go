@@ -216,7 +216,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 		return nil, fmt.Errorf("private key does not match address")
 	}
 
-	hash, err := transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
+	hash, err := api.s.transaction.TransactionSendToSDAG(&txRequestInfo)
 	if err != nil {
 		return nil, fmt.Errorf("transaction failed" + err.Error())
 	}

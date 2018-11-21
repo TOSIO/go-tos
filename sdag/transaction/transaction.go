@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"math/big"
+	"sync"
 
 	"github.com/TOSIO/go-tos/params"
-
-	"github.com/TOSIO/go-tos/devbase/event"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
@@ -17,11 +16,17 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
-var (
-	currentAccountNonce uint64 = 0
-	emptyC                     = make(chan struct{}, 1)
-	//balance                    = make(map[common.Address]big.Int)
-)
+type Transaction struct {
+	currentAccountNonce uint64
+	lock                sync.Mutex
+	pool                core.BlockPoolI
+}
+
+func New(pool core.BlockPoolI) *Transaction {
+	return &Transaction{
+		pool: pool,
+	}
+}
 
 type ReceiverInfo struct {
 	To     common.Address
@@ -35,7 +40,7 @@ type TransInfo struct {
 	PrivateKey *ecdsa.PrivateKey
 }
 
-func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) (*types.TxBlock, error) {
+func (transaction *Transaction) txBlockConstruction(txRequestInfo *TransInfo) (*types.TxBlock, error) {
 	if txRequestInfo.From != crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) {
 		return nil, fmt.Errorf("PrivateKey err")
 	}
@@ -53,7 +58,7 @@ func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestIn
 
 	//2. links
 	for len(txBlock.Links) == 0 {
-		txBlock.Links = pool.SelectUnverifiedBlock(params.MaxLinksNum)
+		txBlock.Links = transaction.pool.SelectUnverifiedBlock(params.MaxLinksNum)
 		/* 	unverifyReq := &core.GetUnverifyBlocksEvent{Hashes: txBlock.Links, Done: make(chan struct{})}
 		event.Post(unverifyReq)
 		<-unverifyReq.Done
@@ -64,10 +69,10 @@ func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestIn
 	}
 
 	//3. accoutnonce
-	emptyC <- struct{}{}
-	txBlock.AccountNonce = currentAccountNonce
-	currentAccountNonce++
-	<-emptyC
+	transaction.lock.Lock()
+	txBlock.AccountNonce = transaction.currentAccountNonce
+	transaction.currentAccountNonce++
+	transaction.lock.Unlock()
 
 	//4. txout
 	for _, v := range txRequestInfo.Receiver {
@@ -86,14 +91,35 @@ func txBlockConstruction(pool core.BlockPoolI, event *event.TypeMux, txRequestIn
 	return txBlock, nil
 }
 
-func Transaction(pool core.BlockPoolI, event *event.TypeMux, txRequestInfo *TransInfo) (common.Hash, error) {
-	TxBlock, err := txBlockConstruction(pool, event, txRequestInfo)
+type BlockConstructionParameter struct {
+	links []common.Hash
+	Nonce uint64
+}
+
+func (transaction *Transaction) GetBlockConstructionParameter() *BlockConstructionParameter {
+	var Links []common.Hash
+	Links = transaction.pool.SelectUnverifiedBlock(params.MaxLinksNum)
+	for len(Links) == 0 {
+		Links = transaction.pool.SelectUnverifiedBlock(params.MaxLinksNum)
+	}
+	transaction.lock.Lock()
+	AccountNonce := transaction.currentAccountNonce
+	transaction.currentAccountNonce++
+	transaction.lock.Unlock()
+	return &BlockConstructionParameter{
+		links: Links,
+		Nonce: AccountNonce,
+	}
+}
+
+func (transaction *Transaction) TransactionSendToSDAG(txRequestInfo *TransInfo) (common.Hash, error) {
+	TxBlock, err := transaction.txBlockConstruction(txRequestInfo)
 	if err != nil {
 		return TxBlock.GetHash(), err
 	}
 
 	log.Debug("block construction success", "hash", TxBlock.GetHash().String(), "block", TxBlock)
-	err = pool.EnQueue(TxBlock)
+	err = transaction.pool.EnQueue(TxBlock)
 	if err != nil {
 		return TxBlock.GetHash(), err
 	}

@@ -2,6 +2,7 @@ package sdag
 
 import (
 	"fmt"
+	"github.com/TOSIO/go-tos/sdag/transaction"
 	"sync"
 
 	"github.com/TOSIO/go-tos/devbase/common"
@@ -50,7 +51,8 @@ type Sdag struct {
 
 	blockPoolEvent *event.TypeMux
 
-	blockPool *manager.BlockPool
+	blockPool   *manager.BlockPool
+	transaction *transaction.Transaction
 
 	miner        *miner.Miner
 	synchroniser *synchronise.Synchroniser
@@ -119,6 +121,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		accountManager:  ctx.AccountManager,
 		tosbase:         config.Tosbase,
 		blockPool:       pool,
+		transaction:     transaction.New(pool),
 		blockPoolEvent:  event,
 		sct:             ctx,
 	}
