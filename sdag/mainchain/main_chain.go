@@ -218,12 +218,12 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 
 	var (
 		chainLinkInfo SingleChainLinkInfo
-		big0          = big.NewInt(0)
 	)
 	chainLinkInfo.SingleChainCumulativeDiff = big.NewInt(0)
 
 	for _, hash := range toBeAddedBlock.GetLinks() {
 		var singleChainLinkInfo SingleChainLinkInfo
+		big0 := big.NewInt(0)
 
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -237,17 +237,17 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 
 		if (block.GetStatus() & types.BlockTmpMaxDiff) != 0 {
 			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				singleChainLinkInfo.set(true, hash, new(big.Int).Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
+				singleChainLinkInfo.set(true, hash, big0.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
 			} else {
 				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					singleChainLinkInfo.set(true, block.GetMaxLink(), new(big.Int).Sub(block.GetCumulativeDiff(), block.GetDiff()).Add(toBeAddedBlock.GetDiff(), big0))
+					singleChainLinkInfo.set(true, block.GetMaxLink(), big0.Add(big0.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff()))
 				} else {
 					singleChainLinkInfo.set(false, hash, block.GetCumulativeDiff())
 				}
 			}
 		} else {
 			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				singleChainLinkInfo.set(true, block.GetMaxLink(), new(big.Int).Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
+				singleChainLinkInfo.set(true, block.GetMaxLink(), big0.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
 			} else {
 				DiffBefore := utils.CalculateWork(block.GetMaxLink())
 				if DiffBefore.Cmp(toBeAddedBlock.GetDiff()) < 0 {
@@ -255,7 +255,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 					if err != nil {
 						return false, err
 					}
-					singleChainLinkInfo.set(true, mutableInfo.MaxLinkHash, new(big.Int).Sub(block.GetCumulativeDiff(), DiffBefore).Add(toBeAddedBlock.GetDiff(), big0))
+					singleChainLinkInfo.set(true, mutableInfo.MaxLinkHash, big0.Add(big0.Sub(block.GetCumulativeDiff(), DiffBefore), toBeAddedBlock.GetDiff()))
 				} else {
 					singleChainLinkInfo.set(false, block.GetMaxLink(), block.GetCumulativeDiff())
 				}
