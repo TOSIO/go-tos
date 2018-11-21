@@ -102,9 +102,9 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
 
-	syncer.blockresCh = make(chan core.Response, 100)
-	syncer.blockresAckCh = make(chan core.Response, 100)
-	syncer.locatorBlockresCh = make(chan core.Response, 100)
+	syncer.blockresCh = make(chan core.Response, 10000)
+	syncer.blockresAckCh = make(chan core.Response, 10000)
+	syncer.locatorBlockresCh = make(chan core.Response, 10000)
 
 	syncer.syncreqCh = make(chan core.Request)
 	syncer.sliceCache = make(map[string]*timesliceHash)
