@@ -270,10 +270,10 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 	var (
-		waitTimeout    <-chan time.Time
-		stat           core.SYNCStatusEvent
-		beginTimeslice uint64
-		lastAck        *protocol.TimesliceIndex
+		waitTimeout   <-chan time.Time
+		stat          core.SYNCStatusEvent
+		lastAck       *protocol.TimesliceIndex
+		forkTimeslice uint64
 	)
 	stat = core.SYNCStatusEvent{
 		Progress:          core.SYNC_READY,
@@ -420,12 +420,12 @@ loop:
 					break loop
 				}
 			} else {
-				if err := peer.SendSYNCBlockRequest(beginTimeslice, 0); err != nil {
-					log.Debug("Error send SYNC-request-message", "beginTS", beginTimeslice, "err", err)
+				if err := peer.SendSYNCBlockRequest(forkTimeslice, 0); err != nil {
+					log.Debug("Error send SYNC-request-message", "beginTS", forkTimeslice, "err", err)
 					postErrStat(&stat, err)
 					break loop
 				} else {
-					log.Debug("Send request-message OK", "timeslice", beginTimeslice)
+					log.Debug("Send request-message OK", "timeslice", forkTimeslice)
 				}
 			}
 			waitTimeout = time.After(s.requestTTL())
@@ -437,6 +437,7 @@ loop:
 			if retryGetlocator >= maxRetryCount {
 				postErrStat(&stat, fmt.Errorf("timeout"))
 				log.Debug("Stop to retry send-get-locator  request")
+
 				break loop
 			}
 			retryGetlocator++
@@ -547,7 +548,8 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 		count := 0
 		response := protocol.SYNCBlockResponse{TSBlocks: make([]*protocol.TimesliceBlocks, 0)}
 		response.CurEndTimeslice = curEndPoint
-		endTimeslice := ack.response.ConfirmPoint.Timeslice
+		endTimeslice :=
+			ack.response.ConfirmPoint.Timeslice
 
 		if ack.response != nil {
 			remain := false
@@ -569,9 +571,9 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 					tsblocks.TSIndex.Index = ack.response.ConfirmPoint.Index
 					tsblocks.Blocks = make([][]byte, 0)
 					endTimeslice = ack.response.ConfirmPoint.Timeslice
+
 					for pos++; count < maxSYNCCapLimit && pos < len(cache.hashes); pos++ {
 						block := s.blkstorage.GetBlock(cache.hashes[pos])
-
 						if block != nil {
 							tsblocks.TSIndex.Index = uint(pos)
 							tsblocks.Blocks = append(tsblocks.Blocks, block.GetRlp())
