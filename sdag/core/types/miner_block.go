@@ -154,6 +154,11 @@ func (mb *MinerBlock) Validation() error {
 		return fmt.Errorf("block time no less than current time")
 	}
 
+	linksNumber := len(mb.Links)
+	if linksNumber < 1 || linksNumber > params.MaxLinksNum {
+		return fmt.Errorf("the block linksNumber =%d", linksNumber)
+	}
+
 	for i := 0; i < len(mb.Links); i++ {
 		for j := i + 1; j < len(mb.Links); j++ {
 			if mb.Links[i] == mb.Links[j] {

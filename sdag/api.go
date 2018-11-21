@@ -20,16 +20,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/params"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
@@ -80,11 +79,11 @@ type accountInfo struct {
 }
 
 type TransactionInfo struct {
-	Form     accountInfo
+	From     accountInfo
 	To       string
 	Amount   string
 	GasPrice string
-	GasLimit string
+	GasLimit uint64
 }
 
 type MainBlockInfo struct {
@@ -152,97 +151,79 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString interface{}) (interfa
 	return mainBlockInfo, nil
 }
 
-func (api *PublicSdagAPI) Transaction(jsonString string) string {
-	//if api.s.Status().Status != STAT_WORKING {
-	//	return fmt.Sprintf(`{"Error":"current status cannot be traded. status=%d","Hash":""}`, api.s.Status().Status)
-	//}
-	result := api.transaction(jsonString)
-	byteString, err := json.Marshal(result)
-	if err != nil {
-		return `{"Error":"result parse error","Hash":""}`
-	}
-	return string(byteString)
-}
-
-type ResultStruct struct {
-	Error string
-	Hash  common.Hash
-}
-
-func (api *PublicSdagAPI) transaction(jsonString string) ResultStruct {
-	log.Debug("RPC receives Transaction", "receives jsonString", jsonString)
-	var transactionInfo TransactionInfo
-	if err := json.Unmarshal([]byte(jsonString), &transactionInfo); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return ResultStruct{Error: err.Error()}
-	}
+func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interface{}, error) {
+	log.Debug("RPC receives Transaction", "receives transactionInfo", transactionInfo)
 	var txRequestInfo transaction.TransInfo
 
-	txRequestInfo.GasPrice = big.NewInt(params.DefaultGasPrice)
-	txRequestInfo.GasLimit = params.DefaultGasLimit
-
-	err := hexString2Address(transactionInfo.Form.Address, &txRequestInfo.From)
-	if err != nil {
-		return ResultStruct{Error: err.Error()}
+	txRequestInfo.From = common.HexToAddress(transactionInfo.From.Address)
+	if txRequestInfo.From == (common.Address{}) {
+		return nil, fmt.Errorf("from address invalid")
 	}
 
-	var to common.Address
-	err = hexString2Address(transactionInfo.To, &to)
-	if err != nil {
-		return ResultStruct{Error: err.Error()}
+	to := common.HexToAddress(transactionInfo.To)
+	if to == (common.Address{}) {
+		return nil, fmt.Errorf("to address invalid")
 	}
+
 	Amount := new(big.Int)
 	var ok bool
 	_, ok = Amount.SetString(transactionInfo.Amount, 10)
 	if !ok {
 		log.Error("Amount is invalid", "Amount", transactionInfo.Amount)
-		return ResultStruct{Error: "Amount is invalid"}
+		return nil, fmt.Errorf("amount is invalid")
 	}
 	if Amount.Sign() < 0 {
 		log.Error("The amount must be positive", "Amount", transactionInfo.Amount)
-		return ResultStruct{Error: "The amount must be positive"}
+		return nil, fmt.Errorf("the amount must be positive")
 	}
-	txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
-	if !ok {
-		log.Error("GasPrice is invalid", "GasPrice", transactionInfo.GasPrice)
-		return ResultStruct{Error: "GasPrice is invalid"}
+	if len(transactionInfo.GasPrice) == 0 {
+		txRequestInfo.GasPrice = big.NewInt(params.DefaultGasPrice)
+	} else {
+		txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
+		if !ok {
+			log.Error("GasPrice is invalid", "GasPrice", transactionInfo.GasPrice)
+			return nil, fmt.Errorf("GasPrice is invalid")
+		}
 	}
 
-	txRequestInfo.GasLimit, err = strconv.ParseUint(transactionInfo.GasLimit, 10, 64)
-	if err != nil {
-		log.Error("GasLimit is invalid", "GasLimit", transactionInfo.GasLimit, "error", err.Error())
-		return ResultStruct{Error: "GasLimit is invalid"}
+	var err error
+	txRequestInfo.GasLimit = transactionInfo.GasLimit
+	if txRequestInfo.GasLimit == 0 {
+		txRequestInfo.GasLimit = params.DefaultGasLimit
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
 
-	if len(transactionInfo.Form.PrivateKey) == 0 {
-		if len(transactionInfo.Form.Passphrase) == 0 {
+	if len(transactionInfo.From.PrivateKey) == 0 {
+		if len(transactionInfo.From.Passphrase) == 0 {
 			log.Error("Passphrase/PrivateKey invalid")
-			return ResultStruct{Error: "Passphrase/PrivateKey invalid"}
+			return nil, fmt.Errorf("Passphrase/PrivateKey invalid")
 		}
-		txRequestInfo.PrivateKey, err = api.s.accountManager.FindPrivateKey(txRequestInfo.From, transactionInfo.Form.Passphrase)
+		txRequestInfo.PrivateKey, err = api.s.accountManager.FindPrivateKey(txRequestInfo.From, transactionInfo.From.Passphrase)
 		if err != nil {
-			log.Error(err.Error())
-			return ResultStruct{Error: err.Error()}
+			log.Error("PrivateKey invalid:" + err.Error())
+			return nil, fmt.Errorf("PrivateKey invalid:%s", err.Error())
 		}
 	} else {
-		txRequestInfo.PrivateKey, err = crypto.HexToECDSA(transactionInfo.Form.PrivateKey)
+		txRequestInfo.PrivateKey, err = crypto.HexToECDSA(transactionInfo.From.PrivateKey)
 		if err != nil {
 			log.Error("PrivateKey invalid", "error", err)
-			return ResultStruct{Error: "PrivateKey invalid error" + err.Error()}
+			return nil, fmt.Errorf("PrivateKey invalid:%s", err.Error())
 		}
 	}
 
 	if crypto.PubkeyToAddress(txRequestInfo.PrivateKey.PublicKey) != txRequestInfo.From {
-		return ResultStruct{Error: "private key does not match address"}
+		return nil, fmt.Errorf("private key does not match address")
 	}
 
 	hash, err := transaction.Transaction(api.s.BlockPool(), api.s.BlockPoolEvent(), &txRequestInfo)
 	if err != nil {
-		return ResultStruct{Error: err.Error()}
+		return nil, fmt.Errorf("transaction failed" + err.Error())
 	}
-	return ResultStruct{Hash: hash}
+
+	return struct {
+		Hash common.Hash
+	}{hash}, nil
 }
 
 func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard RPC server function

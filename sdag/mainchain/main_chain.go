@@ -202,12 +202,19 @@ func TimeSliceDifference(t1, t2 uint64) uint64 {
 	return utils.GetMainTime(t1) - utils.GetMainTime(t2)
 }
 
+type SingleChainLinkInfo struct {
+	isUpdateDiff              bool
+	maxLinkHash               common.Hash
+	SingleChainCumulativeDiff *big.Int
+}
+
+func (singleChainLinkInfo *SingleChainLinkInfo) set(isUpdateDiff bool, maxLinkHash common.Hash, SingleChainCumulativeDiff *big.Int) {
+	singleChainLinkInfo.isUpdateDiff = isUpdateDiff
+	singleChainLinkInfo.maxLinkHash = maxLinkHash
+	singleChainLinkInfo.SingleChainCumulativeDiff = SingleChainCumulativeDiff
+}
+
 func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (bool, error) {
-	type SingleChainLinkInfo struct {
-		isUpdateDiff              bool
-		maxLinkHash               common.Hash
-		SingleChainCumulativeDiff *big.Int
-	}
 
 	var (
 		chainLinkInfo SingleChainLinkInfo
@@ -216,7 +223,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 
 	for _, hash := range toBeAddedBlock.GetLinks() {
 		var singleChainLinkInfo SingleChainLinkInfo
-		singleChainLinkInfo.SingleChainCumulativeDiff = big.NewInt(0)
+		big0 := big.NewInt(0)
 
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -230,39 +237,27 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 
 		if (block.GetStatus() & types.BlockTmpMaxDiff) != 0 {
 			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				singleChainLinkInfo.SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
-				singleChainLinkInfo.isUpdateDiff = true
-				singleChainLinkInfo.maxLinkHash = hash
+				singleChainLinkInfo.set(true, hash, big0.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
 			} else {
 				if block.GetDiff().Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					singleChainLinkInfo.SingleChainCumulativeDiff.Add(singleChainLinkInfo.SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff())
-					singleChainLinkInfo.isUpdateDiff = true
-					singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+					singleChainLinkInfo.set(true, block.GetMaxLink(), big0.Add(big0.Sub(block.GetCumulativeDiff(), block.GetDiff()), toBeAddedBlock.GetDiff()))
 				} else {
-					singleChainLinkInfo.SingleChainCumulativeDiff = block.GetCumulativeDiff()
-					singleChainLinkInfo.isUpdateDiff = false
-					singleChainLinkInfo.maxLinkHash = hash
+					singleChainLinkInfo.set(false, hash, block.GetCumulativeDiff())
 				}
 			}
 		} else {
 			if !IsTheSameTimeSlice(toBeAddedBlock.GetTime(), block.GetTime()) {
-				singleChainLinkInfo.SingleChainCumulativeDiff.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff())
-				singleChainLinkInfo.isUpdateDiff = true
-				singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+				singleChainLinkInfo.set(true, block.GetMaxLink(), big0.Add(block.GetCumulativeDiff(), toBeAddedBlock.GetDiff()))
 			} else {
 				DiffBefore := utils.CalculateWork(block.GetMaxLink())
 				if DiffBefore.Cmp(toBeAddedBlock.GetDiff()) < 0 {
-					singleChainLinkInfo.SingleChainCumulativeDiff.Add(singleChainLinkInfo.SingleChainCumulativeDiff.Sub(block.GetCumulativeDiff(), DiffBefore), toBeAddedBlock.GetDiff())
 					mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, block.GetMaxLink())
 					if err != nil {
 						return false, err
 					}
-					singleChainLinkInfo.isUpdateDiff = true
-					singleChainLinkInfo.maxLinkHash = mutableInfo.MaxLinkHash
+					singleChainLinkInfo.set(true, mutableInfo.MaxLinkHash, big0.Add(big0.Sub(block.GetCumulativeDiff(), DiffBefore), toBeAddedBlock.GetDiff()))
 				} else {
-					singleChainLinkInfo.SingleChainCumulativeDiff = block.GetCumulativeDiff()
-					singleChainLinkInfo.isUpdateDiff = false
-					singleChainLinkInfo.maxLinkHash = block.GetMaxLink()
+					singleChainLinkInfo.set(false, block.GetMaxLink(), block.GetCumulativeDiff())
 				}
 			}
 		}
