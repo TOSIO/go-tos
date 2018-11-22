@@ -20,7 +20,6 @@ import (
 	"math/big"
 
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/ethereum/go-ethereum/consensus"
 
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/core/vm"
@@ -30,47 +29,50 @@ import (
 // current blockchain to be used during transaction processing.
 type ChainContext interface {
 	// Engine retrieves the chain's consensus engine.
-	Engine() consensus.Engine
+	//Engine() consensus.Engine
 
 	// GetHeader returns the hash corresponding to their hash.
 	//GetHeader(common.Hash, uint64) *types.Header
-	GetMainBlock(uint64) *types.TxBlock
+	GetMainBlock(uint64) types.Block
 }
 
 // NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, header *types.TxBlock, chain ChainContext, author *common.Address) vm.Context {
+func NewEVMContext(msg Message, block types.Block, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
-	var beneficiary common.Address
-	if author == nil {
-		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
-	} else {
-		beneficiary = *author
-	}
+	//var beneficiary common.Address
+	/* 	if author == nil {
+	   		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
+	   	} else {
+	   		beneficiary = *author
+	   	} */
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
-		GetHash:     GetHashFn(header, chain),
+		GetHash:     GetHashFn(block, chain),
 		Origin:      msg.From(),
-		Coinbase:    beneficiary,
-		BlockNumber: new(big.Int).Set(header.Number),
-		Time:        new(big.Int).SetUint64(header.Header.Time),
-		Difficulty:  new(big.Int).Set(header.GetDiff()),
-		GasLimit:    header.GetGasLimit(),
+		Coinbase:    *author,
+		BlockNumber: new(big.Int).Set(block.Number),
+		Time:        new(big.Int).SetUint64(block.GetTime()),
+		Difficulty:  new(big.Int).Set(block.GetDiff()),
+		GasLimit:    block.GetGasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
 	}
 }
 
 // GetHashFn returns a GetHashFunc which retrieves header hashes by number
-func GetHashFn(ref *types.TxBlock, chain ChainContext) func(n uint64) common.Hash {
+func GetHashFn(ref types.Block, chain ChainContext) func(n uint64) common.Hash {
 	//var cache map[uint64]common.Hash
 
 	return func(n uint64) common.Hash {
-
-		tempInfo := chain.GetMainBlock(n)
-		if tempInfo == nil {
-			return common.Hash{}
+		if chain != nil {
+			if block := chain.GetMainBlock(n); block != nil {
+				return block.GetHash()
+			} else {
+				return common.Hash{}
+			}
 		}
-		return tempInfo.GetHash()
+		return common.Hash{}
+
 		//If there's no hash cache yet, make one
 		//if cache == nil {
 		//	cache = map[uint64]common.Hash{
