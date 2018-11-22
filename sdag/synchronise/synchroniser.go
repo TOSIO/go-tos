@@ -309,7 +309,7 @@ loop:
 		select {
 		case response := <-s.locatorBlockresCh:
 			//var locatorResp []protocol.MainChainSample
-			forkTimeslice := uint64(0)
+			forkTimeslice = uint64(0)
 			if locatorPacket, ok := response.(*LocatorPacket); ok {
 				log.Debug("decode response msg", "locatorPacket", locatorPacket.response, "size", len(locatorPacket.response))
 				numberEnd := s.mainChain.GetMainTail().Number
