@@ -668,7 +668,7 @@ func (pm *ProtocolManager) handleGetlocatorRequest(p *peer, msg p2p.Msg) error {
 	if err != nil {
 		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
-	fmt.Printf("handle get locator request\n")
+	log.Debug("handle get locator request", "peer", p.id)
 	var samples []protocol.MainChainSample //define a sample block slice
 	sample := protocol.MainChainSample{}
 	numberEnd := pm.mainChain.GetMainTail().Number
@@ -698,7 +698,7 @@ func (pm *ProtocolManager) handleGetlocatorRequest(p *peer, msg p2p.Msg) error {
 	samples = append(samples, protocol.MainChainSample{Number: uint64(0), Hash: genesis})
 	log.Debug("Ouput locator-sample", "number", uint64(0), "hash", genesis.String())
 
-	//回复给对方 打包的采样内容
+	//response packets to peer
 	p.Log().Debug(">> response-locator-msg", "locator-size", len(samples))
 	return p.SendLocatorPackge(samples)
 }

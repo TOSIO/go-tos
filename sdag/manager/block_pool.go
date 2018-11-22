@@ -217,8 +217,9 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 			case p.syncStatus = <-p.syncStatusSub:
 			default:
 			}
-			//if p.syncStatus != core.SDAGSYNC_SYNCING {
+			//	if p.syncStatus != core.SDAGSYNC_SYNCING {
 			currentTime = time.Now().Unix()
+
 			if lastTime+params.TimePeriod/1000 < currentTime {
 				var linksLackBlock []common.Hash
 				p.rwlock.RLock()
@@ -234,7 +235,7 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 				lastTime = currentTime
 			}
 			time.Sleep(time.Second)
-			//}
+			//	}
 		}
 	}()
 }

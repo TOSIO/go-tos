@@ -316,6 +316,7 @@ loop:
 				log.Debug("Local current end", "tailnumber", numberEnd)
 
 			internalloop:
+
 				for _, sample := range locatorPacket.response {
 					if sample.Number > numberEnd {
 						continue
@@ -333,8 +334,6 @@ loop:
 				ticker.Stop()
 				retryGetlocator = 0
 				log.Debug("Reset retryGetlocator")
-
-				forkTimeslice = forkTimeslice - 32
 				if forkTimeslice < s.genesisTimeslice {
 					forkTimeslice = s.genesisTimeslice
 					log.Debug("Adjust the begin timeslice", "begin", forkTimeslice)
@@ -380,6 +379,7 @@ loop:
 					stat.CurTS = lastTSIndex.Timeslice
 					stat.EndTime = time.Now()
 					stat.Progress = core.SYNC_END
+
 					s.syncEvent.Post(stat)
 					log.Debug("Post SYNC-COMPLETED feed")
 					s.netFeed.Send(core.SDAGSYNC_COMPLETED)
@@ -392,6 +392,7 @@ loop:
 					lastAck = lastTSIndex
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
+
 					stat.Err = nil
 					stat.Progress = core.SYNC_SYNCING
 					s.syncEvent.Post(stat)
