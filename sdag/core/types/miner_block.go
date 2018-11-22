@@ -5,12 +5,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
+	"sync/atomic"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
 	"github.com/TOSIO/go-tos/params"
-	"math/big"
-	"sync/atomic"
 )
 
 type BlockNonce [8]byte
@@ -210,4 +211,8 @@ func EncodeNonce(i uint64) BlockNonce {
 	var n BlockNonce
 	binary.BigEndian.PutUint64(n[:], i)
 	return n
+}
+
+func (self *MinerBlock) AsMessage() (Message, error) {
+	return Message{}, nil
 }

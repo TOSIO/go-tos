@@ -2,14 +2,16 @@ package types
 
 import (
 	"crypto/ecdsa"
-	"github.com/TOSIO/go-tos/params"
 	"math/big"
 
+	"github.com/TOSIO/go-tos/params"
+
 	"fmt"
+	"sync/atomic"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
-	"sync/atomic"
 )
 
 //交易输出
@@ -221,4 +223,8 @@ func (tx *TxBlock) GetGasLimit() uint64 {
 
 func (tx *TxBlock) GetPayload() []byte {
 	return tx.Payload
+}
+
+func (tx *TxBlock) AsMessage() (Message, error) {
+	return Message{}, nil
 }

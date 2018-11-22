@@ -89,6 +89,8 @@ type Block interface {
 
 	GetMaxLink() common.Hash        //获取最大连接
 	SetMaxLink(MaxLink common.Hash) //设置最大连接
+
+	AsMessage() (Message, error)
 }
 
 type BlockHeader struct {

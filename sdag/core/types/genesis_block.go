@@ -2,11 +2,12 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"math/big"
+	"sync/atomic"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/utils"
-	"math/big"
-	"sync/atomic"
 )
 
 //创世区块
@@ -130,4 +131,8 @@ func (gb *GenesisBlock) GetGasPrice() *big.Int {
 
 func (gb *GenesisBlock) GetGasLimit() uint64 {
 	return gb.Header.GasLimit
+}
+
+func (self *GenesisBlock) AsMessage() (Message, error) {
+	return Message{}, nil
 }
