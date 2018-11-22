@@ -388,6 +388,7 @@ loop:
 				} else {
 					//lastAck = lastTSIndex.Timeslice
 					log.Debug("Post progress", "nodeID", packet.NodeID(), "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
+
 					lastAck = lastTSIndex
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
@@ -618,7 +619,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						*/
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
-							tsblocks.TSIndex.Index = uint(len(hashes))
+							tsblocks.TSIndex.Index = uint(len(hashes)) - 1 //  再要减一
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 							count += len(hashes)
 							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", endTimeslice,
@@ -630,14 +631,16 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						s.cachelock.Lock()
 						s.sliceCache[nodeID] = &timesliceHash{timeslice: endTimeslice, hashes: hashes}
 						s.cachelock.Unlock()
+
 						/* for i := 0; i < maxSYNCCapLimit-count; i++ {
 
 						} */
 
 						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
 							tsblocks.Blocks = blocks
-							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count)
+							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count - 1) // 再减一
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
+							count += maxSYNCCapLimit - count //少了count加
 
 							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPos", len(blocks), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))

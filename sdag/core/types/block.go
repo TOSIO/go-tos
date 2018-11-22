@@ -122,15 +122,16 @@ func BlockDecode(rlpData []byte) (Block, error) {
 		return nil, errors.New("rlpData is err")
 	}
 
-	if ty == BlockTypeTx {
+	switch ty {
+	case BlockTypeTx:
 		return new(TxBlock).UnRlp(rlpData)
-	} else if ty == BlockTypeMiner {
+	case BlockTypeMiner:
 		return new(MinerBlock).UnRlp(rlpData)
-	} else if ty == BlockTypeGenesis {
+	case BlockTypeGenesis:
 		return new(GenesisBlock).UnRlp(rlpData)
+	default:
+		return nil, errors.New("block upRlp error")
 	}
-
-	return nil, errors.New("block upRlp error")
 }
 
 func RLPList(b byte) (bool, int) {
