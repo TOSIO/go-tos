@@ -107,11 +107,9 @@ type RpcGenerKeyStore struct {
 	Password string
 }
 
-func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, error) {
+func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{}, error) {
 
-	var bolckHashInfo BolckHashInfo
 	db := api.s.chainDb
-	reflectMaptoJSON(bolckHash, &bolckHashInfo)
 	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
 	if err != nil {
 		return "", err
@@ -121,12 +119,8 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHash interface{}) (interface{}, erro
 
 }
 
-func (api *PublicSdagAPI) GetMainBlockInfo(Number interface{}) (interface{}, error) {
-	var mainBlockTime MainBlockInfo
+func (api *PublicSdagAPI) GetMainBlockInfo(mainBlockTime *MainBlockInfo) (interface{}, error) {
 	db := api.s.chainDb
-
-	reflectMaptoJSON(Number, &mainBlockTime)
-
 	tempQueryMainBlockInfo, err := api.s.queryBlockInfo.GetMainBlockInfo(db, mainBlockTime.Number)
 	if err != nil {
 		return "", err
@@ -136,12 +130,7 @@ func (api *PublicSdagAPI) GetMainBlockInfo(Number interface{}) (interface{}, err
 
 }
 
-func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString interface{}) (interface{}, error) {
-
-	if reflect.ValueOf(jsonString).String() != "ok" {
-		fmt.Printf("accept params error")
-		return "", nil
-	}
+func (api *PublicSdagAPI) GetFinalMainBlockInfo() (interface{}, error) {
 
 	mainBlockInfo, err := api.s.queryBlockInfo.GetFinalMainBlockInfo(api.s.chainDb)
 	if err != nil {
@@ -151,6 +140,26 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo(jsonString interface{}) (interfa
 	return mainBlockInfo, nil
 }
 
+type TransactionParameter struct {
+	Links []common.Hash `json:"links"`
+	Nonce uint64
+	Gasprice uint64 `json:"gasprice"`
+	GasLimit uint64 `json:"gaslimit"`
+}
+//获取基础数据
+func (api *PublicSdagAPI) GetBaseData() (interface{}) {
+
+	paramtr := api.s.transaction.GetBlockConstructionParameter();
+	param :=TransactionParameter{
+		Links:paramtr.Links,
+		Nonce:paramtr.Nonce,
+		Gasprice:params.DefaultGasPrice,
+		GasLimit:params.DefaultGasLimit,
+
+	}
+	return param
+
+}
 func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interface{}, error) {
 	log.Debug("RPC receives Transaction", "receives transactionInfo", transactionInfo)
 	var txRequestInfo transaction.TransInfo
@@ -243,11 +252,12 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 
 }
 
+//获取系统gasPrice  gasLimimt links、nonce
+
+
 //keystore 生成
-func (api *PublicSdagAPI) GeneraterKeyStore(param interface{}) interface{} {
-	//Unmarshal json
-	var rpcGenerKeyStore RpcGenerKeyStore
-	reflectMaptoJSON(param, &rpcGenerKeyStore)
+func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) interface{} {
+
 	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
 	privateKey, err := crypto.GenerateKey()
 	if err != nil {
@@ -291,9 +301,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(param interface{}) interface{} {
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(param interface{}) (interface{}, error) {
-	var walletadress WalletAdress
-	reflectMaptoJSON(param, &walletadress)
+func (api *PublicSdagAPI) GetBalance(walletadress *WalletAdress) (interface{}, error) {
 	address := common.HexToAddress(walletadress.Address)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
@@ -358,18 +366,10 @@ func (api *PublicSdagAPI) StopMiner() string {
 }
 
 //start miner
-func (api *PublicSdagAPI) StartMiner(jsonString string) string {
-	//if !api.s.miner.CanMiner(){
-	//	return fmt.Sprintf(`{"Error":"current status cannot be miner. status=%d"}`, api.s.miner.SyncState)
-	//}
+func (api *PublicSdagAPI) StartMiner(rpcMinerInfo *RpcMinerInfo) string {
+
 	if api.s.Status().Status != STAT_WORKING {
 		return fmt.Sprintf(`{"Error":"current status cannot be miner. current status=%d"}`, api.s.Status().Status)
-	}
-	//Unmarshal json
-	var rpcMinerInfo RpcMinerInfo
-	if err := json.Unmarshal([]byte(jsonString), &rpcMinerInfo); err != nil {
-		log.Error("JSON unmarshaling failed: %s", err)
-		return err.Error()
 	}
 	if rpcMinerInfo.Address == "" {
 		return "address is empty"
@@ -447,28 +447,3 @@ func (api *PublicSdagAPI) QueryWallet(jsonstring interface{}) (string, error) {
 	return string(walletsMsg), nil
 }
 
-func reflectMaptoJSON(param interface{}, pStruct interface{}) interface{} {
-	pType := reflect.TypeOf(param)
-	switch pType.Kind() {
-	case reflect.Map:
-		b, errMap := json.Marshal(param)
-		if errMap != nil {
-			fmt.Println("json.Marshal failed:", errMap)
-			return nil
-		}
-
-		errUnjson := json.Unmarshal(b, pStruct)
-		if errUnjson != nil {
-			fmt.Println("Umarshal failed:", errUnjson)
-			return nil
-		}
-	case reflect.String:
-		errString := json.Unmarshal([]byte(param.(string)), pStruct)
-		if errString != nil {
-
-			fmt.Println("Umarshal failed:", errString)
-			return nil
-		}
-	}
-	return pStruct
-}
