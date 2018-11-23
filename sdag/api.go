@@ -141,21 +141,21 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo() (interface{}, error) {
 }
 
 type TransactionParameter struct {
-	Links []common.Hash `json:"links"`
-	Nonce uint64
+	Links    []common.Hash `json:"links"`
+	Nonce    uint64
 	Gasprice uint64 `json:"gasprice"`
 	GasLimit uint64 `json:"gaslimit"`
 }
+
 //获取基础数据
-func (api *PublicSdagAPI) GetBaseData() (interface{}) {
+func (api *PublicSdagAPI) GetBaseData() interface{} {
 
-	paramtr := api.s.transaction.GetBlockConstructionParameter();
-	param :=TransactionParameter{
-		Links:paramtr.Links,
-		Nonce:paramtr.Nonce,
-		Gasprice:params.DefaultGasPrice,
-		GasLimit:params.DefaultGasLimit,
-
+	paramtr := api.s.transaction.GetBlockConstructionParameter()
+	param := TransactionParameter{
+		Links:    paramtr.Links,
+		Nonce:    paramtr.Nonce,
+		Gasprice: params.DefaultGasPrice,
+		GasLimit: params.DefaultGasLimit,
 	}
 	return param
 
@@ -253,7 +253,6 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 }
 
 //获取系统gasPrice  gasLimimt links、nonce
-
 
 //keystore 生成
 func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) interface{} {
@@ -447,3 +446,17 @@ func (api *PublicSdagAPI) QueryWallet(jsonstring interface{}) (string, error) {
 	return string(walletsMsg), nil
 }
 
+type TimeSlice struct {
+	TimeSlice uint64
+}
+
+func (api *PublicSdagAPI) GetBlockNumberTimeSlice(timeSlice *TimeSlice) (interface{}, error) {
+	hash, err := storage.ReadBlocksHashByTmSlice(api.s.chainDb, timeSlice.TimeSlice)
+	if err != nil {
+		return nil, fmt.Errorf("ReadBlocksHashByTmSlice err" + err.Error())
+	}
+
+	return struct {
+		Number int
+	}{len(hash)}, nil
+}

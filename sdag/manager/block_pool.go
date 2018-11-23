@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/utils"
 	"sync"
 	"time"
 
@@ -30,8 +31,9 @@ type IsolatedBlock struct {
 }
 
 type lackBlock struct {
-	LinkIt []common.Hash //Link it
-	Time   uint32
+	LinkIt  []common.Hash //Link it
+	Time    int64
+	MinTime uint64
 }
 
 type protocolManagerI interface {
@@ -44,6 +46,9 @@ type BlockPool struct {
 	db        tosdb.Database
 	emptyC    chan struct{}
 	blockChan chan types.Block
+
+	MaxSyncTime     uint64
+	MaxSyncTimeLock sync.RWMutex
 
 	IsolatedBlockMap map[common.Hash]*IsolatedBlock
 	lackBlockMap     map[common.Hash]*lackBlock
@@ -180,25 +185,25 @@ func (p *BlockPool) BlockProcessing() {
 			for {
 				select {
 				case block := <-localNewBlocks:
-					p.AddBlock(block, true)
+					p.AddBlock(block, true, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-isolateResponse:
-					p.AddBlock(block, false)
+					p.AddBlock(block, false, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-networkNewBlocks:
-					p.AddBlock(block, true)
+					p.AddBlock(block, true, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-syncResponse:
-					p.AddBlock(block, false)
+					p.AddBlock(block, false, true)
 					continue
 				default:
 				}
@@ -217,15 +222,28 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 			case p.syncStatus = <-p.syncStatusSub:
 			default:
 			}
-			//	if p.syncStatus != core.SDAGSYNC_SYNCING {
 			currentTime = time.Now().Unix()
 
 			if lastTime+params.TimePeriod/1000 < currentTime {
 				var linksLackBlock []common.Hash
+				var blockList []types.Block
+				p.MaxSyncTimeLock.RLock()
+				MaxSyncTime := p.MaxSyncTime
+				p.MaxSyncTimeLock.RUnlock()
 				p.rwlock.RLock()
-				for key := range p.lackBlockMap {
+				for key, value := range p.lackBlockMap {
 					log.Debug("Request ancestor", "hash", key.String(), "lackBlockMap len", len(p.lackBlockMap))
-					linksLackBlock = append(linksLackBlock, key)
+					if storage.HasBlock(p.db, key) {
+						block := storage.ReadBlock(p.db, key)
+						if block != nil {
+							blockList = append(blockList, block)
+							continue
+						}
+					}
+					if !(p.syncStatus == core.SDAGSYNC_SYNCING &&
+						utils.GetMainTime(value.MinTime) >= utils.GetMainTime(MaxSyncTime)) {
+						linksLackBlock = append(linksLackBlock, key)
+					}
 				}
 				p.rwlock.RUnlock()
 				if len(linksLackBlock) > 0 {
@@ -233,9 +251,12 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 					p.blockEvent.Post(event)
 				}
 				lastTime = currentTime
+
+				for _, block := range blockList {
+					p.deleteIsolatedBlock(block)
+				}
 			}
 			time.Sleep(time.Second)
-			//	}
 		}
 	}()
 }
@@ -348,9 +369,12 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 			v, ok := p.lackBlockMap[link]
 			if ok {
 				v.LinkIt = append(v.LinkIt, isolated)
+				if v.MinTime > block.GetTime() {
+					v.MinTime = block.GetTime()
+				}
 				//p.lackBlockMap[link] = v
 			} else {
-				p.lackBlockMap[link] = &lackBlock{[]common.Hash{isolated}, uint32(time.Now().Unix())}
+				p.lackBlockMap[link] = &lackBlock{[]common.Hash{isolated}, time.Now().Unix(), block.GetTime()}
 			}
 		}
 	}
@@ -457,7 +481,19 @@ func (p *BlockPool) SyncAddBlock(block types.Block) error {
 	return nil
 }
 
-func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
+func (p *BlockPool) updateSyncTime(time uint64) {
+	p.MaxSyncTimeLock.RLock()
+	if p.MaxSyncTime < time {
+		p.MaxSyncTimeLock.RUnlock()
+		p.MaxSyncTimeLock.Lock()
+		p.MaxSyncTime = time
+		p.MaxSyncTimeLock.Unlock()
+	} else {
+		p.MaxSyncTimeLock.RUnlock()
+	}
+}
+
+func (p *BlockPool) AddBlock(block types.Block, isRelay bool, isSync bool) error {
 	log.Debug("begin AddBlock", "hash", block.GetHash().String(), "block", block)
 
 	ok := storage.HasBlock(p.db, block.GetHash())
@@ -482,7 +518,7 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool) error {
 	return err
 }
 
-func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, error) {
+func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool, isSync bool) (bool, error) {
 	var isIsolated bool
 	//var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
@@ -505,6 +541,10 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool) (bool, err
 			isIsolated = true
 			linksLackBlock = append(linksLackBlock, hash)
 		}
+	}
+
+	if isSync {
+		p.updateSyncTime(block.GetTime())
 	}
 
 	if isIsolated {

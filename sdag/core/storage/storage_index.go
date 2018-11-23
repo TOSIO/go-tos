@@ -9,6 +9,7 @@ import (
 var (
 	count     uint64
 	countTime uint64
+	//lock      sync.RWMutex
 )
 
 func blockLookUpKey(slice uint64) []byte {
@@ -16,7 +17,9 @@ func blockLookUpKey(slice uint64) []byte {
 }
 
 func blockKey(slice uint64) []byte {
+	//lock.Lock()
 	countNum := nextId()
+	//lock.Unlock()
 	return append(blockLookUpKey(slice), countNum...)
 }
 
@@ -30,7 +33,7 @@ func nextId() []byte {
 		count += 1
 	}
 
-	return hexutil.EncodeUnit64ToByte(countTime + count)
+	return append(hexutil.EncodeUnit64ToByte(countTime), hexutil.EncodeUnit64ToByte(count)...)
 }
 
 func blockInfoKey(hash common.Hash) []byte {

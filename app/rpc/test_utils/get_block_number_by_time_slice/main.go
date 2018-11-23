@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TOSIO/go-tos/app/rpc/httpSend"
+	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 	sendFormat2 = `{
 "jsonrpc":"2.0",
 "method":"sdag_getBlockInfo",
-"params":["{\"BlockHash\" :\"%s\"}"],
+"params":[{"BlockHash" :"%s"}],
 "id":1
 }
 `
@@ -41,18 +42,67 @@ type ResultBlock struct {
 	}
 }
 
+func GetBlockInfoByHash(addr string, hash string) (*ResultBlock, error) {
+	sendString2 := fmt.Sprintf(sendFormat2, hash)
+	body, err := httpSend.SendHttp(addr, sendString2)
+	if err != nil {
+		fmt.Printf("sendString1 error %s\n", err.Error())
+		return nil, err
+	}
+	//fmt.Println(string(body))
+	var resultBlock ResultBlock
+	err = json.Unmarshal(body, &resultBlock)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	return &resultBlock, nil
+}
+
+var statisticsResult = make(map[uint64]*uint64)
+var blockSet = make(map[string]bool)
+
+func statisticsBlock(addr string, hash string) {
+	if _, ok := blockSet[hash]; ok {
+		return
+	}
+	blockSet[hash] = true
+
+	ResultBlock, err := GetBlockInfoByHash(addr, hash)
+
+	if err != nil {
+		fmt.Println("GetBlockInfoByHash err:" + err.Error())
+		return
+	}
+	for _, hash := range ResultBlock.Result.Links {
+		statisticsBlock(addr, hash)
+	}
+
+	number, ok := statisticsResult[utils.GetMainTime(ResultBlock.Result.Time)]
+	if !ok {
+		number = new(uint64)
+		statisticsResult[utils.GetMainTime(ResultBlock.Result.Time)] = number
+	}
+	*number++
+}
+
 func main() {
 	body, err := httpSend.SendHttp(addr, sendFormat1)
 	if err != nil {
-		fmt.Printf("sendString1 error %s", err.Error())
+		fmt.Printf("sendString1 error %s\n", err.Error())
 		return
 	}
-	//fmt.Println(string(body))
+	fmt.Println(string(body))
 	var resultTail ResultTail
 	err = json.Unmarshal(body, &resultTail)
 	if err != nil {
 		fmt.Println(string(body))
 		fmt.Println(err)
 		return
+	}
+	statisticsBlock(addr, resultTail.Result.Hash)
+	fmt.Printf("block number:%d\n", len(blockSet))
+	for k, v := range statisticsResult {
+		fmt.Printf("%d:%d\n", k, *v)
 	}
 }
