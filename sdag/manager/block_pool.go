@@ -408,10 +408,12 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 						// save block
 						if fullBlock, err := types.BlockDecode(isolated.RLP); err == nil {
 							p.deleteUnverifiedBlocks(fullBlock.GetLinks())
+							p.addBlockLock.Lock()
 							hasUpdateCumulativeDiff, err := p.mainChainI.ComputeCumulativeDiff(fullBlock)
 							if err == nil {
 								log.Debug("ComputeCumulativeDiff finish", "hash", fullBlock.GetHash().String())
 								p.saveBlock(fullBlock)
+								p.addBlockLock.Unlock()
 								if hasUpdateCumulativeDiff {
 									p.mainChainI.UpdateTail(fullBlock)
 								}
@@ -421,6 +423,7 @@ func (p *BlockPool) deleteIsolatedBlock(block types.Block) {
 								p.statisticsDeleteIsolatedBlock.Statistics(true)
 								count++
 							} else {
+								p.addBlockLock.Unlock()
 								log.Error("deleteIsolatedBlock ComputeCumulativeDiff failed", "block", hash.String(), "err", err)
 							}
 						} else {
