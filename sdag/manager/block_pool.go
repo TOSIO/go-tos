@@ -505,7 +505,7 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool, isSync bool) error
 		//log.Trace("Non-repeating block")
 	}
 
-	isIsolated, err := p.linkCheckAndSave(block, isRelay)
+	isIsolated, err := p.linkCheckAndSave(block, isRelay, isSync)
 	if err != nil {
 		log.Error("linkCheckAndSave error" + err.Error())
 	}
