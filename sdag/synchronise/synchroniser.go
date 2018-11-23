@@ -82,9 +82,9 @@ type Synchroniser struct {
 	//syncResultCh chan error
 	genesisTimeslice uint64
 	genesis          common.Hash
-
-	cancelLock sync.RWMutex   // Lock to protect the cancel channel and peer in delivers
-	wg         sync.WaitGroup // for shutdown sync
+	lastSYStimeslice uint64         //last syschronise time
+	cancelLock       sync.RWMutex   // Lock to protect the cancel channel and peer in delivers
+	wg               sync.WaitGroup // for shutdown sync
 }
 
 func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI, feed *event.Feed, poolEvent *event.TypeMux, event *event.TypeMux /* , resultCh chan error */) (*Synchroniser, error) {
@@ -113,7 +113,7 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.cancelCh = make(chan struct{})
 	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
-
+	syncer.lastSYStimeslice = 0
 	syncer.fetcher = NewFetcher(ps, poolEvent)
 	syncer.relayer = NewRelayer(syncer.fetcher, ps)
 
@@ -162,6 +162,7 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 	target := ""
 	var origin *core.NewSYNCTask
 	var peer core.Peer
+
 	for peer == nil && len(tasks) > 0 {
 		maxMainBlockNum := uint64(0)
 		for i, task := range tasks {
@@ -327,6 +328,9 @@ loop:
 							if block != nil {
 								forkTimeslice = utils.GetMainTime(block.GetTime())
 								break internalloop
+							} else {
+								log.Debug("get block is error,can not to syschronsize")
+								return
 							}
 						}
 					}
@@ -334,10 +338,29 @@ loop:
 				ticker.Stop()
 				retryGetlocator = 0
 				log.Debug("Reset retryGetlocator")
+
+				if s.lastSYStimeslice != 0 { // wait addblock to complete ,syschronise from lastime
+					block := s.blkstorage.GetBlock(locatorPacket.response[0].Hash)
+					if block != nil {
+						compTimeslice := utils.GetMainTime(block.GetTime())
+						if compTimeslice > s.lastSYStimeslice {
+							forkTimeslice = s.lastSYStimeslice
+						} else {
+							log.Debug("The condition is not enough to syschronsize")
+							return
+						}
+					} else {
+						log.Debug("get block is error,can not to syschronsize")
+						return
+					}
+
+				}
+				forkTimeslice -= 2
 				if forkTimeslice < s.genesisTimeslice {
 					forkTimeslice = s.genesisTimeslice
 					log.Debug("Adjust the begin timeslice", "begin", forkTimeslice)
 				}
+
 				atomic.StoreInt32(&s.syncing, 1)
 				stat = core.SYNCStatusEvent{
 					Progress:          core.SYNC_READY,
@@ -379,7 +402,7 @@ loop:
 					stat.CurTS = lastTSIndex.Timeslice
 					stat.EndTime = time.Now()
 					stat.Progress = core.SYNC_END
-
+					s.lastSYStimeslice = lastTSIndex.Timeslice
 					s.syncEvent.Post(stat)
 					log.Debug("Post SYNC-COMPLETED feed")
 					s.netFeed.Send(core.SDAGSYNC_COMPLETED)
@@ -482,9 +505,10 @@ func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.
 				//log.Debug("process response 1")
 				//s.fetcher.UnMarkFlighting(hashes)
 				//log.Debug("process response 2")
-				stat.AccumulateSYNCNum = stat.AccumulateSYNCNum + uint64(len(newblockEvent.Blocks))
+
 				//if tsblocks.Blocks
 			}
+			stat.AccumulateSYNCNum += uint64(len(newblockEvent.Blocks))
 			if len(newblockEvent.Blocks) > 0 {
 				log.Debug("Post newblock event to pool", "nodeID", res.NodeID(), "maxTimeslice", maxTSIndex.Timeslice, "index", maxTSIndex.Index)
 				s.blockPoolEvent.Post(newblockEvent)
@@ -603,6 +627,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 			//endTimeslice =
 
 			for endTimeslice <= curEndPoint && count < maxSYNCCapLimit {
+				//创世区块开始同步
 				endTimeslice++
 				tsblocks := &protocol.TimesliceBlocks{}
 				tsblocks.TSIndex.Index = 0
@@ -620,7 +645,7 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 						*/
 						if blocks, err := s.blkstorage.GetBlocks(hashes); err == nil {
 							tsblocks.Blocks = blocks
-							tsblocks.TSIndex.Index = uint(len(hashes)) - 1 //  再要减一
+							tsblocks.TSIndex.Index = uint(len(hashes)) - 1
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
 							count += len(hashes)
 							log.Debug("Handle packing(full)", "nodeID", nodeID, "timeslice", endTimeslice,
@@ -639,9 +664,9 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 
 						if blocks, err := s.blkstorage.GetBlocks(hashes[0 : maxSYNCCapLimit-count]); err == nil {
 							tsblocks.Blocks = blocks
-							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count - 1) // 再减一
+							tsblocks.TSIndex.Index = uint(maxSYNCCapLimit - count - 1)
 							response.TSBlocks = append(response.TSBlocks, tsblocks)
-							count += maxSYNCCapLimit - count //少了count加
+							count += maxSYNCCapLimit - count
 
 							log.Debug("Handle packing(portion)", "nodeID", nodeID, "timeslice", endTimeslice,
 								"total", len(hashes), "curPos", len(blocks), "curPacking", len(blocks), "remain", len(hashes)-len(blocks))
