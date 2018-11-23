@@ -23,12 +23,12 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/sdag/core/types"
-	"github.com/TOSIO/go-tos/devbase/rlp"
+	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/devbase/trie"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
 type revision struct {
@@ -172,6 +172,16 @@ func (self *StateDB) Preimages() map[common.Hash][]byte {
 func (self *StateDB) AddRefund(gas uint64) {
 	self.journal.append(refundChange{prev: self.refund})
 	self.refund += gas
+}
+
+// SubRefund removes gas from the refund counter.
+// This method will panic if the refund counter goes below zero
+func (self *StateDB) SubRefund(gas uint64) {
+	self.journal.append(refundChange{prev: self.refund})
+	if gas > self.refund {
+		panic("Refund counter below zero")
+	}
+	self.refund -= gas
 }
 
 // Exist reports whether the given account address exists in the state.
@@ -387,6 +397,15 @@ func (self *StateDB) getStateObject(addr common.Address) (stateObject *stateObje
 
 func (self *StateDB) setStateObject(object *stateObject) {
 	self.stateObjects[object.Address()] = object
+}
+
+// GetCommittedState retrieves a value from the given account's committed storage trie.
+func (self *StateDB) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
+	stateObject := self.getStateObject(addr)
+	if stateObject != nil {
+		return stateObject.GetCommittedState(self.db, hash)
+	}
+	return common.Hash{}
 }
 
 // Retrieve a state object or create a new state object if nil.

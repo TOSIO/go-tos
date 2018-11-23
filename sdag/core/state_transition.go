@@ -29,6 +29,8 @@ import (
 
 var (
 	errInsufficientBalanceForGas = errors.New("insufficient balance to pay for gas")
+	ErrNonceTooHigh              = errors.New("nonce too high")
+	ErrNonceTooLow               = errors.New("nonce too low")
 )
 
 /*

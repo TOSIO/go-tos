@@ -37,30 +37,32 @@ type ChainContext interface {
 }
 
 // NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, block types.Block, chain ChainContext, author *common.Address) vm.Context {
+func NewEVMContext(msg Message, tx *types.TxBlock, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	//var beneficiary common.Address
 	/* 	if author == nil {
 	   		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation
 	   	} else {
 	   		beneficiary = *author
-	   	} */
+		   } */
+	number := &big.Int{}
+	number.SetUint64(tx.GetMutableInfo().ConfirmItsNumber)
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
-		GetHash:     GetHashFn(block, chain),
+		GetHash:     GetHashFn( /* tx,  */ chain),
 		Origin:      msg.From(),
 		Coinbase:    *author,
-		BlockNumber: new(big.Int).Set(block.Number),
-		Time:        new(big.Int).SetUint64(block.GetTime()),
-		Difficulty:  new(big.Int).Set(block.GetDiff()),
-		GasLimit:    block.GetGasLimit(),
+		BlockNumber: new(big.Int).Set(number),
+		Time:        new(big.Int).SetUint64(tx.GetTime()),
+		Difficulty:  new(big.Int).Set(tx.GetDiff()),
+		GasLimit:    tx.GetGasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
 	}
 }
 
 // GetHashFn returns a GetHashFunc which retrieves header hashes by number
-func GetHashFn(ref types.Block, chain ChainContext) func(n uint64) common.Hash {
+func GetHashFn( /* ref *types.TxBlock,  */ chain ChainContext) func(n uint64) common.Hash {
 	//var cache map[uint64]common.Hash
 
 	return func(n uint64) common.Hash {

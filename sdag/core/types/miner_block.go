@@ -212,7 +212,3 @@ func EncodeNonce(i uint64) BlockNonce {
 	binary.BigEndian.PutUint64(n[:], i)
 	return n
 }
-
-func (self *MinerBlock) AsMessage() (Message, error) {
-	return Message{}, nil
-}

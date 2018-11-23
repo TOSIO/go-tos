@@ -225,6 +225,9 @@ func (tx *TxBlock) GetPayload() []byte {
 	return tx.Payload
 }
 
+func (tx *TxBlock) Nonce() uint64 {
+	return tx.AccountNonce
+}
 func (tx *TxBlock) AsMessage() (Message, error) {
 	return Message{}, nil
 }

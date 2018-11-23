@@ -17,6 +17,9 @@
 package core
 
 import (
+	"errors"
+	"math/big"
+
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/params"
@@ -83,13 +86,23 @@ import (
 // and uses the input parameters for its environment. It returns the receipt
 // for the transaction, gas used and an error if the transaction failed,
 // indicating the block was invalid.
-func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, block types.Block, usedGas *uint64, cfg vm.Config) (*types.Receipt, uint64, error) {
-	msg, err := block.AsMessage()
+func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gp *GasPool, statedb *state.StateDB, tx *types.TxBlock, usedGas *uint64, cfg vm.Config) (*types.Receipt, uint64, error) {
+	if tx == nil {
+		return nil, 0, errors.New("transaction invalid")
+	}
+
+	number := &big.Int{}
+	if mutable := tx.GetMutableInfo(); mutable != nil {
+		number.SetUint64(mutable.ConfirmItsNumber)
+	} else {
+		return nil, 0, errors.New("transaction(number) invalid")
+	}
+	msg, err := tx.AsMessage()
 	if err != nil {
 		return nil, 0, err
 	}
 	// Create a new context to be used in the EVM environment
-	context := NewEVMContext(msg, block, bc, author)
+	context := NewEVMContext(msg, tx, bc, author)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms.
 	vmenv := vm.NewEVM(context, statedb, config, cfg)
@@ -100,24 +113,24 @@ func ApplyTransaction(config *params.ChainConfig, bc ChainContext, author *commo
 	}
 	// Update the state with pending changes
 	var root []byte
-	if config.IsByzantium(header.Number) {
+	if config.IsByzantium(number) {
 		statedb.Finalise(true)
 	} else {
-		root = statedb.IntermediateRoot(config.IsEIP158(header.Number)).Bytes()
+		root = statedb.IntermediateRoot(config.IsEIP158(number)).Bytes()
 	}
 	*usedGas += gas
 
 	// Create a new receipt for the transaction, storing the intermediate root and gas used by the tx
 	// based on the eip phase, we're passing whether the root touch-delete accounts.
 	receipt := types.NewReceipt(root, failed, *usedGas)
-	receipt.TxHash = tx.Hash()
+	receipt.TxHash = tx.GetHash()
 	receipt.GasUsed = gas
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To() == nil {
 		receipt.ContractAddress = crypto.CreateAddress(vmenv.Context.Origin, tx.Nonce())
 	}
 	// Set the receipt logs and create a bloom for filtering
-	receipt.Logs = statedb.GetLogs(tx.Hash())
+	receipt.Logs = statedb.GetLogs(tx.GetHash())
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
 	return receipt, gas, err

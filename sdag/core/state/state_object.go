@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"github.com/TOSIO/go-tos/devbase/crypto"
+
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 )
 
@@ -98,7 +99,7 @@ type Account struct {
 	Nonce    uint64
 	Balance  *big.Int
 	Root     common.Hash // merkle root of the storage trie
-	CodeHash []byte  //合约代码的Hash值 注：[合约]表示该项仅对合约账户有效
+	CodeHash []byte      //合约代码的Hash值 注：[合约]表示该项仅对合约账户有效
 }
 
 // newObject creates a state object.
@@ -357,3 +358,26 @@ func (self *stateObject) Value() *big.Int {
 	panic("Value on stateObject should never be called")
 }
 
+// GetCommittedState retrieves a value from the committed account storage trie.
+func (self *stateObject) GetCommittedState(db Database, key common.Hash) common.Hash {
+	// If we have the original value cached, return that
+	value, cached := self.cachedStorage[key]
+	if cached {
+		return value
+	}
+	// Otherwise load the value from the database
+	enc, err := self.getTrie(db).TryGet(key[:])
+	if err != nil {
+		self.setError(err)
+		return common.Hash{}
+	}
+	if len(enc) > 0 {
+		_, content, _, err := rlp.Split(enc)
+		if err != nil {
+			self.setError(err)
+		}
+		value.SetBytes(content)
+	}
+	self.cachedStorage[key] = value
+	return value
+}
