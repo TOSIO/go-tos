@@ -113,7 +113,6 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.cancelCh = make(chan struct{})
 	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
-	syncer.lastSYStimeslice = 0
 	syncer.fetcher = NewFetcher(ps, poolEvent)
 	syncer.relayer = NewRelayer(syncer.fetcher, ps)
 
@@ -129,8 +128,10 @@ func (s *Synchroniser) Start() error {
 		s.genesis = genesis
 		if genesisBlock := s.blkstorage.GetBlock(genesis); genesisBlock != nil {
 			s.genesisTimeslice = utils.GetMainTime(genesisBlock.GetTime())
+			s.lastSYStimeslice = s.genesisTimeslice
 		}
 	}
+
 	go s.fetcher.loop()
 	go s.relayer.loop()
 	go s.loop()
@@ -153,9 +154,12 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 		log.Info("Synchronise is completed", "lastTS", s.mainChain.GetLastTempMainBlkSlice(), "nowTS", nowTimeslice)
 		return
 	}
-
 	if atomic.LoadInt32(&s.syncing) != 0 {
 		log.Debug("Synchroniser is in synchronizing")
+		return
+	}
+	if lastTempMBTimeslice < s.lastSYStimeslice {
+		log.Debug("Synchroniser is not completed")
 		return
 	}
 
@@ -310,6 +314,9 @@ loop:
 		select {
 		case response := <-s.locatorBlockresCh:
 			//var locatorResp []protocol.MainChainSample
+			ticker.Stop()
+			retryGetlocator = 0
+			log.Debug("Reset retryGetlocator")
 			forkTimeslice = uint64(0)
 			if locatorPacket, ok := response.(*LocatorPacket); ok {
 				log.Debug("decode response msg", "locatorPacket", locatorPacket.response, "size", len(locatorPacket.response))
@@ -335,26 +342,7 @@ loop:
 						}
 					}
 				}
-				ticker.Stop()
-				retryGetlocator = 0
-				log.Debug("Reset retryGetlocator")
 
-				if s.lastSYStimeslice != 0 { // wait addblock to complete ,syschronise from lastime
-					block := s.blkstorage.GetBlock(locatorPacket.response[0].Hash)
-					if block != nil {
-						compTimeslice := utils.GetMainTime(block.GetTime())
-						if compTimeslice > s.lastSYStimeslice {
-							forkTimeslice = s.lastSYStimeslice
-						} else {
-							log.Debug("The condition is not enough to syschronsize")
-							return
-						}
-					} else {
-						log.Debug("get block is error,can not to syschronsize")
-						return
-					}
-
-				}
 				forkTimeslice -= 2
 				if forkTimeslice < s.genesisTimeslice {
 					forkTimeslice = s.genesisTimeslice
@@ -476,6 +464,7 @@ loop:
 		}
 	}
 	s.done <- struct{}{}
+	// time.Sleep(time.Duration(180) * time.Second)
 	atomic.StoreInt32(&s.syncing, 0)
 }
 
