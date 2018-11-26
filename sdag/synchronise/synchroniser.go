@@ -154,6 +154,7 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 		log.Info("Synchronise is completed", "lastTS", s.mainChain.GetLastTempMainBlkSlice(), "nowTS", nowTimeslice)
 		return
 	}
+
 	if atomic.LoadInt32(&s.syncing) != 0 {
 		log.Debug("Synchroniser is in synchronizing")
 		return
@@ -248,7 +249,7 @@ func (s *Synchroniser) loop() {
 		}
 	}
 	s.listenInbound()
-
+	//	s.lastSYStimeslice = s.genesisTimeslice
 	idle := true
 	for {
 		s.schedule(queuedTask, &idle)
@@ -276,7 +277,15 @@ func (s *Synchroniser) loop() {
 
 func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 	s.wg.Add(1)
-	defer s.wg.Done()
+	clear := func() {
+		s.wg.Done()
+		s.done <- struct{}{}
+		// time.Sleep(time.Duration(180) * time.Second)
+		atomic.StoreInt32(&s.syncing, 0)
+
+	}
+	defer clear()
+	atomic.StoreInt32(&s.syncing, 1)
 	var (
 		waitTimeout   <-chan time.Time
 		stat          core.SYNCStatusEvent
@@ -294,6 +303,7 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 		//TriedOrigin:       make([]string, 0)
 	}
 	s.syncEvent.Post(stat)
+
 	if err := peer.SendGetlocatorRequest(); err != nil {
 		log.Debug("Error send get-locator-request-message", "nodeid ", peer.NodeID(), "err", err)
 		return
@@ -352,19 +362,7 @@ loop:
 					log.Debug("Adjust the begin timeslice", "begin", forkTimeslice)
 				}
 
-				atomic.StoreInt32(&s.syncing, 1)
-				stat = core.SYNCStatusEvent{
-					Progress:          core.SYNC_READY,
-					BeginTS:           forkTimeslice,
-					EndTS:             0,
-					CurTS:             0,
-					AccumulateSYNCNum: 0,
-					BeginTime:         time.Now(),
-					CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
-					//TriedOrigin:       make([]string, 0)
-				}
-
-				s.syncEvent.Post(stat)
+				stat.BeginTS = forkTimeslice
 
 				if err := peer.SendSYNCBlockRequest(forkTimeslice, 0); err != nil {
 					log.Debug("Error send SYNC-request-message", "beginTS", forkTimeslice, "err", err)
@@ -406,7 +404,7 @@ loop:
 					lastAck = lastTSIndex
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
-
+					s.lastSYStimeslice = lastTSIndex.Timeslice
 					stat.Err = nil
 					stat.Progress = core.SYNC_SYNCING
 					s.syncEvent.Post(stat)
@@ -466,9 +464,7 @@ loop:
 			ticker = time.NewTicker(60 * time.Second)
 		}
 	}
-	s.done <- struct{}{}
-	// time.Sleep(time.Duration(180) * time.Second)
-	atomic.StoreInt32(&s.syncing, 0)
+
 }
 
 func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.SYNCStatusEvent) (*protocol.TimesliceIndex, bool, error) {
