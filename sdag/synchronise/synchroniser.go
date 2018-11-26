@@ -255,6 +255,7 @@ func (s *Synchroniser) loop() {
 		if idle {
 			discharg(s.blockresCh)
 		}
+		ticker := time.NewTicker(30 * time.Second)
 		select {
 		case newTask := <-s.newTaskSub.Chan():
 			if task, ok := newTask.Data.(*core.NewSYNCTask); ok {
@@ -267,6 +268,8 @@ func (s *Synchroniser) loop() {
 			close(s.syncreqCh)
 			close(s.blockresAckCh)
 			return
+		case <-ticker.C:
+			continue
 		}
 	}
 }
