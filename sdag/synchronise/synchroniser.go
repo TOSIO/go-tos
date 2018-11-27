@@ -37,8 +37,8 @@ type timesliceHash struct {
 }
 
 type Synchroniser struct {
-	peerset core.PeerSet
-
+	peerset    core.PeerSet
+	queuedTask map[string]*core.NewSYNCTask
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
 
@@ -147,6 +147,7 @@ func (s *Synchroniser) Stop() {
 }
 
 func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) {
+
 	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
 	lastTempMBTimeslice := s.mainChain.GetLastTempMainBlkSlice()
 	if lastTempMBTimeslice >= nowTimeslice {
@@ -161,6 +162,7 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 	}
 	if lastTempMBTimeslice < s.lastSYStimeslice {
 		log.Debug("Synchroniser is not completed")
+
 		return
 	}
 
@@ -237,7 +239,7 @@ func (s *Synchroniser) loop() {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
-	queuedTask := make(map[string]*core.NewSYNCTask)
+	s.queuedTask = make(map[string]*core.NewSYNCTask)
 	discharg := func(resCh chan core.Response /* , resackCh chan core.Response */) {
 		select {
 		/* case <-resackCh:
@@ -248,20 +250,24 @@ func (s *Synchroniser) loop() {
 
 		}
 	}
+
 	s.listenInbound()
-	//	s.lastSYStimeslice = s.genesisTimeslice
+	go s.queuedtask(s.queuedTask)
 	idle := true
 	for {
-		s.schedule(queuedTask, &idle)
+		s.schedule(s.queuedTask, &idle)
+		ticker := time.NewTicker(time.Second * 10)
 		if idle {
 			discharg(s.blockresCh)
 		}
-		ticker := time.NewTicker(30 * time.Second)
+
 		select {
-		case newTask := <-s.newTaskSub.Chan():
-			if task, ok := newTask.Data.(*core.NewSYNCTask); ok {
-				queuedTask[task.NodeID] = task
-			}
+		/*case newTask := <-s.newTaskSub.Chan():
+		if task, ok := newTask.Data.(*core.NewSYNCTask); ok {
+			queuedTask[task.NodeID] = task
+		}
+		newstart:= <- s.newTaskCh
+		log.Debug("new start","start",newstart)*/
 		case <-s.done:
 			idle = true
 			continue
@@ -274,9 +280,23 @@ func (s *Synchroniser) loop() {
 		}
 	}
 }
+func (s *Synchroniser) queuedtask(queuedTask map[string]*core.NewSYNCTask) {
+
+	for {
+		select {
+		case newTask := <-s.newTaskSub.Chan():
+			if task, ok := newTask.Data.(*core.NewSYNCTask); ok {
+				queuedTask[task.NodeID] = task
+
+			}
+		}
+	}
+
+}
 
 func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 	s.wg.Add(1)
+	atomic.StoreInt32(&s.syncing, 1)
 	clear := func() {
 		s.wg.Done()
 		s.done <- struct{}{}
@@ -285,7 +305,7 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 
 	}
 	defer clear()
-	atomic.StoreInt32(&s.syncing, 1)
+
 	var (
 		waitTimeout   <-chan time.Time
 		stat          core.SYNCStatusEvent
@@ -303,6 +323,7 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 		//TriedOrigin:       make([]string, 0)
 	}
 	s.syncEvent.Post(stat)
+	log.Debug("node message0", "address", peer.Address())
 
 	if err := peer.SendGetlocatorRequest(); err != nil {
 		log.Debug("Error send get-locator-request-message", "nodeid ", peer.NodeID(), "err", err)
@@ -376,6 +397,7 @@ loop:
 				stat.Err = nil
 				stat.Progress = core.SYNC_SYNCING
 				s.syncEvent.Post(stat)
+				log.Debug("node message1", "address", peer.Address())
 				break
 			} else {
 				fmt.Printf("not locate begintimeslice")
@@ -408,6 +430,7 @@ loop:
 					stat.Err = nil
 					stat.Progress = core.SYNC_SYNCING
 					s.syncEvent.Post(stat)
+					log.Debug("node message2", "address", peer.Address())
 					log.Debug("Post progress completed", "nodeID", packet.NodeID(), "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
 					if err = peer.SendSYNCBlockResponseACK(lastTSIndex.Timeslice, lastTSIndex.Index); err != nil {
 						log.Debug("Error send SYNC-BLOCK-RESPONSE-ACK message", "nodeID", packet.NodeID(), "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
