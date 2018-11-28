@@ -440,7 +440,7 @@ func (t *udp) loop() {
 			for el := plist.Front(); el != nil; el = el.Next() {
 				p := el.Value.(*pending)
 				if now.After(p.deadline) || now.Equal(p.deadline) {
-					log.Trace("Receive packet timeout", "from", p.from, "type", p.ptype)
+					log.Trace("Receive packet timeout", "from", p.from, "addr", p.addr, "type", p.ptype)
 					p.errc <- errTimeout
 					plist.Remove(el)
 					contTimeouts++
