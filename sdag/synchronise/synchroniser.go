@@ -38,7 +38,7 @@ type timesliceHash struct {
 
 type Synchroniser struct {
 	peerset core.PeerSet
-
+	//queuedTask map[string]*core.NewSYNCTask
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
 
@@ -113,7 +113,6 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.cancelCh = make(chan struct{})
 	syncer.quitCh = make(chan struct{})
 	/* syncer.syncResultCh = resultCh */
-	syncer.lastSYStimeslice = 0
 	syncer.fetcher = NewFetcher(ps, poolEvent)
 	syncer.relayer = NewRelayer(syncer.fetcher, ps)
 
@@ -129,8 +128,10 @@ func (s *Synchroniser) Start() error {
 		s.genesis = genesis
 		if genesisBlock := s.blkstorage.GetBlock(genesis); genesisBlock != nil {
 			s.genesisTimeslice = utils.GetMainTime(genesisBlock.GetTime())
+			s.lastSYStimeslice = s.genesisTimeslice
 		}
 	}
+
 	go s.fetcher.loop()
 	go s.relayer.loop()
 	go s.loop()
@@ -146,6 +147,7 @@ func (s *Synchroniser) Stop() {
 }
 
 func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) {
+
 	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
 	lastTempMBTimeslice := s.mainChain.GetLastTempMainBlkSlice()
 	if lastTempMBTimeslice >= nowTimeslice {
@@ -156,6 +158,11 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 
 	if atomic.LoadInt32(&s.syncing) != 0 {
 		log.Debug("Synchroniser is in synchronizing")
+		return
+	}
+	if lastTempMBTimeslice < s.lastSYStimeslice {
+		log.Debug("Synchroniser is not completed")
+
 		return
 	}
 
@@ -191,6 +198,7 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 		s.netFeed.Send(core.SDAGSYNC_SYNCING)
 		log.Debug("Post SYNC-SYNCING feed End")
 		//go s.synchroinise(peer, beginTimeslice, origin.LastTempMBTimeslice, origin.LastMainBlockNum)
+		atomic.StoreInt32(&s.syncing, 1)
 		go s.synchroiniseV2(peer)
 	} else {
 		for key, _ := range tasks {
@@ -244,10 +252,10 @@ func (s *Synchroniser) loop() {
 		}
 	}
 	s.listenInbound()
-
 	idle := true
 	for {
 		s.schedule(queuedTask, &idle)
+		ticker := time.NewTicker(time.Second * 60)
 		if idle {
 			discharg(s.blockresCh)
 		}
@@ -263,13 +271,23 @@ func (s *Synchroniser) loop() {
 			close(s.syncreqCh)
 			close(s.blockresAckCh)
 			return
+		case <-ticker.C:
+			continue
 		}
 	}
 }
 
 func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 	s.wg.Add(1)
-	defer s.wg.Done()
+	clear := func() {
+		s.wg.Done()
+		s.done <- struct{}{}
+		// time.Sleep(time.Duration(180) * time.Second)
+		atomic.StoreInt32(&s.syncing, 0)
+
+	}
+	defer clear()
+
 	var (
 		waitTimeout   <-chan time.Time
 		stat          core.SYNCStatusEvent
@@ -287,6 +305,7 @@ func (s *Synchroniser) synchroiniseV2(peer core.Peer) {
 		//TriedOrigin:       make([]string, 0)
 	}
 	s.syncEvent.Post(stat)
+
 	if err := peer.SendGetlocatorRequest(); err != nil {
 		log.Debug("Error send get-locator-request-message", "nodeid ", peer.NodeID(), "err", err)
 		return
@@ -310,6 +329,9 @@ loop:
 		select {
 		case response := <-s.locatorBlockresCh:
 			//var locatorResp []protocol.MainChainSample
+			ticker.Stop()
+			retryGetlocator = 0
+			log.Debug("Reset retryGetlocator")
 			forkTimeslice = uint64(0)
 			if locatorPacket, ok := response.(*LocatorPacket); ok {
 				log.Debug("decode response msg", "locatorPacket", locatorPacket.response, "size", len(locatorPacket.response))
@@ -335,45 +357,14 @@ loop:
 						}
 					}
 				}
-				ticker.Stop()
-				retryGetlocator = 0
-				log.Debug("Reset retryGetlocator")
 
-				if s.lastSYStimeslice != 0 { // wait addblock to complete ,syschronise from lastime
-					block := s.blkstorage.GetBlock(locatorPacket.response[0].Hash)
-					if block != nil {
-						compTimeslice := utils.GetMainTime(block.GetTime())
-						if compTimeslice > s.lastSYStimeslice {
-							forkTimeslice = s.lastSYStimeslice
-						} else {
-							log.Debug("The condition is not enough to syschronsize")
-							return
-						}
-					} else {
-						log.Debug("get block is error,can not to syschronsize")
-						return
-					}
-
-				}
 				forkTimeslice -= 2
 				if forkTimeslice < s.genesisTimeslice {
 					forkTimeslice = s.genesisTimeslice
 					log.Debug("Adjust the begin timeslice", "begin", forkTimeslice)
 				}
 
-				atomic.StoreInt32(&s.syncing, 1)
-				stat = core.SYNCStatusEvent{
-					Progress:          core.SYNC_READY,
-					BeginTS:           forkTimeslice,
-					EndTS:             0,
-					CurTS:             0,
-					AccumulateSYNCNum: 0,
-					BeginTime:         time.Now(),
-					CurOrigin:         peer.NodeID() + "[" + peer.Address() + "]",
-					//TriedOrigin:       make([]string, 0)
-				}
-
-				s.syncEvent.Post(stat)
+				stat.BeginTS = forkTimeslice
 
 				if err := peer.SendSYNCBlockRequest(forkTimeslice, 0); err != nil {
 					log.Debug("Error send SYNC-request-message", "beginTS", forkTimeslice, "err", err)
@@ -415,7 +406,7 @@ loop:
 					lastAck = lastTSIndex
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
-
+					s.lastSYStimeslice = lastTSIndex.Timeslice
 					stat.Err = nil
 					stat.Progress = core.SYNC_SYNCING
 					s.syncEvent.Post(stat)
@@ -475,8 +466,7 @@ loop:
 			ticker = time.NewTicker(60 * time.Second)
 		}
 	}
-	s.done <- struct{}{}
-	atomic.StoreInt32(&s.syncing, 0)
+
 }
 
 func (s *Synchroniser) handleSYNCBlockResponse(packet core.Response, stat *core.SYNCStatusEvent) (*protocol.TimesliceIndex, bool, error) {

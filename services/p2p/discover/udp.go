@@ -182,6 +182,7 @@ type udp struct {
 type pending struct {
 	// these fields must match in the reply.
 	from  NodeID
+	addr  string
 	ptype byte
 
 	// time when the request must complete
@@ -287,7 +288,7 @@ func (t *udp) sendPing(toid NodeID, toaddr *net.UDPAddr, callback func()) <-chan
 		errc <- err
 		return errc
 	}
-	errc := t.pending(toid, pongPacket, func(p interface{}) bool {
+	errc := t.pending(toid, toaddr.String(), pongPacket, func(p interface{}) bool {
 		ok := bytes.Equal(p.(*pong).ReplyTok, hash)
 		if ok && callback != nil {
 			callback()
@@ -298,8 +299,8 @@ func (t *udp) sendPing(toid NodeID, toaddr *net.UDPAddr, callback func()) <-chan
 	return errc
 }
 
-func (t *udp) waitping(from NodeID) error {
-	return <-t.pending(from, pingPacket, func(interface{}) bool { return true })
+func (t *udp) waitping(from NodeID, toaddr string) error {
+	return <-t.pending(from, toaddr, pingPacket, func(interface{}) bool { return true })
 }
 
 // findnode sends a findnode request to the given node and waits until
@@ -309,12 +310,12 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 	// our endpoint proof and reject findnode. Solicit a ping first.
 	if time.Since(t.db.lastPingReceived(toid)) > nodeDBNodeExpiration {
 		t.ping(toid, toaddr)
-		t.waitping(toid)
+		t.waitping(toid, toaddr.String())
 	}
 
 	nodes := make([]*Node, 0, bucketSize)
 	nreceived := 0
-	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
+	errc := t.pending(toid, toaddr.String(), neighborsPacket, func(r interface{}) bool {
 		log.Trace("Pending callback called")
 		reply := r.(*neighbors)
 		for _, rn := range reply.Nodes {
@@ -339,9 +340,9 @@ func (t *udp) findnode(toid NodeID, toaddr *net.UDPAddr, target NodeID) ([]*Node
 
 // pending adds a reply callback to the pending reply queue.
 // see the documentation of type pending for a detailed explanation.
-func (t *udp) pending(id NodeID, ptype byte, callback func(interface{}) bool) <-chan error {
+func (t *udp) pending(id NodeID, addr string, ptype byte, callback func(interface{}) bool) <-chan error {
 	ch := make(chan error, 1)
-	p := &pending{from: id, ptype: ptype, callback: callback, errc: ch}
+	p := &pending{from: id, addr: addr, ptype: ptype, callback: callback, errc: ch}
 	select {
 	case t.addpending <- p:
 		// loop will handle it
@@ -439,7 +440,7 @@ func (t *udp) loop() {
 			for el := plist.Front(); el != nil; el = el.Next() {
 				p := el.Value.(*pending)
 				if now.After(p.deadline) || now.Equal(p.deadline) {
-					log.Trace("Receive packet timeout", "from", p.from, "type", p.ptype)
+					log.Trace("Receive packet timeout", "from", p.from, "addr", p.addr, "type", p.ptype)
 					p.errc <- errTimeout
 					plist.Remove(el)
 					contTimeouts++

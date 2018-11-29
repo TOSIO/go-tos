@@ -1,6 +1,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -37,6 +38,9 @@ func (lm *UniqueList) IsExist(e Elem) bool {
 }
 
 func (lm *UniqueList) Push(e Elem) error {
+	if len(lm.container) >= lm.maxSize {
+		return errors.New("exceeded container size limit")
+	}
 	if lm.IsExist(e) {
 		return fmt.Errorf("the element has already exist")
 	}

@@ -29,7 +29,7 @@ func defaultNodeConfig() node.Config {
 	cfg.Name = clientIdentifier
 	cfg.HTTPModules = append(cfg.HTTPModules, "sdag", "TOS")
 	cfg.WSModules = append(cfg.WSModules, "sdag", "TOS")
-	cfg.IPCPath = "geth.ipc"
+	cfg.IPCPath = "tos.ipc"
 	return cfg
 }
 
