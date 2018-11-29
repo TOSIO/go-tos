@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/event"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 	"github.com/TOSIO/go-tos/services/p2p/discover"
 )
@@ -193,6 +194,7 @@ func (p *MsgPipeRW) WriteMsg(msg Msg) error {
 
 // ReadMsg returns a message sent on the other end of the pipe.
 func (p *MsgPipeRW) ReadMsg() (Msg, error) {
+	log.Trace("Try to read message")
 	if atomic.LoadInt32(p.closed) == 0 {
 		select {
 		case msg := <-p.r:

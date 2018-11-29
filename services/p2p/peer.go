@@ -263,14 +263,16 @@ func (p *Peer) readLoop(errc chan<- error) {
 	for {
 		msg, err := p.rw.ReadMsg()
 		if err != nil {
-			//p.Log().Debug("Stop readLoop 1")
+			p.Log().Trace("Stop readLoop 1", "err", err)
 			errc <- err
-			//p.Log().Debug("Stop readLoop")
+			p.Log().Trace("Stop readLoop 2", "err", err)
 			return
 		}
 		msg.ReceivedAt = time.Now()
 		if err = p.handle(msg); err != nil {
+			p.Log().Trace("Stop readLoop 3", "err", err)
 			errc <- err
+			p.Log().Trace("Stop readLoop 4", "err", err)
 			return
 		}
 	}

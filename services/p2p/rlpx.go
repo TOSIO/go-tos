@@ -151,6 +151,7 @@ func (t *rlpx) doProtoHandshake(our *protoHandshake) (their *protoHandshake, err
 func readProtocolHandshake(rw MsgReader, our *protoHandshake) (*protoHandshake, error) {
 	msg, err := rw.ReadMsg()
 	if err != nil {
+		log.Trace("Error read protocol handshake", "err", err)
 		return nil, err
 	}
 	if msg.Size > baseProtocolMaxMsgSize {
