@@ -752,10 +752,11 @@ func (pm *ProtocolManager) getBlock(event *core.GetBlocksEvent) error {
 */
 func (pm *ProtocolManager) CalculateProgressPercent() string {
 	if pm.stat.Syncstat.CurTS == 0 {
-		return "0"
+		return "0%"
 	} else {
 		progressPct := float64(pm.stat.Syncstat.CurTS-pm.stat.Syncstat.BeginTS) / float64(pm.stat.Syncstat.EndTS-pm.stat.Syncstat.BeginTS)
-		progressPercent := strconv.FormatFloat(progressPct, 'E', -1, 64)
-		return progressPercent
+		progress := int(progressPct * 100)
+		progressPercent := strconv.Itoa(progress)
+		return progressPercent + "%"
 	}
 }
