@@ -53,6 +53,12 @@ var (
 		utils.DashboardRefreshFlag,
 		utils.GCModeFlag,
 
+		utils.BlockboardEnabledFlag,
+		utils.BlockboardAddrFlag,
+		utils.BlockboardPortFlag,
+		utils.BlockboardRefreshFlag,
+		utils.GCBoardModeFlag,
+
 		utils.CacheFlag,
 		utils.CacheDatabaseFlag,
 		utils.CacheGCFlag,

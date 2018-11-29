@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
@@ -95,7 +96,7 @@ type BolckHashInfo struct {
 }
 
 type WalletAdress struct {
-	Address string
+	WalletAddr string
 }
 
 type RpcMinerInfo struct {
@@ -139,6 +140,8 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo() (interface{}, error) {
 
 	return mainBlockInfo, nil
 }
+
+
 
 type TransactionParameter struct {
 	Links    []common.Hash `json:"links"`
@@ -301,7 +304,7 @@ func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) 
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
 func (api *PublicSdagAPI) GetBalance(walletadress *WalletAdress) (interface{}, error) {
-	address := common.HexToAddress(walletadress.Address)
+	address := common.HexToAddress(walletadress.WalletAddr)
 	//last mainblock info
 	tailMainBlockInfo := api.s.blockchain.GetMainTail()
 	//find the main timeslice
@@ -343,18 +346,37 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	}
 	return string(nodeIdMsg)
 }
-
-func (api *PublicSdagAPI) GetConnectNumber(jsonstring string) string {
-	if jsonstring != "ok" {
-		fmt.Printf("accept params error")
-	}
-
+//获取节点链接数量
+func (api *PublicSdagAPI) GetConnectNumber() string {
 	_, number := api.s.SdagNodeIDMessage()
-	nodeIdMsg, err := json.Marshal(number)
+	num :=strconv.Itoa(number)
+	return num
+}
+
+//获取主块数量
+func (api *PublicSdagAPI) GetMainBlockNumber() (string) {
+
+	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(api.s.chainDb)
 	if err != nil {
-		fmt.Println("error:", err)
+		return ""
 	}
-	return string(nodeIdMsg)
+	num := strconv.FormatUint(finalMainBlockSlice.Number,10)
+	return num
+}
+
+//获取同步状态
+func (api *PublicSdagAPI) GetSyncStatus() (string) {
+	 status :=api.s.Status().Status
+	switch status {
+		case STAT_SYNCING:
+			return "syncing"
+		case  STAT_WORKING:
+			return "sync_end"
+		case STAT_READY:
+			return "sync_ready"
+		default:
+			return "sync_none"
+	}
 }
 
 //stop minner

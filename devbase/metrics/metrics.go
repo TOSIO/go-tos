@@ -24,13 +24,14 @@ var Enabled bool = false
 // MetricsEnabledFlag is the CLI flag name to use to enable metrics collections.
 const MetricsEnabledFlag = "metrics"
 const DashboardEnabledFlag = "dashboard"
+const BlockboardEnabledFlag = "blockboard"
 
 // Init enables or disables the metrics system. Since we need this to run before
 // any other code gets to create meters and timers, we'll actually do an ugly hack
 // and peek into the command line args for the metrics flag.
 func init() {
 	for _, arg := range os.Args {
-		if flag := strings.TrimLeft(arg, "-"); flag == MetricsEnabledFlag || flag == DashboardEnabledFlag {
+		if flag := strings.TrimLeft(arg, "-"); flag == MetricsEnabledFlag || flag == DashboardEnabledFlag||flag == BlockboardEnabledFlag {
 			log.Info("Enabling metrics collection")
 			Enabled = true
 		}

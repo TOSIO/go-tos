@@ -20,6 +20,7 @@ package utils
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/blockboard"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -153,6 +154,11 @@ var (
 		Usage: `Blockchain garbage collection mode ("full", "archive")`,
 		Value: "full",
 	}
+	GCBoardModeFlag = cli.StringFlag{
+		Name:  "gcboardmode",
+		Usage: `Blockchain garbage collection mode ("full", "archive")`,
+		Value: "full",
+	}
 	LightServFlag = cli.IntFlag{
 		Name:  "lightserv",
 		Usage: "Maximum percentage of time allowed for serving LES requests (0-90)",
@@ -178,22 +184,43 @@ var (
 		Name:  metrics.DashboardEnabledFlag,
 		Usage: "Enable the dashboard",
 	}
+	// Blockboard settings
+	BlockboardEnabledFlag = cli.BoolFlag{
+		Name:  metrics.BlockboardEnabledFlag,
+		Usage: "Enable the blockboard",
+	}
 	DashboardAddrFlag = cli.StringFlag{
 		Name:  "dashboard.addr",
 		Usage: "Dashboard listening interface",
 		Value: dashboard.DefaultConfig.Host,
+	}
+	BlockboardAddrFlag = cli.StringFlag{
+		Name:  "blockboard.addr",
+		Usage: "blockboard listening interface",
+		Value: blockboard.DefaultConfig.Host,
+	}
+	BlockboardPortFlag = cli.IntFlag{
+		Name:  "blockboard.host",
+		Usage: "blockboard listening port",
+		Value: blockboard.DefaultConfig.Port,
 	}
 	DashboardPortFlag = cli.IntFlag{
 		Name:  "dashboard.host",
 		Usage: "Dashboard listening port",
 		Value: dashboard.DefaultConfig.Port,
 	}
+
 	DashboardRefreshFlag = cli.DurationFlag{
 		Name:  "dashboard.refresh",
 		Usage: "Dashboard metrics collection refresh rate",
 		Value: dashboard.DefaultConfig.Refresh,
 	}
 
+	BlockboardRefreshFlag = cli.DurationFlag{
+		Name:  "blockboard.refresh",
+		Usage: "blockboard metrics collection refresh rate",
+		Value: blockboard.DefaultConfig.Refresh,
+	}
 	// Performance tuning settings
 	CacheFlag = cli.IntFlag{
 		Name:  "cache",
@@ -434,6 +461,10 @@ func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
 
 	if gcmode := ctx.GlobalString(GCModeFlag.Name); gcmode != "full" && gcmode != "archive" {
 		Fatalf("--%s must be either 'full' or 'archive'", GCModeFlag.Name)
+	}
+
+	if gcboardmode := ctx.GlobalString(GCBoardModeFlag.Name); gcboardmode != "full" && gcboardmode != "archive" {
+		Fatalf("--%s must be either 'full' or 'archive'", GCBoardModeFlag.Name)
 	}
 
 	// Override any default configs for hard coded networks.
@@ -763,11 +794,25 @@ func RegisterDashboardService(stack *node.Node, cfg *dashboard.Config, commit st
 	})
 }
 
+// RegisterDashboardService adds a blockboard to the stack.
+func RegisterBlockboardService(stack *node.Node, cfg *blockboard.Config, commit string) {
+	stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
+		return blockboard.New(cfg, commit, ctx.ResolvePath("logs")), nil
+	})
+}
+
 // SetDashboardConfig applies dashboard related command line flags to the config.
 func ApplyDashboardConfig(ctx *cli.Context, cfg *dashboard.Config) {
 	cfg.Host = ctx.GlobalString(DashboardAddrFlag.Name)
 	cfg.Port = ctx.GlobalInt(DashboardPortFlag.Name)
 	cfg.Refresh = ctx.GlobalDuration(DashboardRefreshFlag.Name)
+}
+
+// SetDashboardConfig applies blockboard related command line flags to the config.
+func ApplyBlockboardConfig(ctx *cli.Context, cfg *blockboard.Config) {
+	cfg.Host = ctx.GlobalString(BlockboardAddrFlag.Name)
+	cfg.Port = ctx.GlobalInt(BlockboardPortFlag.Name)
+	cfg.Refresh = ctx.GlobalDuration(BlockboardRefreshFlag.Name)
 }
 
 // MakePasswordList reads password lines from the file specified by the global --password flag.
