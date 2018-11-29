@@ -3,6 +3,7 @@ package sdag
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	//"github.com/TOSIO/go-tos/sdag/core/storage"
 	"math/big"
@@ -749,3 +750,8 @@ func (pm *ProtocolManager) getBlock(event *core.GetBlocksEvent) error {
 	return nil
 }
 */
+func (pm *ProtocolManager) CalculateProgressPercent() string {
+	progressPct := float64(pm.stat.Syncstat.CurTS-pm.stat.Syncstat.BeginTS) / float64(pm.stat.Syncstat.EndTS-pm.stat.Syncstat.BeginTS)
+	progressPercent := strconv.FormatFloat(progressPct, 'E', -1, 64)
+	return progressPercent
+}

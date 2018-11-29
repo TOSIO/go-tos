@@ -141,8 +141,6 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo() (interface{}, error) {
 	return mainBlockInfo, nil
 }
 
-
-
 type TransactionParameter struct {
 	Links    []common.Hash `json:"links"`
 	Nonce    uint64
@@ -346,36 +344,37 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	}
 	return string(nodeIdMsg)
 }
+
 //获取节点链接数量
 func (api *PublicSdagAPI) GetConnectNumber() string {
 	_, number := api.s.SdagNodeIDMessage()
-	num :=strconv.Itoa(number)
+	num := strconv.Itoa(number)
 	return num
 }
 
 //获取主块数量
-func (api *PublicSdagAPI) GetMainBlockNumber() (string) {
+func (api *PublicSdagAPI) GetMainBlockNumber() string {
 
 	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(api.s.chainDb)
 	if err != nil {
 		return ""
 	}
-	num := strconv.FormatUint(finalMainBlockSlice.Number,10)
+	num := strconv.FormatUint(finalMainBlockSlice.Number, 10)
 	return num
 }
 
 //获取同步状态
-func (api *PublicSdagAPI) GetSyncStatus() (string) {
-	 status :=api.s.Status().Status
+func (api *PublicSdagAPI) GetSyncStatus() string {
+	status := api.s.Status().Status
 	switch status {
-		case STAT_SYNCING:
-			return "syncing"
-		case  STAT_WORKING:
-			return "sync_end"
-		case STAT_READY:
-			return "sync_ready"
-		default:
-			return "sync_none"
+	case STAT_SYNCING:
+		return "syncing"
+	case STAT_WORKING:
+		return "sync_end"
+	case STAT_READY:
+		return "sync_ready"
+	default:
+		return "sync_none"
 	}
 }
 
@@ -481,4 +480,9 @@ func (api *PublicSdagAPI) GetBlockNumberTimeSlice(timeSlice *TimeSlice) (interfa
 	return struct {
 		Number int
 	}{len(hash)}, nil
+}
+
+func (api *PublicSdagAPI) GetProgressPercent() string {
+	progressPercent := api.s.protocolManager.CalculateProgressPercent()
+	return progressPercent
 }
