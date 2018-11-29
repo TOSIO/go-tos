@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	urlString        = "http://10.10.10.23:8545"
+	urlString        = "http://localhost:8545"
 	GetConnectNumber ="sdag_getConnectNumber"
-	GetMainBlockNumber =""
+	GetMainBlockNumber ="sdag_getMainBlockNumber"
+	GetSyncStatus = "sdag_getSyncStatus"
 )
 
 type request struct {
@@ -35,11 +36,11 @@ type ResultInfo struct {
 	Error   ResultError `json:"error"`
 	Result  string `json:"result"`
 }
-func getSdagInfo()  {
+func GetSdagInfo(method string)  string{
 
 	jsonString :=request{
 		Jsonrpc:"2.0",
-		Method:"sdag_getConnectNumber",
+		Method:method,
 		Params:[]Prams{},
 		Id:1,
 	}
@@ -47,24 +48,23 @@ func getSdagInfo()  {
 	if err != nil {
 		fmt.Println("Error: ", err)
 	}
-	fmt.Println("params body: ",string(body))
 	resposebody, err := httpSend.SendHttp(urlString, string(body))
 	if err != nil {
 		fmt.Println("SendHttp error:", err)
-		return
+		return ""
 
 	}
 	var result ResultInfo
 	err = json.Unmarshal(resposebody, &result)
 	if err != nil {
 		fmt.Println("Unmarshal error:", err)
-		return
+		return ""
 	}
 	if result.Error.Code != 0 {
 		fmt.Println("result error:", result.Error)
-		return
+		return ""
 	}
 
-	fmt.Println("result: ",result.Result)
+	return result.Result
 
 }

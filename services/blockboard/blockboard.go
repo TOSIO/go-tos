@@ -42,19 +42,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	activeMemorySampleLimit   = 200 // Maximum number of active memory data samples
-	virtualMemorySampleLimit  = 200 // Maximum number of virtual memory data samples
-	networkIngressSampleLimit = 200 // Maximum number of network ingress data samples
-	networkEgressSampleLimit  = 200 // Maximum number of network egress data samples
-	processCPUSampleLimit     = 200 // Maximum number of process cpu data samples
-	systemCPUSampleLimit      = 200 // Maximum number of system cpu data samples
-	diskReadSampleLimit       = 200 // Maximum number of disk read data samples
-	diskWriteSampleLimit      = 200 // Maximum number of disk write data samples
-)
-
-var nextID uint32 // Next connection id
-
 // http升级websocket协议的配置
 var wsUpgrader = websocket.Upgrader{
 	// 允许所有CORS跨域请求
@@ -79,11 +66,12 @@ type Blockboard struct {
 
 
 }
+//发送的数据格式
 type SendData struct {
 	Number string `json:"number"`
 	Status string `json:"status"`
 	MainBlock string `json:"main_block"`
-} 
+}
 
 
 // 客户端读写消息
@@ -102,6 +90,11 @@ func New(config *Config, commit string, logdir string) *Blockboard {
 		inChan: make(chan *wsMessage, 1000),
 		outChan: make(chan *wsMessage, 1000),
 		closeChan: make(chan byte),
+		msg:SendData{
+			Number:"",
+			Status:"",
+			MainBlock:"",
+		},
 		isClosed: false,
 	}
 }
@@ -120,8 +113,6 @@ func (db *Blockboard) Start(server *p2p.Server) error  {
 	log.Info("Starting Blockboard")
 
 	http.HandleFunc("/api", db.wsHandler)
-	//http.Handle("/api", nil)
-
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", db.config.Host, db.config.Port))
 	if err != nil {
 		return err
@@ -142,7 +133,6 @@ func (db *Blockboard)wsHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 	db.conn = conn
-
 	// 处理器
 	go db.procLoop()
 	// 读协程
@@ -167,38 +157,16 @@ func (db *Blockboard) Stop() error {
 	return err
 }
 
-// webHandler handles all non-api requests, simply flattening and returning the Blockboard website.
-func (db *Blockboard) webHandler(w http.ResponseWriter, r *http.Request) {
-
-	w.Write([]byte("webHandler"))
-}
-
-
-// apiHandler handles requests for the Blockboard.
-//func (db *Blockboard) apiHandler(conn *websocket.Conn) {
-//
-//
-//	db.conn = conn
-//
-//	// 处理器
-//	go db.procLoop()
-//	// 读协程
-//	go db.wsReadLoop()
-//	// 写协程
-//	go db.wsWriteLoop()
-//
-//}
-
 func (db *Blockboard)procLoop() {
 	// 启动一个gouroutine发送心跳
 	go func() {
 		for {
-			sendmsg :=&SendData{
-				Number:"2",
-				Status:"同步中",
-				MainBlock:"1000",
-			}
-			data, err := json.Marshal(sendmsg)
+			//组装发送数据
+			db.msg.Number = GetSdagInfo(GetConnectNumber)
+			db.msg.MainBlock =GetSdagInfo(GetMainBlockNumber)
+			db.msg.Status = GetSdagInfo(GetSyncStatus)
+
+			data, err := json.Marshal(db.msg)
 			if err != nil {
 				fmt.Printf(err.Error())
 				return
@@ -289,7 +257,6 @@ func (db *Blockboard)wsRead() (*wsMessage, error) {
 
 func (db *Blockboard)wsClose() {
 	db.conn.Close()
-
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 	if !db.isClosed {
