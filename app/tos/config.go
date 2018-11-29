@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"github.com/TOSIO/go-tos/services/blockboard"
 	"io"
 	"os"
 	"reflect"
@@ -82,6 +83,7 @@ type tosConfig struct {
 	Node      node.Config
 	TOSstats  TOSstatsConfig
 	Dashboard dashboard.Config
+	Blockboard blockboard.Config
 	//Shh       whisper.Config
 }
 

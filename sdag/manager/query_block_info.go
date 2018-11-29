@@ -20,6 +20,7 @@ type QueryBlockInfoInterface struct {
 //}
 
 type TxBlockInfo struct {
+	BlockType        types.BlockType           `json:"block_type"`
 	Status           string         `json:"status"`
 	ConfirmItsNumber uint64         `json:"confirm_its_number"`
 	Difficulty       *big.Int       `json:"difficulty"`
@@ -45,6 +46,8 @@ type PublicBlockInfo struct {
 	Links            []common.Hash  `json:"links"`
 	BlockHash        common.Hash    `json:"block_hash"`
 	Sender           common.Address `json:"sender"`
+	GasPrice         *big.Int       `json:"gas_price"`
+	GasLimit         uint64         `json:"gas_limit"`
 }
 
 type TailMainBlockInfo struct {
@@ -97,7 +100,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		return "", err
 	}
 
-	if Block.GetType() == types.BlockTypeTx {
+
 		TxBlock, ok := Block.(*types.TxBlock)
 		if !ok {
 			//return ""
@@ -113,6 +116,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		}
 
 		Data0 := TxBlockInfo{
+			BlockType:        Block.GetType(),
 			Status:           blockStatus,
 			ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
 			Difficulty:       mutableInfo.Difficulty,
@@ -128,33 +132,6 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 			GasLimit:         Block.GetGasLimit(),
 		}
 		return Data0, nil
-		//jsonData, err := json.Marshal(Data0)
-		//if err != nil {
-		//	return "", err
-		//}
-		//
-		//return string(jsonData), nil
-	}
-
-	Data0 := PublicBlockInfo{
-		Status:           blockStatus,
-		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
-		Difficulty:       mutableInfo.Difficulty,
-		CumulativeDiff:   mutableInfo.CumulativeDiff,
-		MaxLinkHash:      mutableInfo.MaxLinkHash,
-		Links:            Block.GetLinks(),
-		Time:             Block.GetTime(),
-		BlockHash:        Block.GetHash(),
-		Sender:           BlockSend,
-	}
-	return Data0, nil
-
-	//jsonData, err := json.Marshal(Data0)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//return string(jsonData), nil
 }
 
 func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) (interface{}, error) {
