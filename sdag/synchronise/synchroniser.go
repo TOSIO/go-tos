@@ -21,7 +21,7 @@ import (
 )
 
 var maxRoutineCount int = 100
-var maxSYNCCapLimit = 6000
+var maxSYNCCapLimit = 10000
 var maxRetryCount = 3
 var maxOringinPeersLimit = 25
 var (
@@ -51,6 +51,7 @@ type Synchroniser struct {
 	newTaskSub     *event.TypeMuxSubscription
 
 	fetcher *Fetcher
+
 	relayer *Relayer
 
 	syncing          int32
@@ -872,7 +873,7 @@ func (s *Synchroniser) MarkAnnounced(hash common.Hash, nodeID string) {
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
-	return time.Duration(60 * time.Second)
+	return time.Duration(120 * time.Second)
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {

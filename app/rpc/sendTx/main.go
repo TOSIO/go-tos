@@ -20,12 +20,12 @@ import (
 
 var (
 	//8545
-	urlString        = "http://10.10.10.37:8545"
+	urlString        = "http://10.10.10.32:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
 "method":"sdag_transaction",
-"params":["{\"Form\":{\"Address\" :\"%s\",\"PrivateKey\"  :\"%s\"},\"GasPrice\":\"100\",\"GasLimit\":\"1000000000\",\"To\":\"%s\",\"Amount\":\"%s\"}"],
+"params":[{"From":{"Address" :"%s","PrivateKey"  :"%s"},"GasPrice":"100","GasLimit":1000000000,"To":"%s","Amount":"%s"}],
 "id":1
 }`
 	passphrase              = "12345"
@@ -44,15 +44,14 @@ type accountInfo struct {
 }
 type resultError struct {
 	Code    int64
-	message string
-	IsError bool
+	Message string
 }
 
 type resultInfo struct {
 	Jsonrpc string
 	Id      uint64
 	Error   resultError
-	Result  string
+	Result  struct{ Hash string }
 }
 
 type informations struct {
@@ -148,6 +147,7 @@ func main() {
 
 		//fmt.Println("receive: ", string(body))
 		var result resultInfo
+		//fmt.Println(string(body))
 		err = json.Unmarshal(body, &result)
 		if err != nil {
 			fmt.Println("Unmarshal error:", err)
