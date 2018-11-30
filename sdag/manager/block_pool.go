@@ -524,18 +524,11 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool, isSync boo
 	var linksLackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
-		linkBlockEI := storage.ReadBlock(p.db, hash) //the 'EI' is empty interface logogram
-		if linkBlockEI != nil {
-			if linkBlockI, ok := linkBlockEI.(types.Block); ok {
-				if linkBlockI.GetTime() > block.GetTime() {
-					log.Error("links time error", "block time", block.GetTime(), "link time", linkBlockI.GetTime())
-					return false, fmt.Errorf("links time error")
-				} else {
-					//linkBlockIs = append(linkBlockIs, linkBlockI)
-				}
-			} else {
-				log.Error("linkBlockEI assertion failure", "hash", hash)
-				return false, fmt.Errorf("linkBlockEI assertion failure")
+		linkBlock := storage.ReadBlock(p.db, hash)
+		if linkBlock != nil {
+			if linkBlock.GetTime() > block.GetTime() {
+				log.Error("links time error", "block time", block.GetTime(), "link time", linkBlock.GetTime())
+				return false, fmt.Errorf("links time error")
 			}
 		} else {
 			isIsolated = true
@@ -549,11 +542,7 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool, isSync boo
 
 	if isIsolated {
 		log.Info("is a Isolated block", "hash", block.GetHash().String())
-		if p.addIsolatedBlock(block, linksLackBlock) {
-			//log.Debug("Request ancestor", "hash", block.GetHash().String())
-			//event := &core.GetBlocksEvent{Hashes: linksLackBlock}
-			//p.blockEvent.Post(event)
-		}
+		p.addIsolatedBlock(block, linksLackBlock)
 	} else {
 		//log.Trace("Verification passed")
 		p.deleteUnverifiedBlocks(block.GetLinks())

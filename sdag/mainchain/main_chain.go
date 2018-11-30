@@ -11,6 +11,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
+	"github.com/TOSIO/go-tos/sdag/core/vm"
 	"math/big"
 	"sync"
 	"time"
@@ -19,24 +20,26 @@ import (
 type MainChain struct {
 	db             tosdb.Database
 	stateDb        state.Database
-	genesis        *core.Genesis
+	Genesis        *core.Genesis
 	Tail           types.TailMainBlockInfo
 	PervTail       types.TailMainBlockInfo
 	MainTail       types.TailMainBlockInfo
 	tailRWLock     sync.RWMutex
 	mainTailRWLock sync.RWMutex
+	ChainConfig    *params.ChainConfig
+	VMConfig       vm.Config
 }
 
 func (mainChain *MainChain) initTail() error {
 	var err error
-	mainChain.genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "")
+	mainChain.Genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "")
 	if err != nil {
 		return err
 	}
 	tailMainBlockInfo, err := storage.ReadTailBlockInfo(mainChain.db)
 	if err != nil {
 		log.Info("generate genesis")
-		genesisBlock, err := mainChain.genesis.Genesis()
+		genesisBlock, err := mainChain.Genesis.Genesis()
 		if err != nil {
 			return err
 		}
@@ -45,7 +48,7 @@ func (mainChain *MainChain) initTail() error {
 		mainChain.MainTail = *genesisBlock
 		return nil
 	}
-	mainChain.genesis.GetGenesisHash()
+	mainChain.Genesis.GetGenesisHash()
 	mainChain.Tail = *tailMainBlockInfo
 	tailMainBlockInfo, err = storage.ReadTailMainBlockInfo(mainChain.db)
 	if err != nil {
@@ -85,16 +88,27 @@ func (mainChain *MainChain) setPerv() error {
 	return nil
 }
 
-func New(chainDb tosdb.Database, stateDb state.Database) (*MainChain, error) {
+func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config) (*MainChain, error) {
 	var mainChain MainChain
 	mainChain.db = chainDb
 	mainChain.stateDb = stateDb
+	mainChain.VMConfig = VMConfig
 
 	err := mainChain.initTail()
 	if err != nil {
 		return nil, err
 	}
 	log.Debug("mainChain initTail finish", "Tail", mainChain.Tail, "PervTail", mainChain.PervTail, "MainTail", mainChain.MainTail)
+
+	genesisHash, err := mainChain.Genesis.GetGenesisHash()
+	if err != nil {
+		return nil, err
+	}
+	if genesisHash == params.MainnetGenesisHash {
+		mainChain.ChainConfig = params.MainnetChainConfig
+	} else {
+		mainChain.ChainConfig = params.TestnetChainConfig
+	}
 
 	go func() {
 		currentTime := time.Now().Unix()
@@ -137,7 +151,7 @@ func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
 }
 
 func (mainChain *MainChain) GetGenesisHash() (common.Hash, error) {
-	return mainChain.genesis.GetGenesisHash()
+	return mainChain.Genesis.GetGenesisHash()
 }
 
 func (mainChain *MainChain) GetNextMain(hash common.Hash) (common.Hash, *types.MutableInfo, error) {
@@ -192,6 +206,26 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 
 func (mainChain *MainChain) GetLastTempMainBlkSlice() uint64 {
 	return utils.GetMainTime(mainChain.GetTail().Time)
+}
+
+func (mainChain *MainChain) GetMainBlock(number uint64) types.Block {
+	mainBlock, err := storage.ReadMainBlock(mainChain.db, number)
+	if err != nil {
+		log.Error("ReadMainBlock err:" + err.Error())
+		return nil
+	}
+	block := storage.ReadBlock(mainChain.db, mainBlock.Hash)
+	if block == nil {
+		log.Error("ReadBlock err:" + err.Error())
+		return nil
+	}
+	MutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, mainBlock.Hash)
+	if err != nil {
+		log.Error("ReadBlockMutableInfo err:" + err.Error())
+		return nil
+	}
+	block.SetMutableInfo(MutableInfo)
+	return block
 }
 
 func IsTheSameTimeSlice(t1, t2 uint64) bool {

@@ -21,7 +21,7 @@ import (
 )
 
 var maxRoutineCount int = 100
-var maxSYNCCapLimit = 6000
+var maxSYNCCapLimit = 10000
 var maxRetryCount = 3
 var maxOringinPeersLimit = 25
 var (

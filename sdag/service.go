@@ -94,7 +94,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI
-	if chain, err = mainchain.New(chainDB, stateDB); err != nil {
+	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
