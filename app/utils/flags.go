@@ -20,12 +20,14 @@ package utils
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"github.com/TOSIO/go-tos/services/blockboard"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/TOSIO/go-tos/sdag/core/vm"
+	"github.com/TOSIO/go-tos/services/blockboard"
 
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/services/accounts"
@@ -399,6 +401,11 @@ var (
 		Usage: "Disable mining(0-disable,1-enable)",
 	}
 
+	VMEnableDebugFlag = cli.BoolFlag{
+		Name:  "vmdebug",
+		Usage: "Record information useful for VM and contract debugging",
+	}
+
 	// ATM the url is left to the user and deployment to
 
 	// Gas price oracle settings
@@ -466,6 +473,8 @@ func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
 	if gcboardmode := ctx.GlobalString(GCBoardModeFlag.Name); gcboardmode != "full" && gcboardmode != "archive" {
 		Fatalf("--%s must be either 'full' or 'archive'", GCBoardModeFlag.Name)
 	}
+
+	cfg.VMConfig = vm.Config{EnablePreimageRecording: ctx.GlobalBool(VMEnableDebugFlag.Name)}
 
 	// Override any default configs for hard coded networks.
 	switch {

@@ -20,20 +20,20 @@ type QueryBlockInfoInterface struct {
 //}
 
 type TxBlockInfo struct {
-	BlockType        types.BlockType           `json:"block_type"`
-	Status           string         `json:"status"`
-	ConfirmItsNumber uint64         `json:"confirm_its_number"`
-	Difficulty       *big.Int       `json:"difficulty"`
-	CumulativeDiff   *big.Int       `json:"cumulative_diff"`
-	MaxLinkHash      common.Hash    `json:"max_link_hash"`
-	Time             uint64         `json:"time"`
-	Links            []common.Hash  `json:"links"`
-	BlockHash        common.Hash    `json:"block_hash"`
-	Amount           *big.Int       `json:"amount"`
-	Receiver         common.Address `json:"receiver"`
-	Sender           common.Address `json:"sender"`
-	GasPrice         *big.Int       `json:"gas_price"`
-	GasLimit         uint64         `json:"gas_limit"`
+	BlockType        types.BlockType `json:"block_type"`
+	Status           string          `json:"status"`
+	ConfirmItsNumber uint64          `json:"confirm_its_number"`
+	Difficulty       *big.Int        `json:"difficulty"`
+	CumulativeDiff   *big.Int        `json:"cumulative_diff"`
+	MaxLinkHash      common.Hash     `json:"max_link_hash"`
+	Time             uint64          `json:"time"`
+	Links            []common.Hash   `json:"links"`
+	BlockHash        common.Hash     `json:"block_hash"`
+	Amount           *big.Int        `json:"amount"`
+	Receiver         common.Address  `json:"receiver"`
+	Sender           common.Address  `json:"sender"`
+	GasPrice         *big.Int        `json:"gas_price"`
+	GasLimit         uint64          `json:"gas_limit"`
 }
 
 type PublicBlockInfo struct {
@@ -99,39 +99,34 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	if err != nil {
 		return "", err
 	}
-
-
-		TxBlock, ok := Block.(*types.TxBlock)
-		if !ok {
-			//return ""
-			return "", fmt.Errorf("db data type error")
-		}
-
-		var tempReceiver common.Address
-		var tempAmount *big.Int
+	var tempReceiver = common.Address{}
+	var tempAmount = big.NewInt(0)
+	TxBlock, ok := Block.(*types.TxBlock)
+	if ok {
 
 		for _, temp := range TxBlock.Outs {
 			tempReceiver = temp.Receiver
 			tempAmount = temp.Amount
 		}
+	}
 
-		Data0 := TxBlockInfo{
-			BlockType:        Block.GetType(),
-			Status:           blockStatus,
-			ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
-			Difficulty:       mutableInfo.Difficulty,
-			CumulativeDiff:   mutableInfo.CumulativeDiff,
-			MaxLinkHash:      mutableInfo.MaxLinkHash,
-			Links:            Block.GetLinks(),
-			Time:             Block.GetTime(),
-			BlockHash:        Block.GetHash(),
-			Amount:           tempAmount,
-			Receiver:         tempReceiver,
-			Sender:           BlockSend,
-			GasPrice:         Block.GetGasPrice(),
-			GasLimit:         Block.GetGasLimit(),
-		}
-		return Data0, nil
+	Data0 := TxBlockInfo{
+		BlockType:        Block.GetType(),
+		Status:           blockStatus,
+		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+		Difficulty:       mutableInfo.Difficulty,
+		CumulativeDiff:   mutableInfo.CumulativeDiff,
+		MaxLinkHash:      mutableInfo.MaxLinkHash,
+		Links:            Block.GetLinks(),
+		Time:             Block.GetTime(),
+		BlockHash:        Block.GetHash(),
+		Amount:           tempAmount,
+		Receiver:         tempReceiver,
+		Sender:           BlockSend,
+		GasPrice:         Block.GetGasPrice(),
+		GasLimit:         Block.GetGasLimit(),
+	}
+	return Data0, nil
 }
 
 func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) (interface{}, error) {
@@ -196,12 +191,6 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 			*mainBlockInfo,
 		}
 		return Data0, err
-		//jsonData, err := json.Marshal(Data0)
-		//if err != nil {
-		//	return "", err
-		//}
-		//
-		//return string(jsonData), nil
 	}
 
 	Data0 := struct {
@@ -222,12 +211,6 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 		*mainBlockInfo,
 	}
 	return Data0, err
-	//jsonData, err := json.Marshal(Data0)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//return string(jsonData), nil
 }
 
 func (q *QueryBlockInfoInterface) GetMainBlockInfo(h tosdb.Database, number uint64) (interface{}, error) {
