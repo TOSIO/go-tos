@@ -148,7 +148,7 @@ type TransactionParameter struct {
 	GasLimit uint64 `json:"gaslimit"`
 }
 
-//获取基础数据
+//获取系统gasPrice  gasLimimt links、nonce
 func (api *PublicSdagAPI) GetBaseData() interface{} {
 
 	paramtr := api.s.transaction.GetBlockConstructionParameter()
@@ -253,7 +253,7 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 
 }
 
-//获取系统gasPrice  gasLimimt links、nonce
+
 
 //keystore 生成
 func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) interface{} {

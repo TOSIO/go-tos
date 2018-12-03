@@ -11,7 +11,7 @@ const (
 
 const (
 	OneTos                     = 1e18 //1 tos = 1e18 tls
-	DefaultGasPrice            = 100
+	DefaultGasPrice            = 100000000
 	DefaultGasLimit            = 1 << 32
 	TransferTransactionGasUsed = 21000                       // 21000 tls
 	MiningGasUsed              = 21000                       // 21000 tls
