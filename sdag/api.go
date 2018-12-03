@@ -377,6 +377,10 @@ func (api *PublicSdagAPI) GetSyncStatus() string {
 		return "sync_none"
 	}
 }
+func (api *PublicSdagAPI) GetProgressPercent() string {
+	progressPercent := api.s.protocolManager.CalculateProgressPercent()
+	return progressPercent
+}
 
 //stop minner
 func (api *PublicSdagAPI) StopMiner() string {
@@ -482,7 +486,4 @@ func (api *PublicSdagAPI) GetBlockNumberTimeSlice(timeSlice *TimeSlice) (interfa
 	}{len(hash)}, nil
 }
 
-func (api *PublicSdagAPI) GetProgressPercent() string {
-	progressPercent := api.s.protocolManager.CalculateProgressPercent()
-	return progressPercent
-}
+

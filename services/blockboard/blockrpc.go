@@ -11,6 +11,7 @@ var (
 	GetConnectNumber ="sdag_getConnectNumber"
 	GetMainBlockNumber ="sdag_getMainBlockNumber"
 	GetSyncStatus = "sdag_getSyncStatus"
+	GetProgressPercent ="sdag_getProgressPercent"
 )
 
 type request struct {
