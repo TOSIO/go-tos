@@ -21,7 +21,7 @@ var (
 {
 "jsonrpc":"2.0",
 "method":"sdag_getBalance",
-"params":["{\"address\" :\"%s\"}"],
+"params":[{"WalletAddr" :"%s"}],
 "id":1
 }`
 	urlString = urlString1

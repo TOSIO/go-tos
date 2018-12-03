@@ -28,7 +28,7 @@ var (
 	addr3 = `http://10.10.10.34:8545`
 	addr4 = `http://10.10.10.32:8545`
 	addr5 = `http://10.10.10.42:8551`
-	addr  = addr2
+	addr  = addr1
 )
 
 type ResultTail struct {
@@ -49,7 +49,8 @@ func GetBlockInfoByHash(addr string, hash string) (*ResultBlock, error) {
 		fmt.Printf("sendString1 error %s\n", err.Error())
 		return nil, err
 	}
-	//fmt.Println(string(body))
+	//stringbody := string(body)
+	//fmt.Println(stringbody)
 	var resultBlock ResultBlock
 	err = json.Unmarshal(body, &resultBlock)
 	if err != nil {
@@ -75,6 +76,9 @@ func statisticsBlock(addr string, hash string) {
 		return
 	}
 	for _, hash := range ResultBlock.Result.Links {
+		if hash == "0x8e34eb77e8b82c3f7cf16face6b4e188f6287a1762561b8833684f3498c2dc5c" {
+			fmt.Println("sdfsd")
+		}
 		statisticsBlock(addr, hash)
 	}
 

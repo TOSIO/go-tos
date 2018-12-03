@@ -21,7 +21,7 @@ var ProtocolVersions = []uint{tos63, tos62}
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
 var ProtocolLengths = []uint64{17, 8}
 
-const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
+const ProtocolMaxMsgSize = 20 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
 // tos protocol message codes
 const (

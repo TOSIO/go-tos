@@ -1,6 +1,9 @@
 package sdag
 
-import "github.com/TOSIO/go-tos/devbase/common"
+import (
+	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/sdag/core/vm"
+)
 
 //sdag的参数配置在此定义
 type Config struct {
@@ -9,6 +12,7 @@ type Config struct {
 	DatabaseHandles int            `toml:"-"`
 	Tosbase         common.Address `toml:",omitempty"`
 	Mining          bool
+	VMConfig        vm.Config
 }
 
 var DefaultConfig = Config{

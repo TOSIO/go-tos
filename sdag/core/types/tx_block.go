@@ -150,7 +150,6 @@ func (tx *TxBlock) Validation() error {
 		4.VerifySignature
 	*/
 
-	//2
 	if tx.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
 	} else if tx.Header.Time > utils.GetTimeStamp()+params.TimePeriod {
@@ -162,7 +161,6 @@ func (tx *TxBlock) Validation() error {
 		return fmt.Errorf("the block linksNumber =%d", linksNumber)
 	}
 
-	//3
 	amount := big.NewInt(0)
 	for _, out := range tx.Outs {
 		amount.Add(amount, out.Amount)
@@ -172,8 +170,28 @@ func (tx *TxBlock) Validation() error {
 		return fmt.Errorf("the amount is not less than the GlobalTosTotal")
 	}
 
+	var isContract bool
+	if len(tx.Payload) > 0 {
+		isContract = true
+		if len(tx.Outs) > 1 {
+			return fmt.Errorf("contract transaction len(tx.Outs) > 1")
+		}
+	} else {
+		if len(tx.Outs) < 1 || len(tx.Outs) > params.MaxTransNum {
+			return fmt.Errorf("len(tx.Outs)=%d number error", len(tx.Outs))
+		}
+	}
+
+	from, err := tx.GetSender()
+	if err != nil {
+		return err
+	}
+
 	for _, out := range tx.Outs {
-		if out.Amount.Sign() < 0 {
+		if out.Receiver == from {
+			return fmt.Errorf("the receiver is self")
+		}
+		if (!isContract) && out.Amount.Sign() < 0 {
 			return fmt.Errorf("the amount must be positive")
 		}
 	}
@@ -184,10 +202,6 @@ func (tx *TxBlock) Validation() error {
 				return fmt.Errorf("links repeat")
 			}
 		}
-	}
-	//4
-	if _, err := tx.GetSender(); err != nil {
-		return err
 	}
 
 	return nil
@@ -229,5 +243,21 @@ func (tx *TxBlock) Nonce() uint64 {
 	return tx.AccountNonce
 }
 func (tx *TxBlock) AsMessage() (Message, error) {
-	return Message{}, nil
+	var to *common.Address
+	amount := big.NewInt(0)
+	if len(tx.Outs) > 0 {
+		amount = tx.Outs[0].Amount
+		if tx.Outs[0].Receiver != (common.Address{}) {
+			to = &tx.Outs[0].Receiver
+		}
+	}
+	return Message{
+		nonce:      tx.AccountNonce,
+		gasLimit:   tx.Header.GasLimit,
+		gasPrice:   tx.Header.GasPrice,
+		to:         to,
+		amount:     amount,
+		data:       tx.Payload,
+		checkNonce: false,
+	}, nil
 }

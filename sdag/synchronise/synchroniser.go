@@ -21,7 +21,7 @@ import (
 )
 
 var maxRoutineCount int = 100
-var maxSYNCCapLimit = 6000
+var maxSYNCCapLimit = 10000
 var maxRetryCount = 3
 var maxOringinPeersLimit = 25
 var (
@@ -38,7 +38,7 @@ type timesliceHash struct {
 
 type Synchroniser struct {
 	peerset core.PeerSet
-	//queuedTask map[string]*core.NewSYNCTask
+
 	mainChain  mainchain.MainChainI
 	blkstorage BlockStorageI
 
@@ -131,7 +131,6 @@ func (s *Synchroniser) Start() error {
 			s.lastSYStimeslice = s.genesisTimeslice
 		}
 	}
-
 	go s.fetcher.loop()
 	go s.relayer.loop()
 	go s.loop()
@@ -147,7 +146,6 @@ func (s *Synchroniser) Stop() {
 }
 
 func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) {
-
 	nowTimeslice := utils.GetMainTime(utils.GetTOSTimeStamp())
 	lastTempMBTimeslice := s.mainChain.GetLastTempMainBlkSlice()
 	if lastTempMBTimeslice >= nowTimeslice {
@@ -169,7 +167,6 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 	target := ""
 	var origin *core.NewSYNCTask
 	var peer core.Peer
-
 	for peer == nil && len(tasks) > 0 {
 		maxMainBlockNum := uint64(0)
 		for i, task := range tasks {
@@ -617,7 +614,6 @@ func (s *Synchroniser) handleSYNCBlockResponseACK(packet core.Response) error {
 			//endTimeslice =
 
 			for endTimeslice <= curEndPoint && count < maxSYNCCapLimit {
-				//创世区块开始同步
 				endTimeslice++
 				tsblocks := &protocol.TimesliceBlocks{}
 				tsblocks.TSIndex.Index = 0
@@ -872,7 +868,7 @@ func (s *Synchroniser) MarkAnnounced(hash common.Hash, nodeID string) {
 }
 
 func (s *Synchroniser) requestTTL() time.Duration {
-	return time.Duration(60 * time.Second)
+	return time.Duration(120 * time.Second)
 }
 
 func (s *Synchroniser) DeliverLastTimeSliceResp(id string, timeslice uint64) error {
