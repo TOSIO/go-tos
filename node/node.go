@@ -237,11 +237,12 @@ func (n *Node) Start() error {
 	}
 	// Lastly start the configured RPC interfaces
 	if err := n.startRPC(services); err != nil {
+		log.Error("Error start RPC", "err", err)
 		for _, service := range services {
 			service.Stop()
 		}
 		running.Stop()
-		log.Error("Error start RPC", "err", err)
+		log.Debug("Stop RPC completed")
 		return err
 	}
 	// Finish initializing the startup
