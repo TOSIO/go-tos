@@ -19,13 +19,14 @@ package node
 import (
 	"errors"
 	"fmt"
-	"github.com/TOSIO/go-tos/services/accounts"
 	"net"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/TOSIO/go-tos/services/accounts"
 
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
@@ -38,7 +39,7 @@ import (
 type Node struct {
 	//eventmux *event.TypeMux // Event multiplexer used between the services of a stack
 	config *Config
-	accman   *accounts.Manager
+	accman *accounts.Manager
 
 	serverConfig p2p.Config
 	server       *p2p.Server // Currently running P2P networking layer
@@ -133,14 +134,14 @@ func New(conf *Config) (*Node, error) {
 	// Note: any interaction with Config that would create/touch files
 	// in the data directory or instance directory is delayed until Start.
 	return &Node{
-		config:       conf,
+		config:            conf,
 		accman:            am,
 		ephemeralKeystore: ephemeralKeystore,
-		serviceFuncs: []ServiceConstructor{},
-		ipcEndpoint:  conf.IPCEndpoint(),
-		httpEndpoint: conf.HTTPEndpoint(),
-		wsEndpoint:   conf.WSEndpoint(),
-		log:          conf.Logger,
+		serviceFuncs:      []ServiceConstructor{},
+		ipcEndpoint:       conf.IPCEndpoint(),
+		httpEndpoint:      conf.HTTPEndpoint(),
+		wsEndpoint:        conf.WSEndpoint(),
+		log:               conf.Logger,
 	}, nil
 }
 
@@ -240,6 +241,7 @@ func (n *Node) Start() error {
 			service.Stop()
 		}
 		running.Stop()
+		log.Error("Error start RPC", "err", err)
 		return err
 	}
 	// Finish initializing the startup
@@ -290,12 +292,14 @@ func (n *Node) startRPC(services map[reflect.Type]Service) error {
 	if err := n.startHTTP(n.httpEndpoint, apis, n.config.HTTPModules, n.config.HTTPCors, n.config.HTTPVirtualHosts, n.config.HTTPTimeouts); err != nil {
 		n.stopIPC()
 		n.stopInProc()
+		//log.Error("Error start HTTP-server", "err", err)
 		return err
 	}
 	if err := n.startWS(n.wsEndpoint, apis, n.config.WSModules, n.config.WSOrigins, n.config.WSExposeAll); err != nil {
 		n.stopHTTP()
 		n.stopIPC()
 		n.stopInProc()
+		//log.Error("Error start WS-server", "err", err)
 		return err
 	}
 	// All API endpoints started successfully
@@ -420,7 +424,6 @@ func (n *Node) stopWS() {
 		n.wsHandler = nil
 	}
 }
-
 
 // AccountManager retrieves the account manager used by the protocol stack.
 func (n *Node) AccountManager() *accounts.Manager {
