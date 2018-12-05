@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"math/big"
@@ -125,4 +126,24 @@ func (transaction *Transaction) TransactionSendToSDAG(txRequestInfo *TransInfo) 
 	}
 	log.Debug("Added to the block pool successfully")
 	return TxBlock.GetHash(), nil
+}
+
+func (transaction *Transaction)RlpTransactionSendToSDAG(rlpData []byte) (hash common.Hash, err error ) {
+	Block, err := types.BlockDecode(rlpData)
+	if err!=nil{
+		return common.Hash{},err
+	}
+	if Block.GetType() !=types.BlockTypeTx{
+		return common.Hash{},errors.New("block type erro")
+	}
+
+	err = transaction.pool.EnQueue(Block)
+		if err != nil {
+			return Block.GetHash(), err
+		}
+	log.Debug("Added to the block pool successfully")
+
+
+	return Block.GetHash(), nil
+
 }

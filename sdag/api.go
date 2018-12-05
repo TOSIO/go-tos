@@ -108,6 +108,12 @@ type RpcGenerKeyStore struct {
 	Password string
 }
 
+type BaseDataParam struct {
+	to string
+	data []byte
+}
+
+
 func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{}, error) {
 
 	db := api.s.chainDb
@@ -150,6 +156,9 @@ type TransactionParameter struct {
 
 //获取系统gasPrice  gasLimimt links、nonce
 func (api *PublicSdagAPI) GetBaseData() interface{} {
+	//if base ==nil{
+	//	return fmt.Errorf("to address invalid or data is null")
+	//}
 
 	paramtr := api.s.transaction.GetBlockConstructionParameter()
 	param := TransactionParameter{
@@ -227,6 +236,23 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 	}
 
 	hash, err := api.s.transaction.TransactionSendToSDAG(&txRequestInfo)
+	if err != nil {
+		return nil, fmt.Errorf("transaction failed" + err.Error())
+	}
+
+	return struct {
+		Hash common.Hash
+	}{hash}, nil
+}
+
+type  TransactionRawParam struct {
+	RlpData []byte `json:"rlpdata"`
+}
+
+//Rlp transaction
+func (api *PublicSdagAPI) TransactionRaw(rlpData *TransactionRawParam) (interface{}, error) {
+
+	hash, err := api.s.transaction.RlpTransactionSendToSDAG(rlpData.RlpData)
 	if err != nil {
 		return nil, fmt.Errorf("transaction failed" + err.Error())
 	}
@@ -370,7 +396,7 @@ func (api *PublicSdagAPI) GetSyncStatus() string {
 	case STAT_SYNCING:
 		return "syncing"
 	case STAT_WORKING:
-		return "sync_end"
+		return "sync_done"
 	case STAT_READY:
 		return "sync_ready"
 	default:
