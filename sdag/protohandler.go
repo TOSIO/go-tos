@@ -40,7 +40,7 @@ type status struct {
 	Syncstat core.SYNCStatusEvent `json:"sync_status,omitempty"`
 }
 
-// tos sdag协议管理、实现
+// ProtocolManager,sdag Protocol management and implementation
 type ProtocolManager struct {
 	networkID uint64
 
@@ -156,7 +156,7 @@ func NewProtocolManager(config *interface{}, networkID uint64, chain mainchain.M
 	return manager, nil
 }
 
-// this function will be removed in future
+// loop ,this function will be removed in future
 func (pm *ProtocolManager) loop() {
 	for {
 		select {
@@ -438,15 +438,15 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case protocol.StatusMsg:
 		// Status messages should never arrive after the handshake
 		return errResp(protocol.ErrExtraStatusMsg, "uncontrolled status message")
-	case protocol.GetLastMainTimeSlice: //获取最近一次临时主块的时间片
+	case protocol.GetLastMainTimeSlice: // get the temporary time slice of the last main time
 		return pm.handleGetLastMainTimeSlice(p, msg)
 	case protocol.LastMainTimeSlice:
 		return pm.handleLastMainTimeSlice(p, msg)
-	case protocol.GetBlockHashBySliceMsg: //获取时间片对应的所有区块hash
+	case protocol.GetBlockHashBySliceMsg: // get all hashes by time slice
 		return pm.handleGetBlockHashBySlice(p, msg)
 	case protocol.BlockHashBySliceMsg:
 		return pm.handleBlockHashBySlice(p, msg)
-	case protocol.GetBlocksBySliceMsg: //获取区块数据
+	case protocol.GetBlocksBySliceMsg: // get block data
 		return pm.handleGetBlocksBySlice(p, msg)
 	case protocol.SYNCBlockRequestMsg:
 		return pm.handleSYNCblockRequest(p, msg)
@@ -462,7 +462,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		return pm.handleNewBlockAnnounce(p, msg)
 	case protocol.NewBlockMsg:
 		return pm.handleNewBlocks(p, msg)
-	case protocol.GetlocatorRequestMsg: //接收到getlocater的请求，在这里处理
+	case protocol.GetlocatorRequestMsg: //handle getlocater
 		return pm.handleGetlocatorRequest(p, msg)
 	case protocol.LocatorResponseMsg:
 		return pm.handleLocatorResponse(p, msg)
@@ -479,7 +479,7 @@ func (pm *ProtocolManager) NodeInfo() *NodeInfo {
 	}
 }
 
-// 获取最近一次临时主块所在时间片消息处理
+// handleGetLastMainTimeSlice send the main time slice of last temporary block  request
 func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 	p.Log().Debug("<< GET-LAST-MAINBLOCK-TIMESLICE")
 
@@ -488,7 +488,7 @@ func (pm *ProtocolManager) handleGetLastMainTimeSlice(p *peer, msg p2p.Msg) erro
 	return p.SendTimeSlice(lastMainSlice)
 }
 
-// 获取最近一次临时主块所在时间片消息处理
+// handleLastMainTimeSlice implement the request
 func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 	//p.Log().Trace("Process the last main timeslice response.")
 	var timeslice uint64
@@ -497,11 +497,11 @@ func (pm *ProtocolManager) handleLastMainTimeSlice(p *peer, msg p2p.Msg) error {
 		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< LAST-MAINBLOCK-TIMESLICE", "timeslice", timeslice)
-	// 将回复结果递送到同步器
+	// Deliver the response to the synchronizer
 	return pm.synchroniser.DeliverLastTimeSliceResp(p.id, timeslice)
 }
 
-// 根据时间片获取对应所有区块hash消息处理
+//handleGetBlockHashBySlice send the request
 func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error {
 	//p.Log().Trace("Process block hash query.")
 	//lastMainSlicer := pm.mainChain.GetLastTempMainBlkSlice()
@@ -523,7 +523,7 @@ func (pm *ProtocolManager) handleGetBlockHashBySlice(p *peer, msg p2p.Msg) error
 	return err
 }
 
-// 根据时间片获取对应所有区块hash消息处理
+// handleBlockHashBySlice get blcok hash according to the specific time slice
 func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 
 	var response protocol.GetBlockHashBySliceResp
@@ -532,12 +532,12 @@ func (pm *ProtocolManager) handleBlockHashBySlice(p *peer, msg p2p.Msg) error {
 		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< BLOCK-HASH-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Hashes))
-	// 将回复结果递送到同步器
+	// Deliver the response to the synchronizer
 
 	return pm.synchroniser.DeliverBlockHashesResp(p.id, response.Timeslice, response.Hashes)
 }
 
-// 根据区块hash返回对应区块（字节流）消息处理
+// handleGetBlocksBySlice handle the request
 func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 
 	var req protocol.GetBlockDataBySliceReq
@@ -559,7 +559,7 @@ func (pm *ProtocolManager) handleGetBlocksBySlice(p *peer, msg p2p.Msg) error {
 	if len(blocks) <= 0 {
 		return nil
 	}
-	// 将结果回复给对方
+	//Deliver the response to the other
 	//p.Log().Trace("Handle GET-BLOCK-BY-SLICEHASH request", "timeslice", req.Timeslice, "size", len(req.Hashes))
 	p.Log().Debug(">> BLOCK-BY-SLICEHASH", "response-block-size", len(blocks))
 	return p.SendSliceBlocks(req.Timeslice, blocks)
@@ -573,7 +573,7 @@ func (pm *ProtocolManager) handleBlocksBySlice(p *peer, msg p2p.Msg) error {
 		return errResp(protocol.ErrDecode, "msg %v: %v", msg, err)
 	}
 	p.Log().Debug("<< BLOCK-BY-TIMESLICE", "timeslice", response.Timeslice, "size", len(response.Blocks))
-	// 将回复结果递送到同步器
+	//Deliver the response to the synchronizer
 	return pm.synchroniser.DeliverBlockDatasResp(p.id, response.Timeslice, response.Blocks)
 }
 
@@ -605,7 +605,7 @@ func (pm *ProtocolManager) handleGetBlockByHash(p *peer, msg p2p.Msg) error {
 		log.Debug("Forward request block", "size", len(req))
 		return nil
 	}
-	// 将结果回复给对方
+	// Deliver the response to the other
 	p.Log().Debug(">> BLOCK-BY-HASH", "size", len(blocks))
 	return p.SendNewBlocks(blocks)
 }
@@ -751,12 +751,16 @@ func (pm *ProtocolManager) getBlock(event *core.GetBlocksEvent) error {
 }
 */
 func (pm *ProtocolManager) CalculateProgressPercent() string {
-	if pm.stat.Syncstat.CurTS == 0 {
-		return "0%"
-	} else {
+
+	var progressPercent string
+	if pm.stat.Syncstat.Progress == 3 {
+		progressPercent = "100"
+	} else if pm.stat.Syncstat.CurTS == 0 {
+		progressPercent = "0"
+	} else if pm.stat.Syncstat.EndTS != pm.stat.Syncstat.BeginTS {
 		progressPct := float64(pm.stat.Syncstat.CurTS-pm.stat.Syncstat.BeginTS) / float64(pm.stat.Syncstat.EndTS-pm.stat.Syncstat.BeginTS)
 		progress := int(progressPct * 100)
-		progressPercent := strconv.Itoa(progress)
-		return progressPercent + "%"
+		progressPercent = strconv.Itoa(progress)
 	}
+	return progressPercent + "%"
 }
