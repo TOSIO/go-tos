@@ -20,7 +20,7 @@ import (
 
 var (
 	//8545
-	urlString        = "http://10.10.10.32:8545"
+	urlString        = "http://10.10.10.37:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -123,10 +123,21 @@ func main() {
 	lastTime = time.Now().Unix()
 
 	for {
-		index := rand.Intn(len(haveBalanceAccountList))
-		fromAccount := haveBalanceAccountList[index]
-		index = rand.Intn(len(allAccountList))
-		toAccount := allAccountList[index]
+		var (
+			index       int
+			fromAccount accountInfo
+			toAccount   accountInfo
+		)
+		for {
+			index = rand.Intn(len(haveBalanceAccountList))
+			fromAccount = haveBalanceAccountList[index]
+			index = rand.Intn(len(allAccountList))
+			toAccount = allAccountList[index]
+			if fromAccount != toAccount {
+				break
+			}
+		}
+
 		amountRatio := big.NewInt(int64(rand.Intn(maxRate)))
 		tempInt := big.NewInt(0)
 		amount := tempInt.Mul(tempInt.Div(fromAccount.Balance, big.NewInt(int64(maxRate))), amountRatio)
