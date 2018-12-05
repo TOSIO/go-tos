@@ -906,7 +906,7 @@ func (s *Synchroniser) DeliverLocatorResponse(id string, response []protocol.Mai
 	return s.deliverResponse(id, s.locatorBlockresCh, &LocatorPacket{peerID: id, response: response})
 }
 
-// deliver injects a new batch of data received from a remote node.
+// deliverResponse deliver injects a new batch of data received from a remote node.
 func (s *Synchroniser) deliverResponse(id string, destCh chan core.Response, response core.Response) (err error) {
 	// Update the delivery metrics for both good and failed deliveries
 	/* inMeter.Mark(int64(packet.Items()))
@@ -931,7 +931,7 @@ func (s *Synchroniser) deliverResponse(id string, destCh chan core.Response, res
 	}
 }
 
-// deliver injects a new batch of data received from a remote node.
+// deliverRequest deliver injects a new batch of data received from a remote node.
 func (s *Synchroniser) deliverRequest(id string, destCh chan core.Request, request core.Request) (err error) {
 	// Update the delivery metrics for both good and failed deliveries
 	/* inMeter.Mark(int64(packet.Items()))

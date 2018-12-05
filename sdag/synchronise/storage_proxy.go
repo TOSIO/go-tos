@@ -29,12 +29,12 @@ func NewStorage(db tosdb.Database) (*StorageProxy, error) {
 	return &StorageProxy{db: lvldb}, nil
 }
 
-// 根据指定的时间片获取对应的所有区块hash
+// Get all corresponding block hashes according to the specified time slice
 func (s *StorageProxy) GetBlockHashByTmSlice(slice uint64) ([]common.Hash, error) {
 	return storage.ReadBlocksHashByTmSlice(s.db, slice)
 }
 
-// 根据指定的hash集合返回对应的区块（RLP流）
+// Get the RLP block information according to the specified hashes）
 func (s *StorageProxy) GetBlocks(hashes []common.Hash) ([][]byte, error) {
 	return storage.ReadBlocks(s.db, hashes)
 }

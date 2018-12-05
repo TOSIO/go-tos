@@ -62,7 +62,7 @@ func WriteBlock(db Writer, block types.Block) error {
 	return err
 }
 
-// 根据指定的时间片获取对应的所有区块hash
+//Get all block hashes according to the specified time slice
 func ReadBlocksHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, error) {
 	//mTime := utils.GetMainTime(slice)
 	var hashes []common.Hash
@@ -80,7 +80,7 @@ func ReadBlocksHashByTmSlice(db ReadIteration, slice uint64) ([]common.Hash, err
 	return hashes, nil
 }
 
-//根据指定的hash集合返回对应的区块（RLP流）
+//Get the block of RLP according to the specified hashes
 func ReadBlocks(db Reader, hashes []common.Hash) ([][]byte, error) {
 
 	var blockRlps [][]byte

@@ -7,7 +7,7 @@ import (
 )
 
 type MainChainI interface {
-	// 返回最近一次临时主块所在的时间片
+	//  return the time slice of the last time temporary block
 	GetLastTempMainBlkSlice() uint64
 	GetPervTail() (common.Hash, *big.Int)
 	GetTail() *types.TailMainBlockInfo

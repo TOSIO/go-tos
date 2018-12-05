@@ -23,7 +23,7 @@ var (
 	handshakeTimeout = 5 * time.Second
 )
 
-// peer实现节点对节点的业务逻辑（交易转发、请求区块、握手等）
+// peer,Implement node-to-node business logic (transaction , request block, handshake, etc.)
 type peer struct {
 	id string
 
@@ -65,7 +65,7 @@ func (p *peer) close() {
 	close(p.term)
 }
 
-// 节点传输的业务逻辑在此实现
+// broadcast implement the business logic of the node transmission
 func (p *peer) broadcast() {
 	p.Log().Info("Starting broadcast")
 	for {
@@ -148,7 +148,6 @@ func (p *peer) readStatus(network uint64, status *protocol.StatusData, genesis c
 	return nil
 }
 
-// 发送时间片点
 func (p *peer) SendTimeSlice(slice uint64) error {
 	return p2p.Send(p.rw, protocol.LastMainTimeSlice, slice)
 }

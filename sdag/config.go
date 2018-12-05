@@ -5,7 +5,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/vm"
 )
 
-//sdag的参数配置在此定义
+// Config define sdag elements
 type Config struct {
 	NetworkId       uint64 // Network ID to use for selecting peers to connect to
 	DatabaseCache   int

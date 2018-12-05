@@ -2,14 +2,14 @@ package types
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
-	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
 	"github.com/TOSIO/go-tos/devbase/crypto"
+	"github.com/TOSIO/go-tos/devbase/crypto/sha3"
 	"github.com/TOSIO/go-tos/devbase/rlp"
 
-	"math/big"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
-	"crypto/ecdsa"
+	"math/big"
 )
 
 func rlpHash(x interface{}) (h common.Hash) {
@@ -18,7 +18,6 @@ func rlpHash(x interface{}) (h common.Hash) {
 	hw.Sum(h[:0])
 	return h
 }
-
 
 func recoverPlain(sigHash common.Hash, R, S, Vb *big.Int) (common.Address, error) {
 	if Vb.BitLen() > 8 {
@@ -59,11 +58,11 @@ func (bs *BlockSign) WithSignature(sig []byte) error {
 	if err != nil {
 		return err
 	}
-	bs.R,bs.S,bs.V=r,s,v
+	bs.R, bs.S, bs.V = r, s, v
 	return nil
 }
 
-func (bs *BlockSign)SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
+func (bs *BlockSign) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 	if len(sig) != 65 {
 		panic(fmt.Sprintf("wrong size for signature: got %d, want 65", len(sig)))
 	}
@@ -73,7 +72,7 @@ func (bs *BlockSign)SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 	return r, s, v, nil
 }
 
-//签名
+// SignByHash sets bs to sign by hash return error
 func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) error {
 	sig, err := crypto.Sign(hash, prv)
 	if err != nil {
@@ -81,4 +80,3 @@ func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) error {
 	}
 	return bs.WithSignature(sig)
 }
-

@@ -154,7 +154,7 @@ type TransactionParameter struct {
 	GasLimit uint64 `json:"gaslimit"`
 }
 
-//获取系统gasPrice  gasLimimt links、nonce
+// GetBaseData get gasPrice  gasLimimt links、nonce
 func (api *PublicSdagAPI) GetBaseData() interface{} {
 	//if base ==nil{
 	//	return fmt.Errorf("to address invalid or data is null")
@@ -279,9 +279,7 @@ func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard 
 
 }
 
-
-
-//keystore 生成
+// GeneraterKeyStore genetate keystore
 func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) interface{} {
 
 	log.Debug("RPC GeneraterKeyStore", "receives password", rpcGenerKeyStore.Password)
@@ -371,14 +369,12 @@ func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
 	return string(nodeIdMsg)
 }
 
-//获取节点链接数量
 func (api *PublicSdagAPI) GetConnectNumber() string {
 	_, number := api.s.SdagNodeIDMessage()
 	num := strconv.Itoa(number)
 	return num
 }
 
-//获取主块数量
 func (api *PublicSdagAPI) GetMainBlockNumber() string {
 
 	finalMainBlockSlice, err := storage.ReadTailMainBlockInfo(api.s.chainDb)
@@ -389,7 +385,6 @@ func (api *PublicSdagAPI) GetMainBlockNumber() string {
 	return num
 }
 
-//获取同步状态
 func (api *PublicSdagAPI) GetSyncStatus() string {
 	status := api.s.Status().Status
 	switch status {
@@ -408,14 +403,12 @@ func (api *PublicSdagAPI) GetProgressPercent() string {
 	return progressPercent
 }
 
-//stop minner
 func (api *PublicSdagAPI) StopMiner() string {
 	api.s.config.Mining = false
 	result := api.s.miner.PostStop()
 	return result
 }
 
-//start miner
 func (api *PublicSdagAPI) StartMiner(rpcMinerInfo *RpcMinerInfo) string {
 
 	if api.s.Status().Status != STAT_WORKING {
@@ -511,5 +504,3 @@ func (api *PublicSdagAPI) GetBlockNumberTimeSlice(timeSlice *TimeSlice) (interfa
 		Number int
 	}{len(hash)}, nil
 }
-
-

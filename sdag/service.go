@@ -30,11 +30,7 @@ import (
 	"github.com/TOSIO/go-tos/services/rpc"
 )
 
-/*
-sdag的账户、内存交易池、主链、数据库、同步、网络消息协议等各子模块在此管理（创建、初始化、子模块对象获取等）
-*/
-
-// Sdag implements the Ethereum full node service.
+// Sdag implements the node service.
 type Sdag struct {
 	config *Config
 
@@ -43,9 +39,9 @@ type Sdag struct {
 
 	// Handlers(tx mempool)
 	blockchain      mainchain.MainChainI
-	protocolManager *ProtocolManager //消息协议管理器（与p2p对接）
+	protocolManager *ProtocolManager // protocol manager of p2p
 
-	queryBlockInfo *manager.QueryBlockInfoInterface //查询区块状态接口
+	queryBlockInfo *manager.QueryBlockInfoInterface // query the interface status of blcok
 
 	networkFeed *event.Feed
 
@@ -108,7 +104,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	minerParam := miner.MinerInfo{}
 
 	sdag := &Sdag{
-		//初始化
+		// init
 		config:          config,
 		shutdownChan:    make(chan bool),
 		networkID:       config.NetworkId,
@@ -133,7 +129,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	return sdag, nil
 }
 
-//实现service APIs()接口,返回sdag支持的rpc API接口
+// APIs implement the interface of service APIs and return rpc API interface
 func (s *Sdag) APIs() []rpc.API {
 	log.Debug("Sdag.APIs() called.")
 
@@ -161,7 +157,6 @@ func (s *Sdag) APIs() []rpc.API {
 
 // Protocols implements node.Service, returning all the currently configured
 // network protocols to start.
-//实现service Protocols()接口,返回sdag支持的rpc API接口
 func (s *Sdag) Protocols() []p2p.Protocol {
 	log.Debug("Sdag.Protocols() called.")
 	return s.protocolManager.SubProtocols
@@ -169,7 +164,6 @@ func (s *Sdag) Protocols() []p2p.Protocol {
 
 // Start implements node.Service, starting all internal goroutines needed by the
 // tos protocol implementation.
-//实现service Start()接口,启动协议
 func (s *Sdag) Start(srv *p2p.Server) error {
 	log.Debug("Sdag.Start() called.")
 	// Start the RPC service

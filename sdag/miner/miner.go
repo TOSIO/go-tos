@@ -45,34 +45,30 @@ const (
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mineinfo  *MinerInfo
-	netstatus chan int
-	mainchin  mainchain.MainChainI
-	blockPool core.BlockPoolI
-	feed      *event.Feed
-	SyncState  int32
-	mining       int32
-	miningCh     chan bool
-	quitCh       chan struct{}
-	stopMiningCh chan struct{}
+	mineinfo         *MinerInfo
+	netstatus        chan int
+	mainchin         mainchain.MainChainI
+	blockPool        core.BlockPoolI
+	feed             *event.Feed
+	SyncState        int32
+	mining           int32
+	miningCh         chan bool
+	quitCh           chan struct{}
+	stopMiningCh     chan struct{}
 	poststopMiningCh chan struct{}
-	wg           sync.WaitGroup
-	canStop      int32
-	stopCount    int32
-	mineBlockI types.Block
-	coinbase   string
+	wg               sync.WaitGroup
+	canStop          int32
+	stopCount        int32
+	mineBlockI       types.Block
+	coinbase         string
 }
 
 type MinerInfo struct {
 	From       common.Address
-	GasPrice   *big.Int //tls
-	GasLimit   uint64   //gas max value
+	GasPrice   *big.Int // tls
+	GasLimit   uint64   // gas max value
 	PrivateKey *ecdsa.PrivateKey
 }
-
-//type SyncState struct {
-//	//state
-//}
 
 func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, feed *event.Feed) *Miner {
 	//init start
@@ -88,19 +84,19 @@ func New(pool core.BlockPoolI, minerinfo *MinerInfo, mc mainchain.MainChainI, fe
 	//minerinfo.PrivateKey = PrivateKey
 	//init end
 	mine := &Miner{
-		blockPool:    pool,
-		mineinfo:     minerinfo,
-		netstatus:    make(chan int),
-		mainchin:     mc,
-		feed:         feed,
-		mining:       0,
-		canStop:      1, //1  stop   0 can not stop
-		stopCount:    0,
-		SyncState:   core.SDAGSYNC_SYNCING,
-		miningCh:     make(chan bool),
-		quitCh:       make(chan struct{}),
-		stopMiningCh: make(chan struct{}),
-		poststopMiningCh:make(chan struct{}),
+		blockPool:        pool,
+		mineinfo:         minerinfo,
+		netstatus:        make(chan int),
+		mainchin:         mc,
+		feed:             feed,
+		mining:           0,
+		canStop:          1, // 1  stop   0 can not stop
+		stopCount:        0,
+		SyncState:        core.SDAGSYNC_SYNCING,
+		miningCh:         make(chan bool),
+		quitCh:           make(chan struct{}),
+		stopMiningCh:     make(chan struct{}),
+		poststopMiningCh: make(chan struct{}),
 	}
 
 	return mine
@@ -147,7 +143,7 @@ func (m *Miner) listen() {
 				schedule(m, true)
 			}
 		case ismining, ok := <-m.miningCh:
-			log.Debug("miner netstatus ","m.miningCh",ismining)
+			log.Debug("miner netstatus ", "m.miningCh", ismining)
 			if ok {
 				schedule(m, ismining)
 			}
@@ -157,8 +153,8 @@ func (m *Miner) listen() {
 	}
 }
 
-//start miner work
-func (m *Miner) Start(coinbase string,privatekey *ecdsa.PrivateKey) {
+//Start miner work
+func (m *Miner) Start(coinbase string, privatekey *ecdsa.PrivateKey) {
 	log.Debug("miner", "Start address", coinbase)
 	m.SetTosCoinbase(coinbase)
 	m.mineinfo.PrivateKey = privatekey
@@ -170,9 +166,9 @@ func (m *Miner) StartInit() {
 	go m.listen()
 }
 
-//miner work
+//work implement miner work
 func work(m *Miner) {
-	if m.mineinfo.PrivateKey==nil{
+	if m.mineinfo.PrivateKey == nil {
 		return
 	}
 	m.wg.Add(1)
@@ -183,7 +179,6 @@ func work(m *Miner) {
 		m.wg.Done()
 	}
 	defer clean()
-
 
 newMinerTash:
 	for {
@@ -207,7 +202,7 @@ newMinerTash:
 		mineBlock.Links = append(mineBlock.Links, fhash)
 		//select params.MaxLinksNum-1 unverifiedblock to links
 		mineBlock.Links = append(mineBlock.Links, m.blockPool.SelectUnverifiedBlock(params.MaxLinksNum-1)...)
-		//去重
+		//remove the repeated element
 		mineBlock.Links = RemoveRepeatedElement(mineBlock.Links)
 		// search nonce
 
@@ -219,20 +214,20 @@ newMinerTash:
 			default:
 				nonce++
 				count++
-				//每循环1024次检测主链是否更新
+				// Check if the main chain is updated 1024 times per cycle
 				if count == 1024 {
-					//log.Debug("miner", "work", count)
-					//compare time
+					// log.Debug("miner", "work", count)
+					// compare time
 					if mineBlock.Header.Time < utils.GetTimeStamp() {
-						log.Debug("miner sender start","time",mineBlock.Header.Time)
-						//add block
+						log.Debug("miner sender start", "time", mineBlock.Header.Time)
+						// add block
 						mineBlock.Nonce = types.EncodeNonce(nonce)
-						//创币地址即挖矿者本身设置的地址
+						// The coin address is the address set by the miner itself.
 						mineBlock.Miner = crypto.PubkeyToAddress(m.mineinfo.PrivateKey.PublicKey)
 
-						//send block
+						// send block
 						m.sender(mineBlock)
-						//break
+						// break
 						time.Sleep(time.Second)
 						continue newMinerTash
 					}
@@ -241,7 +236,7 @@ newMinerTash:
 					//compare diff value
 					if diff.Cmp(fDiff) > 0 {
 						mineBlock.Links[0] = hash
-						//去重
+						// remove the repeated element
 						mineBlock.Links = RemoveRepeatedElement(mineBlock.Links)
 					}
 					count = 0
@@ -253,7 +248,7 @@ newMinerTash:
 	log.Debug("Stopp mining work")
 }
 
-//stop miner work
+//Stop miner work
 func (m *Miner) Stop() {
 	log.Debug("miner stopped")
 	close(m.stopMiningCh)
@@ -268,7 +263,7 @@ func (m *Miner) PostStop() string {
 
 }
 
-//send miner result
+//sender miner result
 func (m *Miner) sender(mineblock *types.MinerBlock) {
 	log.Debug("miner sender")
 	m.mineBlockI = mineblock
@@ -276,7 +271,7 @@ func (m *Miner) sender(mineblock *types.MinerBlock) {
 	m.blockPool.EnQueue(mineblock)
 }
 
-//get random nonce
+//getNonceSeed implement random nonce
 func (m *Miner) getNonceSeed() (nonce uint64) {
 	return rand.Uint64()
 }
@@ -285,15 +280,16 @@ func (m *Miner) SetTosCoinbase(coinbase string) {
 	m.coinbase = coinbase
 
 }
-//只有同步完成才能挖矿
-func (m *Miner) CanMiner() bool{
-	if m.SyncState==core.SDAGSYNC_COMPLETED{
+
+// CanMiner implement after synchronise finished
+func (m *Miner) CanMiner() bool {
+	if m.SyncState == core.SDAGSYNC_COMPLETED {
 		return true
 	}
 	return false
 }
 
-//数组去重
+// RemoveRepeatedElement remove the repeated element
 func RemoveRepeatedElement(arr []common.Hash) (newArr []common.Hash) {
 	newArr = make([]common.Hash, 0)
 	for i := 0; i < len(arr); i++ {
@@ -310,4 +306,3 @@ func RemoveRepeatedElement(arr []common.Hash) (newArr []common.Hash) {
 	}
 	return
 }
-

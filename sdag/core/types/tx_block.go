@@ -14,16 +14,14 @@ import (
 	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
-//交易输出
 type TxOut struct {
 	Receiver common.Address
 	Amount   *big.Int //tls
 }
 
-//交易区块
 type TxBlock struct {
 	Header       BlockHeader
-	Links        []common.Hash // 链接的区块hash
+	Links        []common.Hash // block link hash
 	AccountNonce uint64        // 100
 	Outs         []TxOut       //
 	Payload      []byte        // vm code  0x0
@@ -62,7 +60,7 @@ func (tx *TxBlock) GetRlp() []byte {
 	return enc
 }
 
-// Hash returns the hash to be signed by the sender.
+// GetHash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (tx *TxBlock) GetHash() common.Hash {
 	if hash := tx.hash.Load(); hash != nil {
@@ -98,7 +96,7 @@ func (tx *TxBlock) SetStatus(status BlockStatus) {
 	tx.mutableInfo.Status = status
 }
 
-//relate sign
+//GetSender relate sign
 func (tx *TxBlock) GetSender() (common.Address, error) {
 	if sender := tx.sender.Load(); sender != nil {
 		return sender.(common.Address), nil
@@ -140,16 +138,8 @@ func (tx *TxBlock) UnRlp(txRLP []byte) (*TxBlock, error) {
 	return newTx, nil
 }
 
-//validate RlpEncoded TxBlock
+//Validation RlpEncoded TxBlock
 func (tx *TxBlock) Validation() error {
-	//TODO
-
-	/*
-		2.区块的产生时间不小于Dagger元年；
-		3.区块的所有输出金额加上费用之和必须小于TOS总金额;
-		4.VerifySignature
-	*/
-
 	if tx.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
 	} else if tx.Header.Time > utils.GetTimeStamp()+params.TimePeriod {

@@ -20,10 +20,10 @@ type RespPacketI interface {
 }
 */
 type BlockStorageI interface {
-	// 根据指定的时间片获取对应的所有区块hash
+	// Get all corresponding block hashes according to the specified time slice
 	GetBlockHashByTmSlice(slice uint64) ([]common.Hash, error)
 
-	// 根据指定的hash集合返回对应的区块（RLP流）
+	// Get the RLP block information according to the specified hashes
 	GetBlocks(hashes []common.Hash) ([][]byte, error)
 
 	GetBlock(hash common.Hash) types.Block

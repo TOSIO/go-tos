@@ -14,28 +14,28 @@ var (
 	ErrInvalidSig = errors.New("invalid transaction v, r, s values")
 )
 
-//定义block公共的接口
+// Difine some common interfaces of block
 
-// get接口
-//1. 获取区块hash
-//2. 区块难度   挖矿块与交易块略有不同，参考6.1 区块难度
-//3. 累积难度
-//4. 区块时间
-//5. 区块发送者 根据vrs签名获取发送者地址
-//6. 区块链接组
-//7. 获取原始数据 整体RLP数据
-//8. status
+// Cet interface
+// 1. get block hash
+// 2. block difficulty,digging block and transaction block have some different，refering 6.1 block hash
+// 3. cumulative difficulty
+// 4. blcok time
+// 5. the sender of the block,get the sender address according to vrs signature
+// 6. block links
+// 7. get original data,RLP data
+// 8. status
 
-//set
-//1. 设置累积难度
-//2. status
+// Set
+// 1. set umulative difficulty
+// 2. status
 
-//动作
-//1. 签名
-//2. 校验数据 - 根据文档6.3描述检查区块数据  1，2， 3，  如果是挖矿区块 sender与vsr中解析中的签名是相同的
+// Action
+// 1. signature
+// 2. check data,checking blcok data according to the document description oin 6.3.if it is digging block,the signature of sender and vsr is same.
 
-//初始化
-//解析接口 -- RLP解码 - 从网络收到字节码，解码成block  DecodeRLP implements rlp.Decoder
+// Init
+// Parsing interface  -- RLP decode - Accepting bytes from the internet，decode block to DecodeRLP implements rlp.Decoder
 type BlockStatus uint
 
 const (
@@ -60,54 +60,54 @@ var (
 	GenesisTime uint64 //1546272000000
 )
 
-//挖矿不包括签名，hash
+// Block,digging not including signaturation，hash
 //**************************
 type Block interface {
-	GetType() BlockType    //获取区块类型
-	GetGasPrice() *big.Int //获取gas
-	GetGasLimit() uint64   //获取gas max value
-	GetRlp() []byte        //获取区块原始数据
-	GetHash() common.Hash  //获取区块hash,包括签名,tx,miner block is the same
-	GetDiff() *big.Int     //获取区块难度,pow.go,calutae 传入hash(tx:包含签名,miner:不包括签名 )
+	GetType() BlockType    // Get the type of block
+	GetGasPrice() *big.Int // Get gas
+	GetGasLimit() uint64   // Get the max value of gas
+	GetRlp() []byte        // Get the original data of block
+	GetHash() common.Hash  // Get block hash,including signature tx,miner block is the same
+	GetDiff() *big.Int     // Get block difficulty ,pow.go,calutae sending hash(tx:including signature,miner:not including signaturatiom)
 
-	GetCumulativeDiff() *big.Int               //区块累积难度
-	SetCumulativeDiff(cumulativeDiff *big.Int) //设置累积难度
+	GetCumulativeDiff() *big.Int               // Block cumulative difficulty
+	SetCumulativeDiff(cumulativeDiff *big.Int) // Set cumulative difficulty
 
-	GetTime() uint64                    //获取区块时间
-	GetSender() (common.Address, error) //获取区块发送者，即创建者,从签名获取
-	GetLinks() []common.Hash            //获取区块链接组
+	GetTime() uint64                    // Get blcok time
+	GetSender() (common.Address, error) // Get block sender,creator from signature
+	GetLinks() []common.Hash            // Get block links
 
-	GetStatus() BlockStatus       //获取状态
-	SetStatus(status BlockStatus) //设置状态
+	GetStatus() BlockStatus       // Get status
+	SetStatus(status BlockStatus) // Set status
 
-	GetMutableInfo() *MutableInfo            //获取易变信息
-	SetMutableInfo(mutableInfo *MutableInfo) //设置易变信息
+	GetMutableInfo() *MutableInfo            // Get mutable information
+	SetMutableInfo(mutableInfo *MutableInfo) // Set mutable information
 
-	Sign(prv *ecdsa.PrivateKey) error //签名
+	Sign(prv *ecdsa.PrivateKey) error // Signature
 
-	Validation() error // (check data,校验解签名)
+	Validation() error // Check data
 
-	GetMaxLink() common.Hash        //获取最大连接
-	SetMaxLink(MaxLink common.Hash) //设置最大连接
+	GetMaxLink() common.Hash        // Get the max link
+	SetMaxLink(MaxLink common.Hash) // Set the max link
 }
 
 type BlockHeader struct {
-	Type     BlockType //1 tx, 2 miner
-	Time     uint64    //ms  timestamp
-	GasPrice *big.Int  //tls
-	GasLimit uint64    //gas max value
+	Type     BlockType // 1 tx, 2 miner
+	Time     uint64    // ms  timestamp
+	GasPrice *big.Int  // tls
+	GasLimit uint64    // gas max value
 }
 
 type MutableInfo struct {
-	Status           BlockStatus //status
-	ConfirmItsNumber uint64      //Confirm its time slice
-	Difficulty       *big.Int    //self difficulty
-	CumulativeDiff   *big.Int    //cumulative difficulty
+	Status           BlockStatus // status
+	ConfirmItsNumber uint64      // confirm its time slice
+	Difficulty       *big.Int    // self difficulty
+	CumulativeDiff   *big.Int    // cumulative difficulty
 	//MaxLink             uint8
 	MaxLinkHash common.Hash
 }
 
-//数据解析
+// BlockDecode, rlpData to block
 func BlockDecode(rlpData []byte) (Block, error) {
 
 	var ty BlockType
