@@ -622,7 +622,9 @@ func (pm *ProtocolManager) handleNewBlocks(p *peer, msg p2p.Msg) error {
 }
 
 func (pm *ProtocolManager) handleNewBlockAnnounce(p *peer, msg p2p.Msg) error {
-
+	if pm.synchroniser.ExceedAnnounceLimit(p.NodeID()) {
+		return errors.New("block annouce is exceed limit")
+	}
 	var response common.Hash
 	err := msg.Decode(&response)
 	if err != nil {

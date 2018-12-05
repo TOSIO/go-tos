@@ -24,6 +24,8 @@ var maxRoutineCount int = 100
 var maxSYNCCapLimit = 10000
 var maxRetryCount = 3
 var maxOringinPeersLimit = 25
+var maxAnnouceLimitPeer = 10000
+
 var (
 	errNoSyncActive   = errors.New("no sync active")
 	errInternal       = errors.New("internal error")
@@ -849,6 +851,10 @@ func (s *Synchroniser) syncTimeslice(p core.Peer, stat *core.SYNCStatusEvent, ts
 	}
 
 	//return nil
+}
+
+func (s *Synchroniser) ExceedAnnounceLimit(node string) bool {
+	return s.fetcher.ExceedAnnounceLimit(node)
 }
 
 func (s *Synchroniser) RequestBlock(hash common.Hash) error {

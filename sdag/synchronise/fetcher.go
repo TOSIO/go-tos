@@ -167,15 +167,34 @@ func (f *Fetcher) fetch(hash common.Hash, orphan bool) {
 func (f *Fetcher) detectTimeout() {
 	event := &core.ErrorGetBlocksEvent{Requests: make([]core.BlockReq, 0, 100), Err: fmt.Errorf("timeout")}
 	//del := make([]core.BlockReq, 0, 100)
+	dels := make(map[common.Hash]*fetchTask)
 	f.flightLock.Lock()
 	for hash, task := range f.flighting {
 		if time.Since(task.beginTime) >= f.requestTTL() {
+			dels[hash] = f.flighting[hash]
 			delete(f.flighting, hash)
+			//delete(f.announceCount)
 			event.Requests = append(event.Requests, core.BlockReq{Hash: hash, Isolated: task.orphan})
 		}
 	}
 	f.flightLock.Unlock()
 
+	f.announceLock.Lock()
+	for hash, task := range dels {
+		//delelte(f.announced)
+		for _, node := range task.nodes {
+			if _, ok := f.announced[hash]; ok {
+				f.announced[hash].Remove(node)
+			}
+			if _, ok := f.announceCount[node]; ok {
+				f.announceCount[node]--
+				if f.announceCount[node] <= 0 {
+					delete(f.announceCount, node)
+				}
+			}
+		}
+	}
+	f.announceLock.Unlock()
 	if len(event.Requests) > 0 {
 		log.Debug("Post error event", "size", len(event.Requests))
 		f.blockPoolEvent.Post(event)
@@ -286,6 +305,7 @@ func (f *Fetcher) processResponse(response core.Response) {
 	/* f.flightLock.Lock()
 	defer f.flightLock.Lock() */
 	//delHashes := make([]common.Hash, 0)
+	count := 0
 	newblockEvent := &core.NetworkNewBlocksEvent{Blocks: make([]types.Block, 0, 1)}
 	isolateEvent := &core.IsolateResponseEvent{Blocks: make([]types.Block, 0, 1)}
 	if packet, ok := response.(*NewBlockPacket); ok {
@@ -297,6 +317,7 @@ func (f *Fetcher) processResponse(response core.Response) {
 						isolateEvent.Blocks = append(isolateEvent.Blocks, block)
 					} else {
 						newblockEvent.Blocks = append(newblockEvent.Blocks, block)
+						count++
 					}
 					delete(f.flighting, block.GetHash())
 					log.Debug("Post block event to mempool", "hash", block.GetHash().String())
@@ -311,7 +332,22 @@ func (f *Fetcher) processResponse(response core.Response) {
 			}
 		}
 		f.flightLock.Unlock()
+
+		f.announceLock.Lock()
+		if _, ok := f.announceCount[packet.NodeID()]; ok {
+			f.announceCount[packet.NodeID()] -= count
+			if f.announceCount[packet.NodeID()] <= 0 {
+				delete(f.announceCount, packet.NodeID())
+			}
+		}
+		for _, block := range newblockEvent.Blocks {
+			if _, ok := f.announced[block.GetHash()]; ok {
+				f.announced[block.GetHash()].Remove(packet.NodeID())
+			}
+		}
+		f.announceLock.Unlock()
 	}
+
 	//f.UnMarkFlighting(delHashes)
 	if len(newblockEvent.Blocks) > 0 {
 		f.blockPoolEvent.Post(newblockEvent)
@@ -349,4 +385,14 @@ func (f *Fetcher) AsyncRequestOrphanBlock(hash common.Hash) error {
 	//s.blockQueueLock.Unlock()
 
 	//s.blockReqCh <- struct{}{}
+}
+
+func (f *Fetcher) ExceedAnnounceLimit(node string) bool {
+	f.announceLock.Lock()
+	defer f.announceLock.Unlock()
+	if _, ok := f.announceCount[node]; ok {
+		return f.announceCount[node] >= maxAnnouceLimitPeer
+	} else {
+		return false
+	}
 }

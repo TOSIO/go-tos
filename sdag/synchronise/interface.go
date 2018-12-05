@@ -47,6 +47,8 @@ type SynchroniserI interface {
 	Broadcast(hash common.Hash) error
 	MarkAnnounced(hash common.Hash, nodeID string)
 
+	ExceedAnnounceLimit(node string) bool
+
 	DeliverLastTimeSliceResp(id string, timeslice uint64) error
 	DeliverBlockHashesResp(id string, ts uint64, hashes []common.Hash) error
 	DeliverBlockDatasResp(id string, ts uint64, blocks [][]byte) error
