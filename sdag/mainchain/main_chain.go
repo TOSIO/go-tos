@@ -310,7 +310,7 @@ func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (b
 	return chainLinkInfo.isUpdateDiff, nil
 }
 
-//Find the main block that can confirm other blocks
+//findTheMainBlockThatCanConfirmOtherBlocks find the main block that can confirm other blocks
 func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(mainTail *types.TailMainBlockInfo) ([]types.Block, types.Block, error) {
 	tail := mainChain.GetTail()
 	hash := tail.Hash

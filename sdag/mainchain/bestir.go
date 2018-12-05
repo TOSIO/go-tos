@@ -158,7 +158,7 @@ func CalculatingMinerReward(block types.Block, blockNumber uint64, confirmReward
 	return nil
 }
 
-//1/2^(n/HalfLife)*Initial
+// RewardMiner implement 1/2^(n/HalfLife)*Initial
 func RewardMiner(number uint64) *big.Int {
 	return new(big.Int).Mul(big.NewInt(int64(math.Exp2(-float64(number/params.HalfLifeRewardMiner))*(params.InitialRewardMiner/params.OneTos))), big.NewInt(params.OneTos))
 }

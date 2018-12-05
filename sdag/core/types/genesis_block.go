@@ -10,7 +10,6 @@ import (
 	"github.com/TOSIO/go-tos/devbase/utils"
 )
 
-//创世区块
 type GenesisBlock struct {
 	Header   BlockHeader
 	RootHash common.Hash
@@ -71,7 +70,7 @@ func (gb *GenesisBlock) SetStatus(status BlockStatus) {
 	gb.mutableInfo.Status = status
 }
 
-//relate sign
+// GetSender relate sign
 func (gb *GenesisBlock) GetSender() (common.Address, error) {
 	return common.Address{}, nil
 }
@@ -99,7 +98,7 @@ func (gb *GenesisBlock) UnRlp(mbRLP []byte) (*GenesisBlock, error) {
 	return newGb, nil
 }
 
-//validate RlpEncoded TxBlock
+// Validation RlpEncoded TxBlock
 func (gb *GenesisBlock) Validation() error {
 	return nil
 }
@@ -112,7 +111,7 @@ func (gb *GenesisBlock) SetMutableInfo(mutableInfo *MutableInfo) {
 	gb.mutableInfo = *mutableInfo
 }
 
-// block interface
+// SetMaxLink is block interface
 func (gb *GenesisBlock) SetMaxLink(MaxLink common.Hash) {
 	gb.mutableInfo.MaxLinkHash = MaxLink
 }
