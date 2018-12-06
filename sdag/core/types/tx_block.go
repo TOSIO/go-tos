@@ -27,7 +27,10 @@ type TxBlock struct {
 	Payload      []byte        // vm code  0x0
 
 	// Signature values
-	BlockSign
+	V *big.Int `json:"v" gencodec:"required"`
+	R *big.Int `json:"r" gencodec:"required"`
+	S *big.Int `json:"s" gencodec:"required"`
+
 	sender atomic.Value
 
 	mutableInfo MutableInfo
@@ -112,7 +115,13 @@ func (tx *TxBlock) GetSender() (common.Address, error) {
 
 func (tx *TxBlock) Sign(prv *ecdsa.PrivateKey) error {
 	hash := rlpHash(tx.data(false))
-	return tx.SignByHash(hash[:], prv)
+
+
+	return (&BlockSign{
+		tx.V,
+		tx.R,
+		tx.S,
+	}).SignByHash(hash[:], prv)
 }
 
 func (tx *TxBlock) GetLinks() []common.Hash {
@@ -232,6 +241,7 @@ func (tx *TxBlock) GetPayload() []byte {
 func (tx *TxBlock) Nonce() uint64 {
 	return tx.AccountNonce
 }
+
 func (tx *TxBlock) AsMessage() (Message, error) {
 	var to *common.Address
 	amount := big.NewInt(0)

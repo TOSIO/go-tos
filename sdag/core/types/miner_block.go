@@ -24,7 +24,9 @@ type MinerBlock struct {
 	Nonce  BlockNonce
 
 	// Signature values
-	BlockSign
+	V *big.Int `json:"v" gencodec:"required"`
+	R *big.Int `json:"r" gencodec:"required"`
+	S *big.Int `json:"s" gencodec:"required"`
 
 	//status BlockStatusParam
 
@@ -112,7 +114,13 @@ func (mb *MinerBlock) GetSender() (common.Address, error) {
 
 func (mb *MinerBlock) Sign(prv *ecdsa.PrivateKey) error {
 	hash := rlpHash(mb.data(false))
-	return mb.SignByHash(hash[:], prv)
+
+	bs := BlockSign{
+		mb.V,
+		mb.R,
+		mb.S,
+	}
+	return bs.SignByHash(hash[:], prv)
 }
 
 func (mb *MinerBlock) GetLinks() []common.Hash {

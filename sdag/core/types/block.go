@@ -91,6 +91,7 @@ type Block interface {
 	SetMaxLink(MaxLink common.Hash) // Set the max link
 }
 
+
 type BlockHeader struct {
 	Type     BlockType // 1 tx, 2 miner
 	Time     uint64    // ms  timestamp
