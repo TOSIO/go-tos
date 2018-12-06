@@ -55,6 +55,7 @@ type Receipt struct {
 	TxHash          common.Hash    `json:"transactionHash" gencodec:"required"`
 	ContractAddress common.Address `json:"contractAddress"`
 	GasUsed         uint64         `json:"gasUsed" gencodec:"required"`
+	Index           uint64
 }
 
 type receiptMarshaling struct {
@@ -95,23 +96,23 @@ func NewReceipt(root []byte, failed bool, cumulativeGasUsed uint64) *Receipt {
 
 // EncodeRLP implements rlp.Encoder, and flattens the consensus fields of a receipt
 // into an RLP stream. If no post state is present, byzantium fork is assumed.
-func (r *Receipt) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, &receiptRLP{r.statusEncoding(), r.CumulativeGasUsed, r.Bloom, r.Logs})
-}
+//func (r *Receipt) EncodeRLP(w io.Writer) error {
+//	return rlp.Encode(w, &receiptRLP{r.statusEncoding(), r.CumulativeGasUsed, r.Bloom, r.Logs})
+//}
 
 // DecodeRLP implements rlp.Decoder, and loads the consensus fields of a receipt
 // from an RLP stream.
-func (r *Receipt) DecodeRLP(s *rlp.Stream) error {
-	var dec receiptRLP
-	if err := s.Decode(&dec); err != nil {
-		return err
-	}
-	if err := r.setStatus(dec.PostStateOrStatus); err != nil {
-		return err
-	}
-	r.CumulativeGasUsed, r.Bloom, r.Logs = dec.CumulativeGasUsed, dec.Bloom, dec.Logs
-	return nil
-}
+//func (r *Receipt) DecodeRLP(s *rlp.Stream) error {
+//	var dec receiptRLP
+//	if err := s.Decode(&dec); err != nil {
+//		return err
+//	}
+//	if err := r.setStatus(dec.PostStateOrStatus); err != nil {
+//		return err
+//	}
+//	r.CumulativeGasUsed, r.Bloom, r.Logs = dec.CumulativeGasUsed, dec.Bloom, dec.Logs
+//	return nil
+//}
 
 func (r *Receipt) setStatus(postStateOrStatus []byte) error {
 	switch {

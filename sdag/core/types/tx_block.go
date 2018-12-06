@@ -241,7 +241,7 @@ func (tx *TxBlock) AsMessage() (Message, error) {
 			to = &tx.Outs[0].Receiver
 		}
 	}
-	return Message{
+	msg := Message{
 		nonce:      tx.AccountNonce,
 		gasLimit:   tx.Header.GasLimit,
 		gasPrice:   tx.Header.GasPrice,
@@ -249,5 +249,10 @@ func (tx *TxBlock) AsMessage() (Message, error) {
 		amount:     amount,
 		data:       tx.Payload,
 		checkNonce: false,
-	}, nil
+	}
+
+	var err error
+	msg.from, err = tx.GetSender()
+	return msg, err
+
 }

@@ -83,6 +83,7 @@ type TransactionInfo struct {
 	From     accountInfo
 	To       string
 	Amount   string
+	Payload  string
 	GasPrice string
 	GasLimit uint64
 }
@@ -109,10 +110,9 @@ type RpcGenerKeyStore struct {
 }
 
 type BaseDataParam struct {
-	to string
+	to   string
 	data []byte
 }
-
 
 func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{}, error) {
 
@@ -180,7 +180,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 	}
 
 	to := common.HexToAddress(transactionInfo.To)
-	if to == (common.Address{}) {
+	if to == (common.Address{}) && len(transactionInfo.Payload) == 0 {
 		return nil, fmt.Errorf("to address invalid")
 	}
 
@@ -212,6 +212,8 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 	}
 
 	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
+
+	txRequestInfo.Payload = transactionInfo.Payload
 
 	if len(transactionInfo.From.PrivateKey) == 0 {
 		if len(transactionInfo.From.Passphrase) == 0 {
@@ -245,7 +247,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 	}{hash}, nil
 }
 
-type  TransactionRawParam struct {
+type TransactionRawParam struct {
 	RlpData []byte `json:"rlpdata"`
 }
 
@@ -503,4 +505,16 @@ func (api *PublicSdagAPI) GetBlockNumberTimeSlice(timeSlice *TimeSlice) (interfa
 	return struct {
 		Number int
 	}{len(hash)}, nil
+}
+
+type Hash struct {
+	Hash common.Hash
+}
+
+func (api *PublicSdagAPI) GetReceipt(hash Hash) (interface{}, error) {
+	Receipt, err := storage.ReadReceiptInfo(api.s.chainDb, hash.Hash)
+	if err != nil {
+		return nil, fmt.Errorf("GetReceipt error:" + err.Error())
+	}
+	return Receipt, nil
 }

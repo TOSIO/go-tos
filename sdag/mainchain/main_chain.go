@@ -18,16 +18,17 @@ import (
 )
 
 type MainChain struct {
-	db             tosdb.Database
-	stateDb        state.Database
-	Genesis        *core.Genesis
-	Tail           types.TailMainBlockInfo
-	PervTail       types.TailMainBlockInfo
-	MainTail       types.TailMainBlockInfo
-	tailRWLock     sync.RWMutex
-	mainTailRWLock sync.RWMutex
-	ChainConfig    *params.ChainConfig
-	VMConfig       vm.Config
+	db               tosdb.Database
+	stateDb          state.Database
+	Genesis          *core.Genesis
+	Tail             types.TailMainBlockInfo
+	PervTail         types.TailMainBlockInfo
+	MainTail         types.TailMainBlockInfo
+	tailRWLock       sync.RWMutex
+	mainTailRWLock   sync.RWMutex
+	ChainConfig      *params.ChainConfig
+	VMConfig         vm.Config
+	CurrentMainBlock types.Block
 }
 
 func (mainChain *MainChain) initTail() error {
@@ -406,7 +407,9 @@ func (mainChain *MainChain) Confirm() error {
 		info := block.GetMutableInfo()
 		info.Status |= types.BlockMain
 		block.SetMutableInfo(info)
-		confirmReward, err := mainChain.singleBlockConfirm(block, number, state)
+		mainChain.CurrentMainBlock = block
+		count := uint64(0)
+		confirmReward, err := mainChain.singleBlockConfirm(block, number, &count, state)
 		if err != nil {
 			return err
 		}
@@ -429,7 +432,7 @@ func (mainChain *MainChain) Confirm() error {
 		if err != nil {
 			return err
 		}
-		err = storage.WriteMainBlock(mainChain.db, &types.MainBlockInfo{Hash: block.GetHash(), Root: root}, number)
+		err = storage.WriteMainBlock(mainChain.db, &types.MainBlockInfo{Hash: block.GetHash(), Root: root, ConfirmCount: count}, number)
 		if err != nil {
 			return err
 		}
@@ -512,10 +515,9 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block, number uint6
 	return nil
 }
 
-func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64, state *state.StateDB) (*ConfirmRewardInfo, error) {
+func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64, count *uint64, state *state.StateDB) (*ConfirmRewardInfo, error) {
 	var (
-		transactionSuccess bool
-		confirmRewardInfo  ConfirmRewardInfo
+		confirmRewardInfo ConfirmRewardInfo
 	)
 	confirmRewardInfo.Init()
 	log.Debug("begin singleBlockConfirm", "block", block.GetHash())
@@ -532,7 +534,7 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 			return nil, fmt.Errorf("hash=%s ReadBlock Not found", hash.String())
 		}
 		block.SetMutableInfo(mutableInfo)
-		linksReward, err := mainChain.singleBlockConfirm(block, number, state)
+		linksReward, err := mainChain.singleBlockConfirm(block, number, count, state)
 		if err != nil {
 			log.Error(err.Error())
 		}
@@ -544,18 +546,15 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 	}
 	log.Debug("singleBlockConfirm self", "hash", block.GetHash().String(),
 		"block", block, "confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String())
+	block.GetMutableInfo().ConfirmItsNumber = number
+	block.GetMutableInfo().Status |= types.BlockConfirm
+
 	var err error
-	confirmRewardInfo.userReward, err = CalculatingAccounts(block, confirmRewardInfo.userReward, state)
+	confirmRewardInfo.userReward, err = mainChain.CalculatingAccounts(block, confirmRewardInfo.userReward, count, state)
 	if err == nil {
-		transactionSuccess = true
+		block.GetMutableInfo().Status |= types.BlockApply
 	}
-	info := block.GetMutableInfo()
-	info.Status |= types.BlockConfirm
-	if transactionSuccess {
-		info.Status |= types.BlockApply
-	}
-	info.ConfirmItsNumber = number
-	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), info); err != nil {
+	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), block.GetMutableInfo()); err != nil {
 		log.Error(err.Error())
 	}
 

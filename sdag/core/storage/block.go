@@ -196,3 +196,20 @@ func WriteTailMainBlockInfo(db Writer, tm *types.TailMainBlockInfo) error {
 
 	return nil
 }
+
+func ReadReceiptInfo(db Reader, hash common.Hash) (*types.Receipt, error) {
+	data, err := db.Get(ReceiptKey(hash))
+	if err != nil {
+		return nil, fmt.Errorf("ReadReceiptInfo error:" + err.Error())
+	}
+
+	return new(types.Receipt).UnRlp(data)
+}
+
+func WriteReceiptInfo(db Writer, hash common.Hash, receipt *types.Receipt) error {
+	if err := db.Put(ReceiptKey(hash), receipt.Rlp()); err != nil {
+		return fmt.Errorf("WriteReceiptInfo error:" + err.Error())
+	}
+
+	return nil
+}

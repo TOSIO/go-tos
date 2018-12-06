@@ -8,15 +8,16 @@ import (
 )
 
 type MainBlockInfo struct {
-	Hash common.Hash //block hash
-	Root common.Hash //status root
+	Hash         common.Hash //block hash
+	Root         common.Hash //status root
+	ConfirmCount uint64
 }
 
 type TailMainBlockInfo struct {
 	Hash           common.Hash
 	CumulativeDiff *big.Int
 	Number         uint64
-	Time           uint64//
+	Time           uint64 //
 }
 
 func (mb *MainBlockInfo) Rlp() []byte {
@@ -49,4 +50,20 @@ func (tm *TailMainBlockInfo) UnRlp(rlpByte []byte) (*TailMainBlockInfo, error) {
 	}
 
 	return tm, nil
+}
+
+func (receipt *Receipt) Rlp() []byte {
+	rlpByte, err := rlp.EncodeToBytes(receipt)
+	if err != nil {
+		fmt.Println("err: ", err)
+	}
+	return rlpByte
+}
+
+func (receipt *Receipt) UnRlp(rlpByte []byte) (*Receipt, error) {
+	if err := rlp.DecodeBytes(rlpByte, receipt); err != nil {
+		return nil, err
+	}
+
+	return receipt, nil
 }

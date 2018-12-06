@@ -36,6 +36,7 @@ type ReceiverInfo struct {
 type TransInfo struct {
 	From       common.Address
 	Receiver   []ReceiverInfo
+	Payload    string
 	GasPrice   *big.Int //tls
 	GasLimit   uint64   //gas max value
 	PrivateKey *ecdsa.PrivateKey
@@ -81,7 +82,7 @@ func (transaction *Transaction) txBlockConstruction(txRequestInfo *TransInfo) (*
 	}
 
 	//5. vm code
-	txBlock.Payload = []byte{0x0, 0x3b}
+	txBlock.Payload = common.FromHex(txRequestInfo.Payload)
 
 	//6. sign
 	err := txBlockI.Sign(txRequestInfo.PrivateKey)

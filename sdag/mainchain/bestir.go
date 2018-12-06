@@ -5,7 +5,9 @@ import (
 	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"math"
 	"math/big"
@@ -21,87 +23,128 @@ func (reward *ConfirmRewardInfo) Init() {
 	reward.minerReward = big.NewInt(0)
 }
 
-func CalculatingAccounts(block types.Block, confirmReward *big.Int, state *state.StateDB) (*big.Int, error) {
+func (mainChain *MainChain) CalculatingAccounts(block types.Block, confirmReward *big.Int, count *uint64, state *state.StateDB) (*big.Int, error) {
 	log.Debug("begin CalculatingAccounts", "hash", block.GetHash().String())
-	cost, IsGasCostOverrun, _ := ComputeCost(block)
-	log.Debug("ComputeCost", "block", block.GetHash().String(), "cost", cost.String(), "IsGasCostOverrun", IsGasCostOverrun)
 	address, err := block.GetSender()
 	if err != nil {
 		log.Error(err.Error())
-		return big.NewInt(0), err
+		return confirmReward, err
 	}
 	log.Debug("Add confirmReward", "address", address, "confirmReward", confirmReward.String())
 
 	state.AddBalance(address, confirmReward)
 	balance := state.GetBalance(address)
 	log.Debug("Calculate the balance after confirming the reward", "address", address, "balance", balance.String())
+	var gasPool uint64
+	if new(big.Int).Mul(big.NewInt(int64(block.GetGasLimit())), block.GetGasPrice()).Cmp(balance) > 0 {
+		gasPool = new(big.Int).Quo(balance, block.GetGasPrice()).Uint64()
+	} else {
+		gasPool = block.GetGasLimit()
+	}
+
+	cost, err := mainChain.ExecutionTransaction(block, gasPool, count, state)
+	log.Debug("ComputeCost", "block", block.GetHash().String(), "cost", cost.String())
 
 	actualCostDeduction := deductCost(address, balance, cost, state)
 	log.Debug("deduct cost", "address", address, "actualCostDeduction", actualCostDeduction.String(), "balance", state.GetBalance(address))
-	if block.GetType() == types.BlockTypeTx {
-		if !IsGasCostOverrun {
-			txBlock, ok := block.(*types.TxBlock)
-			if !ok {
-				err = fmt.Errorf("assert fail")
-				log.Error(err.Error())
-				return actualCostDeduction, err
-			}
 
-			if !CheckTransactionAmount(balance, txBlock.Outs, cost) {
-				err = fmt.Errorf("%s insufficient balance", address.String())
-				log.Info(err.Error())
-				return actualCostDeduction, err
-			}
+	return actualCostDeduction, err
+}
 
-			for _, out := range txBlock.Outs {
-				log.Debug("calculate transaction", "address", address, "out", out)
-				log.Debug("Receiver balance", "Receiver", out.Receiver, "balance", state.GetBalance(out.Receiver))
-				state.SubBalance(address, out.Amount)
-				state.AddBalance(out.Receiver, out.Amount)
-				log.Debug("after calculate transaction", "address", address, "balance", balance.String(), "Receiver", out.Receiver, "Receiver balance", state.GetBalance(out.Receiver))
-			}
+func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint64, count *uint64, state *state.StateDB) (*big.Int, error) {
+	needUseGas, IsGasCostOverrun, receipt, err := mainChain.TransferAccounts(block, gasPool, state)
+	useGas := needUseGas
+	var returnErr error
+	var receiptStatus uint64
+	if err != nil {
+		fmt.Errorf("ExecutionTransaction error:" + err.Error())
+		returnErr = err
+	} else if IsGasCostOverrun {
+		fmt.Errorf("gas use overrun")
+		returnErr = fmt.Errorf("gas use overrun")
+		useGas = gasPool
+	}
+
+	if (block.GetMutableInfo().Status & types.BlockMain) != 0 {
+		useGas = 0
+		needUseGas = 0
+	}
+
+	if returnErr == nil {
+		receiptStatus = types.ReceiptStatusSuccessful
+	} else {
+		receiptStatus = types.ReceiptStatusFailed
+	}
+
+	*count++
+	if receipt == nil {
+		receipt = &types.Receipt{
+			TxHash:  block.GetHash(),
+			Status:  receiptStatus,
+			GasUsed: useGas,
+			Index:   *count,
 		}
 	}
-
-	return actualCostDeduction, nil
-}
-
-func ComputeCost(block types.Block) (*big.Int, bool, error) {
-	costGas, IsGasCostOverrun, err := ComputeCostGas(block)
-
-	if IsGasCostOverrun {
-		log.Info("gas cost overrun")
+	receipt.Index = *count
+	err = storage.WriteReceiptInfo(mainChain.db, block.GetHash(), receipt)
+	if err != nil {
+		log.Error("ExecutionTransaction error:" + err.Error())
 	}
 
-	return ComputeTransactionCost(costGas, block.GetGasPrice()), IsGasCostOverrun, err
+	return ComputeTransactionCost(needUseGas, block.GetGasPrice()), returnErr
 }
 
-func ComputeCostGas(block types.Block) (uint64, bool, error) {
-	var costGas uint64
-	var IsGasCostOverrun bool
-	var err error
-	if (block.GetMutableInfo().Status & types.BlockMain) != 0 {
-		return costGas, IsGasCostOverrun, err
+func (mainChain *MainChain) TransferAccounts(block types.Block, gasPool uint64, state *state.StateDB) (uint64, bool, *types.Receipt, error) {
+	var (
+		costGas uint64
+		err     error
+		receipt *types.Receipt
+	)
+
+	mainAddress, err := mainChain.CurrentMainBlock.GetSender()
+	if err != nil {
+		log.Error("ComputeCostGas err:" + err.Error())
+		return costGas, false, nil, fmt.Errorf("ComputeCostGas err:" + err.Error())
 	}
+
 	if block.GetType() == types.BlockTypeTx {
 		costGas = params.TransferTransactionGasUsed
 		txBlock, ok := block.(*types.TxBlock)
 		if ok {
+			costGas *= uint64(len(txBlock.Outs))
+			GasPool := core.GasPool(gasPool)
 			if len(txBlock.GetPayload()) != 0 {
+				var contractGas uint64
+				receipt, costGas, err = core.ApplyTransaction(mainChain.ChainConfig, mainChain, &mainAddress,
+					&GasPool, state, txBlock, &contractGas, mainChain.VMConfig)
+			} else {
+				from, _ := block.GetSender()
+				balance := state.GetBalance(from)
+				state.SetNonce(from, state.GetNonce(from)+1)
+				if !CheckTransactionAmount(balance, txBlock.Outs, ComputeTransactionCost(costGas, block.GetGasPrice())) {
+					err = fmt.Errorf("%s insufficient balance", from.String())
+					log.Info(err.Error())
+					return costGas, gasPool < costGas, nil, err
+				}
 
+				for _, out := range txBlock.Outs {
+					log.Debug("calculate transaction", "address", from, "out", out)
+					log.Debug("Receiver balance", "Receiver", out.Receiver, "balance", state.GetBalance(out.Receiver))
+					state.SubBalance(from, out.Amount)
+					state.AddBalance(out.Receiver, out.Amount)
+					log.Debug("after calculate transaction", "address", from, "balance", balance.String(), "Receiver", out.Receiver, "Receiver balance", state.GetBalance(out.Receiver))
+				}
 			}
 		} else {
-			err = fmt.Errorf("block.(*types.TxBlock) error")
-			log.Error(err.Error())
+			err = fmt.Errorf("block.(*types.TxBlock) assert fail")
+			log.Error("TransferAccounts:" + err.Error())
+			return costGas, gasPool < costGas, nil, err
 		}
 	} else {
 		costGas = params.MiningGasUsed
 	}
-	if costGas > block.GetGasLimit() {
-		costGas = block.GetGasLimit()
-		IsGasCostOverrun = true
-	}
-	return costGas, IsGasCostOverrun, err
+
+	return costGas, gasPool < costGas, receipt, err
 }
 
 func ComputeTransactionCost(costGas uint64, gasPrice *big.Int) *big.Int {

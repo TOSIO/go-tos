@@ -51,3 +51,7 @@ func tailChainInfoKey() []byte {
 func tailMainChainInfoKey() []byte {
 	return []byte("TailMainChainInfo")
 }
+
+func ReceiptKey(hash common.Hash) []byte {
+	return append([]byte("r"), hash[:]...)
+}

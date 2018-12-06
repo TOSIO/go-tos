@@ -6,7 +6,7 @@ const (
 	TimePeriod   = 10000 // 60000 毫秒
 	MaxLinksNum  = 3     //最大链接次数
 	MaxTransNum  = 3     //单个区块所包含的交易数量
-	ConfirmBlock = 8     //最大确定个数
+	ConfirmBlock = 1     //最大确定个数
 )
 
 const (
