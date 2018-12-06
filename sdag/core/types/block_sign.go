@@ -52,20 +52,11 @@ type BlockSign struct {
 	S *big.Int `json:"s" gencodec:"required"`
 }
 
-func (bs *BlockSign) WithSignature(sig []byte) error {
-	r, s, v, err := bs.SignatureValues(sig)
-	//fmt.Println("r: ", r, "\n s: ", s , "\n v: ", v )
-	if err != nil {
-		return err
-	}
-	bs.R, bs.S, bs.V = r, s, v
-	return nil
-}
-
 func (bs *BlockSign) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 	if len(sig) != 65 {
 		panic(fmt.Sprintf("wrong size for signature: got %d, want 65", len(sig)))
 	}
+	fmt.Println("sing: ", sig)
 	r = new(big.Int).SetBytes(sig[:32])
 	s = new(big.Int).SetBytes(sig[32:64])
 	v = new(big.Int).SetBytes([]byte{sig[64] + 27})
@@ -73,10 +64,10 @@ func (bs *BlockSign) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 }
 
 // SignByHash sets bs to sign by hash return error
-func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) error {
+func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) (r, s, v *big.Int, err error) {
 	sig, err := crypto.Sign(hash, prv)
 	if err != nil {
-		return err
+		return nil,nil,nil, err
 	}
-	return bs.WithSignature(sig)
+	return bs.SignatureValues(sig)
 }

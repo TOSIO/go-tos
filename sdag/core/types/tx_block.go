@@ -116,12 +116,14 @@ func (tx *TxBlock) GetSender() (common.Address, error) {
 func (tx *TxBlock) Sign(prv *ecdsa.PrivateKey) error {
 	hash := rlpHash(tx.data(false))
 
-
-	return (&BlockSign{
+	var err error
+	tx.R, tx.S, tx.V, err = (&BlockSign{
 		tx.V,
 		tx.R,
 		tx.S,
 	}).SignByHash(hash[:], prv)
+
+	return err
 }
 
 func (tx *TxBlock) GetLinks() []common.Hash {

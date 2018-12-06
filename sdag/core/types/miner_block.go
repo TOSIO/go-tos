@@ -115,12 +115,13 @@ func (mb *MinerBlock) GetSender() (common.Address, error) {
 func (mb *MinerBlock) Sign(prv *ecdsa.PrivateKey) error {
 	hash := rlpHash(mb.data(false))
 
-	bs := BlockSign{
+	var err error
+	mb.V, mb.R, mb.S, err = (&BlockSign{
 		mb.V,
 		mb.R,
 		mb.S,
-	}
-	return bs.SignByHash(hash[:], prv)
+	}).SignByHash(hash[:], prv)
+	return err
 }
 
 func (mb *MinerBlock) GetLinks() []common.Hash {
