@@ -522,3 +522,43 @@ func (api *PublicSdagAPI) GetReceipt(hash Hash) (interface{}, error) {
 	}
 	return Receipt, nil
 }
+
+type GetState struct {
+	Address common.Address
+	Hash    common.Hash
+}
+
+func (api *PublicSdagAPI) GetState(getState GetState) (interface{}, error) {
+	tailMainBlockInfo := api.s.blockchain.GetMainTail()
+	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
+	if err != nil {
+		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
+	}
+
+	state, err := state.New(mainInfo.Root, api.s.stateDb)
+	if err != nil {
+		return nil, err
+	}
+	hash := state.GetState(getState.Address, getState.Hash)
+	return hash, state.Error()
+}
+
+type GetCode struct {
+	Address common.Address
+	Hash    common.Hash
+}
+
+func (api *PublicSdagAPI) GetCode(getCode GetCode) (interface{}, error) {
+	tailMainBlockInfo := api.s.blockchain.GetMainTail()
+	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
+	if err != nil {
+		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
+	}
+
+	state, err := state.New(mainInfo.Root, api.s.stateDb)
+	if err != nil {
+		return nil, err
+	}
+	code := state.GetCode(getCode.Address)
+	return common.Bytes2Hex(code), state.Error()
+}
