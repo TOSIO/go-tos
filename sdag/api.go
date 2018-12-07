@@ -121,6 +121,12 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{
 	if err != nil {
 		return "", err
 	}
+	Receipt, err := storage.ReadReceiptInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
+	if err != nil {
+		return nil, fmt.Errorf("GetReceipt error:" + err.Error())
+	}
+	//获取GasUsed
+	blockInfo.GasUsed =Receipt.GasUsed
 
 	return blockInfo, nil
 
@@ -253,7 +259,7 @@ type TransactionRawParam struct {
 
 //Rlp transaction
 func (api *PublicSdagAPI) TransactionRaw(rlpData *TransactionRawParam) (interface{}, error) {
-
+	fmt.Println(rlpData)
 	hash, err := api.s.transaction.RlpTransactionSendToSDAG(rlpData.RlpData)
 	if err != nil {
 		return nil, fmt.Errorf("transaction failed" + err.Error())
@@ -262,13 +268,11 @@ func (api *PublicSdagAPI) TransactionRaw(rlpData *TransactionRawParam) (interfac
 	return struct {
 		Hash common.Hash
 	}{hash}, nil
+	return rlpData,nil
 }
 
+
 func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard RPC server function
-	//emptyC <- struct{}{}
-	//statisticsObj.Statistics()
-	//<-emptyC
-	//return "OK"
 	if accept != "ok" {
 		fmt.Printf("accept params error")
 	}

@@ -33,6 +33,7 @@ type TxBlockInfo struct {
 	Receiver         common.Address  `json:"receiver"`
 	Sender           common.Address  `json:"sender"`
 	GasPrice         *big.Int        `json:"gas_price"`
+	GasUsed         uint64         	 `json:"gasUsed"`
 	GasLimit         uint64          `json:"gas_limit"`
 }
 
@@ -74,7 +75,7 @@ func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash comm
 	return blockStatus, nil
 }
 
-func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) (interface{}, error) {
+func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) (*TxBlockInfo, error) {
 
 	//commonHash := common.HexToHash(hash)
 
@@ -110,7 +111,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		}
 	}
 
-	Data0 := TxBlockInfo{
+	Data0 := &TxBlockInfo{
 		BlockType:        Block.GetType(),
 		Status:           blockStatus,
 		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
