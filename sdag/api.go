@@ -122,11 +122,11 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{
 		return "", err
 	}
 	Receipt, err := storage.ReadReceiptInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
-	if err != nil {
-		return nil, fmt.Errorf("GetReceipt error:" + err.Error())
+	if err == nil {
+		//获取GasUsed
+		blockInfo.GasUsed =Receipt.GasUsed
 	}
-	//获取GasUsed
-	blockInfo.GasUsed =Receipt.GasUsed
+
 
 	return blockInfo, nil
 
