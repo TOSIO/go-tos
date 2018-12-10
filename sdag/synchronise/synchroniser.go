@@ -104,8 +104,8 @@ func NewSynchroinser(ps core.PeerSet, mc mainchain.MainChainI, bs BlockStorageI,
 	syncer.blocksCh = make(chan core.Response)
 	syncer.blockReqCh = make(chan struct{})
 
-	syncer.blockresCh = make(chan core.Response, 10000)
-	syncer.blockresAckCh = make(chan core.Response, 10000)
+	syncer.blockresCh = make(chan core.Response, 15000)
+	syncer.blockresAckCh = make(chan core.Response, 15000)
 	syncer.locatorBlockresCh = make(chan core.Response, 10000)
 
 	syncer.syncreqCh = make(chan core.Request)
@@ -162,7 +162,6 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 	}
 	if lastTempMBTimeslice < s.lastSYStimeslice {
 		log.Debug("Synchroniser is not completed")
-
 		return
 	}
 
@@ -401,7 +400,6 @@ loop:
 				} else {
 					//lastAck = lastTSIndex.Timeslice
 					log.Debug("Post progress", "nodeID", packet.NodeID(), "timeslice", lastTSIndex.Timeslice, "index", lastTSIndex.Index)
-
 					lastAck = lastTSIndex
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
