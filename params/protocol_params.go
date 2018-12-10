@@ -3,17 +3,11 @@ package params
 import "math/big"
 
 const (
-<<<<<<< Updated upstream
-	TimePeriod   = 10000 // 60000 毫秒
-	MaxLinksNum  = 3     //最大链接次数
-	MaxTransNum  = 3     //单个区块所包含的交易数量
-	ConfirmBlock = 1     //最大确定个数
-=======
 	TimePeriod   = 10000 // 60000 ms
 	MaxLinksNum  = 3     // the max counts of link
 	MaxTransNum  = 3     // the transaction counts of single block
 	ConfirmBlock = 8     // the max confirmed number
->>>>>>> Stashed changes
+
 )
 
 const (
