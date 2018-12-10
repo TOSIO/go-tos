@@ -85,7 +85,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	if err != nil {
 		log.Error("Read Txblock Info fail")
 		//return "Query failure"
-		return "", err
+		return nil, err
 	}
 
 	Block := storage.ReadBlock(h, hash)
@@ -93,12 +93,12 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	BlockSend, err := Block.GetSender()
 	if err != nil {
 		log.Error("Query failure")
-		return "", err
+		return nil, err
 	}
 
 	blockStatus, err := q.GetUserBlockStatus(h, hash)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var tempReceiver = common.Address{}
 	var tempAmount = big.NewInt(0)
