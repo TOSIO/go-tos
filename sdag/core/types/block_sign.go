@@ -54,9 +54,9 @@ type BlockSign struct {
 
 func (bs *BlockSign) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 	if len(sig) != 65 {
-		panic(fmt.Sprintf("wrong size for signature: got %d, want 65", len(sig)))
+		return r, s, v, fmt.Errorf("wrong size for signature: got %d, want 65", len(sig))
 	}
-	fmt.Println("sing: ", sig)
+
 	r = new(big.Int).SetBytes(sig[:32])
 	s = new(big.Int).SetBytes(sig[32:64])
 	v = new(big.Int).SetBytes([]byte{sig[64] + 27})
@@ -67,7 +67,7 @@ func (bs *BlockSign) SignatureValues(sig []byte) (r, s, v *big.Int, err error) {
 func (bs *BlockSign) SignByHash(hash []byte, prv *ecdsa.PrivateKey) (r, s, v *big.Int, err error) {
 	sig, err := crypto.Sign(hash, prv)
 	if err != nil {
-		return nil,nil,nil, err
+		return nil, nil, nil, err
 	}
 	return bs.SignatureValues(sig)
 }
