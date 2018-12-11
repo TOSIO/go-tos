@@ -161,6 +161,7 @@ func (s *Synchroniser) schedule(tasks map[string]*core.NewSYNCTask, idle *bool) 
 		return
 	}
 	if lastTempMBTimeslice < s.lastSYStimeslice {
+		log.Debug("timeslice", "lastTempMBTimeslice:", lastTempMBTimeslice, "lastSYStimeslice:", s.lastSYStimeslice)
 		log.Debug("Synchroniser is not completed")
 		return
 	}
@@ -404,6 +405,7 @@ loop:
 					stat.CurTS = lastAck.Timeslice
 					stat.Index = lastAck.Index
 					s.lastSYStimeslice = lastTSIndex.Timeslice
+					log.Debug("lastSYStimeslice", "lastSYStimeslice:", s.lastSYStimeslice)
 					stat.Err = nil
 					stat.Progress = core.SYNC_SYNCING
 					s.syncEvent.Post(stat)
