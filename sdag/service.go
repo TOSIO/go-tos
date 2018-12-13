@@ -117,7 +117,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		accountManager:  ctx.AccountManager,
 		tosbase:         config.Tosbase,
 		blockPool:       pool,
-		transaction:     transaction.New(pool),
+		transaction:     transaction.New(pool, chain, chainDB, stateDB),
 		blockPoolEvent:  event,
 		sct:             ctx,
 	}

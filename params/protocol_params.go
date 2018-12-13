@@ -3,12 +3,14 @@ package params
 import "math/big"
 
 const (
-	TimePeriod   = 10000 // 60000 ms
-	MaxLinksNum  = 3     // the max counts of link
-	MaxTransNum  = 3     // the transaction counts of single block
-	ConfirmBlock = 8     // the max confirmed number
-
+	TimePeriod      = 1000 // 60000 ms
+	MaxLinksNum     = 3    // the max counts of link
+	MaxTransNum     = 3    // the transaction counts of single block
+	ConfirmBlock    = 8    // the max confirmed number
+	PayloadLenLimit = 1024 * 1024 * 1
 )
+
+var GasPriceMin = big.NewInt(1)
 
 const (
 	OneTos                     = 1e18 //1 tos = 1e18 tls

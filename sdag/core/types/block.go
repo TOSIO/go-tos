@@ -91,7 +91,6 @@ type Block interface {
 	SetMaxLink(MaxLink common.Hash) // Set the max link
 }
 
-
 type BlockHeader struct {
 	Type     BlockType // 1 tx, 2 miner
 	Time     uint64    // ms  timestamp
@@ -101,11 +100,12 @@ type BlockHeader struct {
 
 type MutableInfo struct {
 	Status           BlockStatus // status
-	ConfirmItsNumber uint64      // confirm its time slice
+	ConfirmItsNumber uint64      // confirm its main number
 	Difficulty       *big.Int    // self difficulty
 	CumulativeDiff   *big.Int    // cumulative difficulty
 	//MaxLink             uint8
-	MaxLinkHash common.Hash
+	MaxLinkHash     common.Hash
+	ConfirmItsIndex uint64
 }
 
 // BlockDecode, rlpData to block

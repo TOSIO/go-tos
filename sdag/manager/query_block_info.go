@@ -33,7 +33,7 @@ type TxBlockInfo struct {
 	Receiver         common.Address  `json:"receiver"`
 	Sender           common.Address  `json:"sender"`
 	GasPrice         *big.Int        `json:"gas_price"`
-	GasUsed         uint64         	 `json:"gasUsed"`
+	GasUsed          uint64          `json:"gasUsed"`
 	GasLimit         uint64          `json:"gas_limit"`
 }
 

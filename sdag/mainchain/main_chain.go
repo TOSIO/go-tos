@@ -17,18 +17,58 @@ import (
 	"time"
 )
 
+type LocalBlockNotice struct {
+	Hash    common.Hash
+	Address common.Address
+	Action  int
+}
+
+const (
+	noneAction = iota //0
+	ConfirmAction
+	RollBackAction
+)
+
 type MainChain struct {
-	db               tosdb.Database
-	stateDb          state.Database
-	Genesis          *core.Genesis
-	Tail             types.TailMainBlockInfo
-	PervTail         types.TailMainBlockInfo
-	MainTail         types.TailMainBlockInfo
-	tailRWLock       sync.RWMutex
-	mainTailRWLock   sync.RWMutex
-	ChainConfig      *params.ChainConfig
-	VMConfig         vm.Config
-	CurrentMainBlock types.Block
+	db                 tosdb.Database
+	stateDb            state.Database
+	Genesis            *core.Genesis
+	Tail               types.TailMainBlockInfo
+	PervTail           types.TailMainBlockInfo
+	MainTail           types.TailMainBlockInfo
+	tailRWLock         sync.RWMutex
+	mainTailRWLock     sync.RWMutex
+	ChainConfig        *params.ChainConfig
+	VMConfig           vm.Config
+	CurrentMainBlock   types.Block
+	LocalBlockNotice   chan LocalBlockNotice
+	LocalAddress       map[common.Address]bool
+	LocalAddressRWLock sync.RWMutex
+}
+
+func (mainChain *MainChain) AddLocalAddress(address common.Address) {
+	mainChain.LocalAddressRWLock.RLock()
+	if !mainChain.LocalAddress[address] {
+		mainChain.LocalAddressRWLock.RUnlock()
+		mainChain.LocalAddressRWLock.Lock()
+		mainChain.LocalAddress[address] = true
+		mainChain.LocalAddressRWLock.Unlock()
+	} else {
+		mainChain.LocalAddressRWLock.RUnlock()
+	}
+}
+
+func (mainChain *MainChain) LocalBlockNoticeSend(hash common.Hash, address common.Address, action int) {
+	mainChain.LocalAddressRWLock.RLock()
+	if mainChain.LocalAddress[address] {
+		mainChain.LocalAddressRWLock.RUnlock()
+		mainChain.LocalBlockNotice <- LocalBlockNotice{hash, address, action}
+	} else {
+		mainChain.LocalAddressRWLock.RUnlock()
+	}
+}
+func (mainChain *MainChain) LocalBlockNoticeChan() chan LocalBlockNotice {
+	return mainChain.LocalBlockNotice
 }
 
 func (mainChain *MainChain) initTail() error {
@@ -94,6 +134,8 @@ func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config) (*M
 	mainChain.db = chainDb
 	mainChain.stateDb = stateDb
 	mainChain.VMConfig = VMConfig
+	mainChain.LocalBlockNotice = make(chan LocalBlockNotice)
+	mainChain.LocalAddress = make(map[common.Address]bool)
 
 	err := mainChain.initTail()
 	if err != nil {
@@ -483,9 +525,13 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash, number uint64) erro
 	}
 
 	mutableInfo.Status &= ^(types.BlockMain | types.BlockConfirm | types.BlockApply)
+	mutableInfo.ConfirmItsNumber = 0
+	mutableInfo.ConfirmItsIndex = 0
 	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo); err != nil {
 		return fmt.Errorf("RollBackStatus err:" + err.Error())
 	}
+	from, _ := block.GetSender()
+	mainChain.LocalBlockNoticeSend(block.GetHash(), from, RollBackAction)
 	return nil
 }
 
@@ -511,7 +557,10 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block, number uint6
 	mutableInfo := block.GetMutableInfo()
 	mutableInfo.Status &= ^(types.BlockConfirm | types.BlockApply)
 	mutableInfo.ConfirmItsNumber = 0
+	mutableInfo.ConfirmItsIndex = 0
 	storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), mutableInfo)
+	from, _ := block.GetSender()
+	mainChain.LocalBlockNoticeSend(block.GetHash(), from, RollBackAction)
 	return nil
 }
 
@@ -546,17 +595,23 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 	}
 	log.Debug("singleBlockConfirm self", "hash", block.GetHash().String(),
 		"block", block, "confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String())
+	*count++
 	block.GetMutableInfo().ConfirmItsNumber = number
 	block.GetMutableInfo().Status |= types.BlockConfirm
+	block.GetMutableInfo().ConfirmItsIndex = *count
 
 	var err error
 	confirmRewardInfo.userReward, err = mainChain.CalculatingAccounts(block, confirmRewardInfo.userReward, count, state)
 	if err == nil {
 		block.GetMutableInfo().Status |= types.BlockApply
 	}
+
 	if err = storage.WriteBlockMutableInfo(mainChain.db, block.GetHash(), block.GetMutableInfo()); err != nil {
 		log.Error(err.Error())
 	}
+
+	from, _ := block.GetSender()
+	mainChain.LocalBlockNoticeSend(block.GetHash(), from, ConfirmAction)
 
 	return ComputeConfirmReward(&confirmRewardInfo), err
 }

@@ -57,10 +57,9 @@ func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint
 	var returnErr error
 	var receiptStatus uint64
 	if err != nil {
-		fmt.Errorf("ExecutionTransaction error:" + err.Error())
+		err = fmt.Errorf("ExecutionTransaction error:" + err.Error())
 		returnErr = err
 	} else if IsGasCostOverrun {
-		fmt.Errorf("gas use overrun")
 		returnErr = fmt.Errorf("gas use overrun")
 		useGas = gasPool
 	}
@@ -76,7 +75,6 @@ func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint
 		receiptStatus = types.ReceiptStatusFailed
 	}
 
-	*count++
 	if receipt == nil {
 		receipt = &types.Receipt{
 			TxHash:  block.GetHash(),

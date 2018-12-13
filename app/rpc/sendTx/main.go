@@ -20,7 +20,8 @@ import (
 
 var (
 	//8545
-	urlString        = "http://47.74.255.165:9545"
+	urlString1       = "http://47.74.255.165:9545"
+	urlString2       = "http://10.10.10.37:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -28,6 +29,7 @@ var (
 "params":[{"From":{"Address" :"%s","PrivateKey"  :"%s"},"GasPrice":"100","GasLimit":1000000000,"To":"%s","Amount":"%s"}],
 "id":1
 }`
+	urlString               = urlString2
 	passphrase              = "12345"
 	maxRate                 = 10000
 	totalCount     *big.Int = big.NewInt(0)
@@ -68,7 +70,7 @@ func main() {
 		files []os.FileInfo
 		err   error
 	)
-	filePath := filepath.Join(node.DefaultDataDir(), "keystore")
+	filePath := filepath.Join(node.DefaultDataDir(), "tos", "keystore")
 	files, err = ioutil.ReadDir(filePath)
 
 	if err != nil {

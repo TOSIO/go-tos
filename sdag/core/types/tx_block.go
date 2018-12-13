@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"github.com/TOSIO/go-tos/devbase/log"
 	"math/big"
 
 	"github.com/TOSIO/go-tos/params"
@@ -58,7 +59,7 @@ func (tx *TxBlock) data(withSig bool) (x interface{}) {
 func (tx *TxBlock) GetRlp() []byte {
 	enc, err := rlp.EncodeToBytes(tx.data(true))
 	if err != nil {
-		fmt.Println("err: ", err)
+		log.Error("GetRlp" + err.Error())
 	}
 	return enc
 }
@@ -151,9 +152,13 @@ func (tx *TxBlock) UnRlp(txRLP []byte) (*TxBlock, error) {
 
 //Validation RlpEncoded TxBlock
 func (tx *TxBlock) Validation() error {
+	if tx.Header.GasPrice.Cmp(params.GasPriceMin) < 0 || tx.Header.GasLimit <= 0 {
+		return fmt.Errorf("GasPrice is less than the minimum")
+	}
+
 	if tx.Header.Time < GenesisTime {
 		return fmt.Errorf("block time no greater than Genesis time")
-	} else if tx.Header.Time > utils.GetTimeStamp()+params.TimePeriod {
+	} else if tx.Header.Time > utils.GetTimeStamp()+params.TimePeriod/4 {
 		return fmt.Errorf("block time no less than current time")
 	}
 
@@ -173,6 +178,9 @@ func (tx *TxBlock) Validation() error {
 
 	var isContract bool
 	if len(tx.Payload) > 0 {
+		if len(tx.Payload) > params.PayloadLenLimit {
+			return fmt.Errorf("payload is too long len(tx.Payload)=%d", len(tx.Payload))
+		}
 		isContract = true
 		if len(tx.Outs) > 1 {
 			return fmt.Errorf("contract transaction len(tx.Outs) > 1")
@@ -192,8 +200,13 @@ func (tx *TxBlock) Validation() error {
 		if out.Receiver == from {
 			return fmt.Errorf("the receiver is self")
 		}
-		if (!isContract) && out.Amount.Sign() < 0 {
-			return fmt.Errorf("the amount must be positive")
+		if !isContract {
+			if out.Amount.Sign() <= 0 {
+				return fmt.Errorf("the amount must be positive")
+			}
+			if tx.Outs[0].Receiver == (common.Address{}) {
+				return fmt.Errorf("receiver cannot be empty")
+			}
 		}
 	}
 

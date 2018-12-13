@@ -16,4 +16,8 @@ type MainChainI interface {
 	UpdateTail(block types.Block)
 	GetGenesisHash() (common.Hash, error)
 	GetNextMain(hash common.Hash) (common.Hash, *types.MutableInfo, error)
+
+	AddLocalAddress(address common.Address)
+	LocalBlockNoticeSend(hash common.Hash, address common.Address, action int)
+	LocalBlockNoticeChan() chan LocalBlockNotice
 }

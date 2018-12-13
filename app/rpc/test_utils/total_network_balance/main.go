@@ -26,7 +26,7 @@ var (
 "params":[{"WalletAddr" :"%s"}],
 "id":1
 }`
-	urlString = urlString6
+	urlString = urlString1
 )
 
 type KeyInfo struct {
@@ -42,7 +42,7 @@ func main() {
 		files []os.FileInfo
 		err   error
 	)
-	filePath := filepath.Join(node.DefaultDataDir(), "keystore")
+	filePath := filepath.Join(node.DefaultDataDir(), "tos", "keystore")
 	files, err = ioutil.ReadDir(filePath)
 	if err != nil {
 		fmt.Println("ReadDir error:", err)

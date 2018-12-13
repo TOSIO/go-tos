@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core/types"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -124,9 +125,8 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{
 	Receipt, err := storage.ReadReceiptInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
 	if err == nil {
 		//获取GasUsed
-		blockInfo.GasUsed =Receipt.GasUsed
+		blockInfo.GasUsed = Receipt.GasUsed
 	}
-
 
 	return blockInfo, nil
 
@@ -217,7 +217,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 		txRequestInfo.GasLimit = params.DefaultGasLimit
 	}
 
-	txRequestInfo.Receiver = append(txRequestInfo.Receiver, transaction.ReceiverInfo{to, Amount})
+	txRequestInfo.Outs = append(txRequestInfo.Outs, types.TxOut{to, Amount})
 
 	txRequestInfo.Payload = transactionInfo.Payload
 
@@ -243,9 +243,9 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 		return nil, fmt.Errorf("private key does not match address")
 	}
 
-	hash, err := api.s.transaction.TransactionSendToSDAG(&txRequestInfo)
+	hash, err := api.s.transaction.BlockTransactionSendToSDAG(&txRequestInfo)
 	if err != nil {
-		return nil, fmt.Errorf("transaction failed" + err.Error())
+		return nil, fmt.Errorf("transaction failed:" + err.Error())
 	}
 
 	return struct {
@@ -259,18 +259,17 @@ type TransactionRawParam struct {
 
 //Rlp transaction
 func (api *PublicSdagAPI) TransactionRaw(rlpData *TransactionRawParam) (interface{}, error) {
-	fmt.Println(rlpData)
+	log.Debug("receive rlp:", rlpData)
 	hash, err := api.s.transaction.RlpTransactionSendToSDAG(rlpData.RlpData)
 	if err != nil {
-		return nil, fmt.Errorf("transaction failed" + err.Error())
+		return nil, fmt.Errorf("transaction failed:" + err.Error())
 	}
 
 	return struct {
 		Hash common.Hash
 	}{hash}, nil
-	return rlpData,nil
+	return rlpData, nil
 }
-
 
 func (api *PublicSdagAPI) GetActiveNodeList(accept string) string { //dashboard RPC server function
 	if accept != "ok" {
