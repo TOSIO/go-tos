@@ -156,7 +156,7 @@ func (api *PublicSdagAPI) GetFinalMainBlockInfo() (interface{}, error) {
 type TransactionParameter struct {
 	Links    []common.Hash `json:"links"`
 	Nonce    uint64
-	Gasprice uint64 `json:"gasprice"`
+	Gasprice string `json:"gasprice"`
 	GasLimit uint64 `json:"gaslimit"`
 }
 
@@ -170,7 +170,7 @@ func (api *PublicSdagAPI) GetBaseData() interface{} {
 	param := TransactionParameter{
 		Links:    paramtr.Links,
 		Nonce:    paramtr.Nonce,
-		Gasprice: params.DefaultGasPrice,
+		Gasprice: params.DefaultGasPrice.String(),
 		GasLimit: params.DefaultGasLimit,
 	}
 	return param
@@ -202,7 +202,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 		return nil, fmt.Errorf("the amount must be positive")
 	}
 	if len(transactionInfo.GasPrice) == 0 {
-		txRequestInfo.GasPrice = big.NewInt(params.DefaultGasPrice)
+		txRequestInfo.GasPrice = params.DefaultGasPrice
 	} else {
 		txRequestInfo.GasPrice, ok = new(big.Int).SetString(transactionInfo.GasPrice, 10)
 		if !ok {

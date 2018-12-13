@@ -10,18 +10,17 @@ const (
 	PayloadLenLimit = 1024 * 1024 * 1
 )
 
-var GasPriceMin = big.NewInt(1)
+var GasPriceMin = big.NewInt(1000000000)
+var DefaultGasPrice = big.NewInt(1000000000)
 
 const (
-	OneTos                     = 1e18 //1 tos = 1e18 tls
-	DefaultGasPrice            = 100000000
-	DefaultGasLimit            = 1 << 32
-	TransferTransactionGasUsed = 21000                       // 21000 tls
-	MiningGasUsed              = 21000                       // 21000 tls
-	InitialRewardMiner         = 50 * 1e18                   //50 tos
-	HalfLifeRewardMiner        = 2000000                     //Half down every 2,000,000 main blocks
-	ConfirmUserRewardRate      = 20                          //Need to divide by 100
-	ConfirmMinerRewardRate     = 100 - ConfirmUserRewardRate //Need to divide by 100
+	OneTos                 = 1e18 //1 tos = 1e18 tls
+	DefaultGasLimit        = 1 << 32
+	MiningGasUsed          = 21000                       // 21000 tls
+	InitialRewardMiner     = 50 * 1e18                   //50 tos
+	HalfLifeRewardMiner    = 2000000                     //Half down every 2,000,000 main blocks
+	ConfirmUserRewardRate  = 20                          //Need to divide by 100
+	ConfirmMinerRewardRate = 100 - ConfirmUserRewardRate //Need to divide by 100
 
 	// vm
 	//MaximumExtraDataSize  uint64 = 32    // Maximum size extra data may be after Genesis.

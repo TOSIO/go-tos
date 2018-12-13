@@ -106,7 +106,7 @@ func (mainChain *MainChain) TransferAccounts(block types.Block, gasPool uint64, 
 	}
 
 	if block.GetType() == types.BlockTypeTx {
-		costGas = params.TransferTransactionGasUsed
+		costGas = params.TxGas
 		txBlock, ok := block.(*types.TxBlock)
 		if ok {
 			costGas *= uint64(len(txBlock.Outs))
