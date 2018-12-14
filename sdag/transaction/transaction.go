@@ -229,6 +229,7 @@ func (transaction *Transaction) transactionCheck(address common.Address, amount 
 	if err != nil {
 		return false, fmt.Errorf("GetBalance error:" + err.Error())
 	}
+	log.Debug("balance", "balance", balance.String(), "address", address.String(), "amount", amount.String())
 
 	if balance.Cmp(amount) < 0 {
 		return false, nil
@@ -241,9 +242,11 @@ func (transaction *Transaction) transactionCheck(address common.Address, amount 
 		}
 	}
 	transaction.addressTransactionLock.RUnlock()
-	if balance.Sub(balance, historyAmountTotal).Cmp(historyAmountTotal) < 0 {
+	if new(big.Int).Sub(balance, historyAmountTotal).Cmp(historyAmountTotal) < 0 {
 		return false, nil
 	}
+	log.Debug("balance", "balance", balance.String(), "address", address.String(), "amount", amount.String(), "historyAmountTotal", historyAmountTotal.String())
+
 	return true, nil
 }
 
