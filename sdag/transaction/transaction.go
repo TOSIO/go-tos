@@ -242,10 +242,11 @@ func (transaction *Transaction) transactionCheck(address common.Address, amount 
 		}
 	}
 	transaction.addressTransactionLock.RUnlock()
-	if new(big.Int).Sub(balance, historyAmountTotal).Cmp(historyAmountTotal) < 0 {
+	log.Debug("balance", "balance", balance.String(), "address", address.String(), "amount", amount.String(), "historyAmountTotal", historyAmountTotal.String())
+	if new(big.Int).Sub(balance, historyAmountTotal).Cmp(amount) < 0 {
+		log.Debug("insufficient balance")
 		return false, nil
 	}
-	log.Debug("balance", "balance", balance.String(), "address", address.String(), "amount", amount.String(), "historyAmountTotal", historyAmountTotal.String())
 
 	return true, nil
 }
