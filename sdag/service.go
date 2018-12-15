@@ -28,6 +28,7 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
+	"github.com/TOSIO/go-tos/services/messagequeue"
 )
 
 // Sdag implements the node service.
@@ -72,11 +73,11 @@ type Sdag struct {
 	lock sync.RWMutex
 	sct  *node.ServiceContext
 
+	mq *messagequeue.MessageQueue
+
 	// Protects the variadic fields (e.g. gas price and etherbase)
 }
 
-// New creates a new Ethereum object (including the
-// initialisation of the common Ethereum object)
 func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	chainDB, err := CreateDB(ctx, config, "levelDB/sdagData/chain")
 	if err != nil {
@@ -120,6 +121,15 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		transaction:     transaction.New(pool, chain, chainDB, stateDB),
 		blockPoolEvent:  event,
 		sct:             ctx,
+	}
+
+	if config.MessageQueue {
+		mq, err := messagequeue.CreateMQ()
+		if err != nil {
+			log.Error(err.Error())
+		} else {
+			sdag.mq = mq
+		}
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", protocol.ProtocolVersions, "network", config.NetworkId)

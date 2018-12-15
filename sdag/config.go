@@ -13,10 +13,12 @@ type Config struct {
 	Tosbase         common.Address `toml:",omitempty"`
 	Mining          bool
 	VMConfig        vm.Config
+	MessageQueue 	bool
 }
 
 var DefaultConfig = Config{
 	NetworkId:     1,
 	DatabaseCache: 768,
 	Mining:        false,
+	MessageQueue:  false,
 }
