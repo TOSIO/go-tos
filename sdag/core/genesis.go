@@ -115,7 +115,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	info.Difficulty = genesisBlock.GetDiff()
 	info.CumulativeDiff = genesisBlock.GetDiff()
 	info.ConfirmItsNumber = 0
-	info.Status = types.BlockMain | types.BlockTmpMaxDiff | types.BlockApply
+	info.Status = types.BlockMain | types.BlockTmpMaxDiff | types.BlockConfirm | types.BlockApply
 	genesisBlock.SetMutableInfo(info)
 
 	storage.WriteBlock(genesis.db, genesisBlock)
@@ -123,6 +123,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 	var mainBlock types.MainBlockInfo
 	mainBlock.Hash = genesisBlock.GetHash()
 	mainBlock.Root = root
+	mainBlock.ConfirmCount = 1
 
 	err = storage.WriteMainBlock(genesis.db, &mainBlock, 0)
 	if err != nil {
