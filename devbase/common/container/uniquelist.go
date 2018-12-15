@@ -32,6 +32,10 @@ func NewUniqueList(size int) *UniqueList {
 		container: make(map[Elem]*Value)}
 }
 
+func (lm *UniqueList) ContainLen(e Elem) int {
+	return len(lm.container)
+}
+
 func (lm *UniqueList) IsExist(e Elem) bool {
 	_, ok := lm.container[e]
 	return ok

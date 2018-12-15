@@ -292,7 +292,6 @@ func (singleChainLinkInfo *SingleChainLinkInfo) set(isUpdateDiff bool, maxLinkHa
 }
 
 func (mainChain *MainChain) ComputeCumulativeDiff(toBeAddedBlock types.Block) (bool, error) {
-
 	var (
 		chainLinkInfo SingleChainLinkInfo
 	)

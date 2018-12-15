@@ -204,6 +204,10 @@ func (mb *MinerBlock) GetGasLimit() uint64 {
 	return mb.Header.GasLimit
 }
 
+func (mb *MinerBlock) GetPayload() []byte {
+	return []byte{}
+}
+
 // EncodeNonce converts the given integer to a block nonce.
 func EncodeNonce(i uint64) BlockNonce {
 	var n BlockNonce

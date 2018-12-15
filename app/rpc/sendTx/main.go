@@ -26,7 +26,7 @@ var (
 {
 "jsonrpc":"2.0",
 "method":"sdag_transaction",
-"params":[{"From":{"Address" :"%s","PrivateKey"  :"%s"},"GasPrice":"100","GasLimit":1000000000,"To":"%s","Amount":"%s"}],
+"params":[{"From":{"Address" :"%s","PrivateKey"  :"%s"},"GasPrice":"1000000000","GasLimit":4294967296,"To":"%s","Amount":"%s"}],
 "id":1
 }`
 	urlString               = urlString2

@@ -135,3 +135,7 @@ func (gb *GenesisBlock) GetGasLimit() uint64 {
 func (self *GenesisBlock) AsMessage() (Message, error) {
 	return Message{}, nil
 }
+
+func (self *GenesisBlock) GetPayload() []byte {
+	return []byte{}
+}

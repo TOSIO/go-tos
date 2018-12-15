@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/TOSIO/go-tos/app/rpc/httpSend"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"sort"
 )
 
 var (
@@ -28,7 +29,7 @@ var (
 	addr3 = `http://10.10.10.34:8545`
 	addr4 = `http://10.10.10.32:8545`
 	addr5 = `http://10.10.10.42:8551`
-	addr  = addr1
+	addr  = addr2
 )
 
 type ResultTail struct {
@@ -106,7 +107,12 @@ func main() {
 	}
 	statisticsBlock(addr, resultTail.Result.Hash)
 	fmt.Printf("block number:%d\n", len(blockSet))
-	for k, v := range statisticsResult {
-		fmt.Printf("%d:%d\n", k, *v)
+	var keys []int
+	for k := range statisticsResult {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for index, k := range keys {
+		fmt.Printf("%d:%d:%d\n", index, k, *statisticsResult[uint64(k)])
 	}
 }

@@ -89,6 +89,8 @@ type Block interface {
 
 	GetMaxLink() common.Hash        // Get the max link
 	SetMaxLink(MaxLink common.Hash) // Set the max link
+
+	GetPayload() []byte //Get the Payload
 }
 
 type BlockHeader struct {

@@ -23,6 +23,7 @@ type TxBlockInfo struct {
 	BlockType        types.BlockType `json:"block_type"`
 	Status           string          `json:"status"`
 	ConfirmItsNumber uint64          `json:"confirm_its_number"`
+	ConfirmIndex     uint64          `json:"confirm_Index"`
 	Difficulty       *big.Int        `json:"difficulty"`
 	CumulativeDiff   *big.Int        `json:"cumulative_diff"`
 	MaxLinkHash      common.Hash     `json:"max_link_hash"`
@@ -115,6 +116,7 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		BlockType:        Block.GetType(),
 		Status:           blockStatus,
 		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+		ConfirmIndex:     mutableInfo.ConfirmItsIndex,
 		Difficulty:       mutableInfo.Difficulty,
 		CumulativeDiff:   mutableInfo.CumulativeDiff,
 		MaxLinkHash:      mutableInfo.MaxLinkHash,
@@ -177,6 +179,7 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 			TxBlockInfo{
 				Status:           blockStatus,
 				ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
+				ConfirmIndex:     mutableInfo.ConfirmItsIndex,
 				Difficulty:       mutableInfo.Difficulty,
 				CumulativeDiff:   mutableInfo.CumulativeDiff,
 				MaxLinkHash:      mutableInfo.MaxLinkHash,

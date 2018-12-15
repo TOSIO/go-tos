@@ -74,11 +74,9 @@ type BlockPool struct {
 	newBlockAddChan   chan types.Block
 	unverifiedAddChan chan common.Hash
 	unverifiedDelChan chan common.Hash
-	//unverifiedGetChan: make(chan unverifiedReq),
-	unverifiedBlocks *container.UniqueList
-	listLock         sync.RWMutex
+	unverifiedBlocks  *container.UniqueList
+	listLock          sync.RWMutex
 
-	//UnverifiedBlockList *list.List
 	statisticsAddBlock            statistics.Statistics
 	statisticsDeleteIsolatedBlock statistics.Statistics
 
@@ -105,8 +103,6 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 		syncStatusSub:     make(chan int),
 
 		blockEvent: blockEvent,
-		//newBlocksEvent: make(chan core.NewBlocksEvent, 8),
-		//unverifiedGetChan: make(chan unverifiedReq),
 	}
 	pool.newAnnounceSub = pool.blockEvent.Subscribe(&core.AnnounceEvent{})
 	pool.localNewBlocksSub = pool.blockEvent.Subscribe(&core.LocalNewBlocksEvent{})
@@ -262,11 +258,8 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 }
 
 func (p *BlockPool) loop() {
-	//UnverifiedBlockList = list.New()
-	//UnverifiedBlockList.PushFront(genesis)
 	p.unverifiedBlocks.Push(p.mainChainI.GetTail().Hash)
 	go func() {
-		//defer p.syncSub.Unsubscribe()
 		for {
 			select {
 			case ch := <-p.newAnnounceSub.Chan():
@@ -279,21 +272,11 @@ func (p *BlockPool) loop() {
 						log.Debug("Post fetch block event", "hash", ev.Hash)
 					}
 				}
-			//case ch := <-p.newBlocksSub.Chan():
-			//	if ev, ok := ch.Data.(*core.NewBlocksEvent); ok {
-			//		go func(event *core.NewBlocksEvent) {
-			//			for _, block := range event.Blocks {
-			//				p.AddBlock(block)
-			//			}
-			//		}(ev)
-			//	}
 			case ch := <-p.queryUnverifySub.Chan():
 				if ev, ok := ch.Data.(*core.GetUnverifyBlocksEvent); ok {
 					ev.Hashes = p.SelectUnverifiedBlock(4)
 					ev.Done <- struct{}{}
 				}
-			//case block := <-p.blockChan:
-			//	go p.AddBlock(block)
 			case hash := <-p.unverifiedAddChan:
 				p.listLock.Lock()
 				p.unverifiedBlocks.Push(hash)
@@ -303,18 +286,6 @@ func (p *BlockPool) loop() {
 				p.listLock.Lock()
 				p.unverifiedBlocks.Remove(hash)
 				p.listLock.Unlock()
-				/* 	case req := <-p.unverifiedGetChan:
-				i := 0
-				for itr, _ := p.unverifiedBlocks.Front(); itr != nil && i < params.MaxLinksNum; itr = itr.Next() {
-					if hash, ok := itr.Data().(common.Hash); ok {
-						*req.links = append(*req.links, hash)
-						//req.callback(hash, req.links)
-						i++
-					} else {
-						log.Error("error hash.(common.Hash): ", hash)
-					}
-					req.done <- struct{}{}
-				} */
 			}
 		}
 	}()
@@ -323,24 +294,6 @@ func (p *BlockPool) loop() {
 	p.BlockProcessing()
 }
 
-/* func SetDB(chainDb tosdb.Database) {
-	db = chainDb
-}
-
-
-
-func SetProtocolManager(protocolManager protocolManagerI) {
-	pm = protocolManager
-}
-
-func SetMainChain(mainChain mainchain.MainChainI) {
-	mainChainI = mainChain
-}
-*/
-/*
-func SetMemPool(mp *MemPool) {
-	//mempool = mp
-} */
 func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) bool {
 	defer p.rwlock.Unlock()
 	p.rwlock.Lock()
@@ -348,7 +301,7 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 	log.Debug("begin addIsolatedBlock", "hash", block.GetHash().String())
 	isolated := block.GetHash()
 	if _, ok := p.IsolatedBlockMap[isolated]; ok {
-		//log.Warn("the Isolated block already exists")
+		log.Debug("the Isolated block already exists")
 		return false
 	}
 
@@ -364,7 +317,6 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 		v, ok := p.IsolatedBlockMap[link] //if the ancestor of the block has already existed in orphan graph
 		if ok {
 			v.LinkIt = append(v.LinkIt, isolated) //update the ancestor's desendant list who is directly reference it
-			//p.IsolatedBlockMap[link] = v
 		} else { //marker the parent
 			v, ok := p.lackBlockMap[link]
 			if ok {
@@ -372,7 +324,6 @@ func (p *BlockPool) addIsolatedBlock(block types.Block, links []common.Hash) boo
 				if v.MinTime > block.GetTime() {
 					v.MinTime = block.GetTime()
 				}
-				//p.lackBlockMap[link] = v
 			} else {
 				p.lackBlockMap[link] = &lackBlock{[]common.Hash{isolated}, time.Now().Unix(), block.GetTime()}
 			}
@@ -473,11 +424,7 @@ func (p *BlockPool) EnQueue(block types.Block) error {
 }
 
 func (p *BlockPool) SyncAddBlock(block types.Block) error {
-	//emptyC <- struct{}{}
-	//err := AddBlock(block)
-	//<-emptyC
 	p.blockChan <- block
-	//time.Sleep(1)
 	return nil
 }
 
@@ -501,16 +448,12 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool, isSync bool) error
 		log.Debug("the block has been added", "hash", block.GetHash().String())
 		p.deleteIsolatedBlock(block)
 		return fmt.Errorf("the block has been added")
-	} else {
-		//log.Trace("Non-repeating block")
 	}
 
 	isIsolated, err := p.linkCheckAndSave(block, isRelay, isSync)
 	if err != nil {
 		log.Error("linkCheckAndSave error" + err.Error())
 	}
-	//deleteIsolatedBlock(block)
-	//go pm.RelayBlock(block.GetRlp())
 
 	log.Debug("addBlock finish", "hash", block.GetHash().String())
 
@@ -520,7 +463,6 @@ func (p *BlockPool) AddBlock(block types.Block, isRelay bool, isSync bool) error
 
 func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool, isSync bool) (bool, error) {
 	var isIsolated bool
-	//var linkBlockIs []types.Block
 	var linksLackBlock []common.Hash
 
 	for _, hash := range block.GetLinks() {
@@ -544,7 +486,6 @@ func (p *BlockPool) linkCheckAndSave(block types.Block, isRelay bool, isSync boo
 		log.Info("is a Isolated block", "hash", block.GetHash().String())
 		p.addIsolatedBlock(block, linksLackBlock)
 	} else {
-		//log.Trace("Verification passed")
 		p.deleteUnverifiedBlocks(block.GetLinks())
 		log.Debug("deleteUnverifiedBlocks finish", "hash", block.GetHash().String())
 		p.addBlockLock.Lock()
@@ -577,13 +518,9 @@ func (p *BlockPool) saveBlock(block types.Block) {
 	log.Debug("Save block", "hash", block.GetHash().String())
 	storage.WriteBlock(p.db, block)
 	p.addUnverifiedBlock(block.GetHash())
-	/* hash := block.GetHash()
-	   addUnverifiedBlockList(hash) */
 }
 
 func (p *BlockPool) verifyAncestor(ancestor types.Block) {
-	//ancestor.SetStatus(ancestor.GetStatus() | types.BlockVerify)
-	//storage.WriteBlockMutableInfoRlp(p.db, ancestor.GetHash(), types.GetMutableRlp(ancestor.GetMutableInfo()))
 	p.deleteUnverifiedBlock(ancestor.GetHash())
 }
 
@@ -599,16 +536,6 @@ func (p *BlockPool) deleteUnverifiedBlocks(hashSlice []common.Hash) {
 	}
 }
 
-/* func DeleteUnverifiedTransactionList(linkHash common.Hash) error {
-	for e := UnverifiedBlockList.Front(); e != nil; e = e.Next() {
-		if e.Value == linkHash {
-			UnverifiedBlockList.Remove(e)
-			return nil
-		}
-	}
-	return fmt.Errorf("Not found the linkHash")
-}
-*/
 func (p *BlockPool) addUnverifiedBlock(hash common.Hash) {
 	select {
 	case p.unverifiedAddChan <- hash:
@@ -617,12 +544,9 @@ func (p *BlockPool) addUnverifiedBlock(hash common.Hash) {
 }
 
 func (p *BlockPool) deleteUnverifiedBlock(hash common.Hash) {
-	//p.tempSlice = append(p.tempSlice, hash)
 	select {
 	case p.unverifiedDelChan <- hash:
 		return
-		/* 	default:
-		log.Trace("dropping request") */
 	}
 }
 
