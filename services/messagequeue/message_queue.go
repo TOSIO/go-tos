@@ -3,20 +3,19 @@ package messagequeue
 import (
 	fmt "fmt"
 	"github.com/streadway/amqp"
-	"flag"
 	"log"
 )
 
 var (
-	uri          = flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
-	exchangeName = flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
-	exchangeType = flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
-	reliable     = flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
+	uri          = "amqp://chen:chen@10.10.10.42:5672/" //flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
+	exchangeName = "test-exchange"//flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
+	exchangeType = "direct"//flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
+	reliable     = false //flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
 )
 
-func init() {
-	flag.Parse()
-}
+//func init() {
+//	//flag.Parse()
+//}
 
 type MessageQueue struct  {
 	connection *amqp.Connection
@@ -26,7 +25,7 @@ type MessageQueue struct  {
 
 func CreateMQ() (*MessageQueue , error){
 	needClose := true
-	connection, err := amqp.Dial(*uri)
+	connection, err := amqp.Dial(uri)
 	if err != nil {
 		return nil, fmt.Errorf("Dial: %s", err)
 	}
@@ -42,11 +41,11 @@ func CreateMQ() (*MessageQueue , error){
 		return nil, fmt.Errorf("Channel: %s", err)
 	}
 
-	log.Printf("got Channel, declaring %q Exchange (%q)", *exchangeType, *exchangeName)
+	log.Printf("got Channel, declaring %q Exchange (%q)", exchangeType, exchangeName)
 
 	if err := channel.ExchangeDeclare(
-		*exchangeName,     // name
-		*exchangeType, // type
+		exchangeName,     // name
+		exchangeType, // type
 		true,         // durable  防止队列丢失
 		false,        // auto-deleted
 		false,        // internal
@@ -58,7 +57,7 @@ func CreateMQ() (*MessageQueue , error){
 
 	// Reliable publisher confirms require confirm.select support from the
 	// connection.
-	if *reliable {
+	if reliable {
 		log.Printf("enabling publishing confirms.")
 		if err := channel.Confirm(false); err != nil {
 			return nil, fmt.Errorf("Channel could not be put into confirm mode: %s", err)
@@ -90,7 +89,7 @@ func (mq *MessageQueue)Publish(routingKey, body string) error {
 	log.Printf("declared Exchange, publishing %dB body (%q)", len(body), body)
 
 	if err := mq.channel.Publish(
-		*exchangeName,   // publish to an exchange
+		exchangeName,   // publish to an exchange
 		routingKey, // routing to 0 or more queues
 		false,      // mandatory
 		false,      // immediate
