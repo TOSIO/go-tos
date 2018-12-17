@@ -19,9 +19,11 @@ type QueryBlockInfoInterface struct {
 //	Amount   *big.Int //tls
 //}
 
-type TxBlockInfo struct {
-	BlockType        types.BlockType `json:"block_type"`
-	Status           string          `json:"status"`
+type BlockInfo struct {
+	BlockType         string 		 `json:"block_type"`
+	ConfirmStatus     string 		 `json:"confirm_status"`
+	IsMian			  bool 			 `json:"is_mian"`
+	CofirmCount      uint64 		 `json:"cofirm_count"`
 	ConfirmItsNumber uint64          `json:"confirm_its_number"`
 	ConfirmIndex     uint64          `json:"confirm_Index"`
 	Difficulty       *big.Int        `json:"difficulty"`
@@ -30,16 +32,19 @@ type TxBlockInfo struct {
 	Time             uint64          `json:"time"`
 	Links            []common.Hash   `json:"links"`
 	BlockHash        common.Hash     `json:"block_hash"`
+	MainBlockHash    common.Hash `json:"main_block_hash"`
 	Amount           *big.Int        `json:"amount"`
-	Receiver         common.Address  `json:"receiver"`
-	Sender           common.Address  `json:"sender"`
+	ReceiverAddr         common.Address `json:"receiver_addr"`
+	SenderAddr           common.Address `json:"sender_addr"`
+	MinerAddr        common.Address `json:"miner_addr"`
 	GasPrice         *big.Int        `json:"gas_price"`
 	GasUsed          uint64          `json:"gasUsed"`
+	ActualTxFee      string 		`json:"actual_tx_fee"`
 	GasLimit         uint64          `json:"gas_limit"`
 }
 
 type PublicBlockInfo struct {
-	Status           string         `json:"status"`
+	Status           *types.BlockstatusTmp          `json:"status"`
 	ConfirmItsNumber uint64         `json:"confirm_its_number"`
 	Difficulty       *big.Int       `json:"difficulty"`
 	CumulativeDiff   *big.Int       `json:"cumulative_diff"`
@@ -59,14 +64,13 @@ type TailMainBlockInfo struct {
 	Time           uint64      `json:"time"`
 }
 
-func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) (string, error) {
+func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash common.Hash) (*types.BlockstatusTmp, error) {
 
 	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
 
 	if err != nil {
 		log.Error("Read block stauts fail")
-		//return "Query is not possible"
-		return "", err
+		return nil, err
 	}
 
 	tempBlockStatus := mutableInfo.Status
@@ -76,16 +80,18 @@ func (q *QueryBlockInfoInterface) GetUserBlockStatus(h tosdb.Database, hash comm
 	return blockStatus, nil
 }
 
-func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) (*TxBlockInfo, error) {
-
-	//commonHash := common.HexToHash(hash)
-
+func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Hash) (*BlockInfo, error) {
+	var (
+	 tempReceiver = common.Address{}
+	 tempAmount = big.NewInt(0)
+	 err error
+	 mainInfo *types.MainBlockInfo
+	 confirmcount uint64
+	 mainblcokhash =common.Hash{}
+	)
 	mutableInfo, err := storage.ReadBlockMutableInfo(h, hash)
-	//BlockInfo := storage.ReadBlock(h, hash)
-
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		//return "Query failure"
 		return nil, err
 	}
 
@@ -101,20 +107,41 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 	if err != nil {
 		return nil, err
 	}
-	var tempReceiver = common.Address{}
-	var tempAmount = big.NewInt(0)
-	TxBlock, ok := Block.(*types.TxBlock)
-	if ok {
+	//根据区块类型做不同处理
+	blockType := Block.GetType()
+	switch blockType {
+	case types.BlockTypeTx://交易区块
+		blockStatus.BType = "txblock"
+		TxBlock, ok := Block.(*types.TxBlock)
+		if ok {
 
-		for _, temp := range TxBlock.Outs {
-			tempReceiver = temp.Receiver
-			tempAmount = temp.Amount
+			for _, temp := range TxBlock.Outs {
+				tempReceiver = temp.Receiver
+				tempAmount = temp.Amount
+			}
 		}
-	}
+	case types.BlockTypeMiner://挖矿区块
+		blockStatus.BType = "miner_block"
+	case types.BlockTypeGenesis://创世区块
+		blockStatus.BType = "genesisBlock"
+		blockStatus.IsMain = true
+		blockStatus.BlockStatus="Accepted"
 
-	Data0 := &TxBlockInfo{
-		BlockType:        Block.GetType(),
-		Status:           blockStatus,
+	}
+	//如果是主块
+	if blockStatus.IsMain{
+		mainInfo, err = storage.ReadMainBlock(h, mutableInfo.ConfirmItsNumber)
+		if err != nil {
+			return nil, err
+		}
+		confirmcount = mainInfo.ConfirmCount
+		mainblcokhash = mainInfo.Hash
+	}
+	AllBlockInfo := &BlockInfo{
+		BlockType:        getBlockType(Block.GetType()),
+		ConfirmStatus:    blockStatus.BlockStatus,
+		IsMian:           blockStatus.IsMain,
+		CofirmCount:	  confirmcount,
 		ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
 		ConfirmIndex:     mutableInfo.ConfirmItsIndex,
 		Difficulty:       mutableInfo.Difficulty,
@@ -123,13 +150,28 @@ func (q *QueryBlockInfoInterface) GetBlockInfo(h tosdb.Database, hash common.Has
 		Links:            Block.GetLinks(),
 		Time:             Block.GetTime(),
 		BlockHash:        Block.GetHash(),
+		MainBlockHash:    mainblcokhash,
 		Amount:           tempAmount,
-		Receiver:         tempReceiver,
-		Sender:           BlockSend,
+		ReceiverAddr:     tempReceiver,
+		SenderAddr:       BlockSend,
+		MinerAddr:        BlockSend,
 		GasPrice:         Block.GetGasPrice(),
 		GasLimit:         Block.GetGasLimit(),
 	}
-	return Data0, nil
+	return AllBlockInfo, nil
+}
+
+func getBlockType(bolockType types.BlockType) string {
+	switch bolockType {
+	case types.BlockTypeTx:
+		return "txblock"
+	case types.BlockTypeMiner:
+		return "miner_block"
+	case types.BlockTypeGenesis:
+		return "genesisBlock"
+
+	}
+	return ""
 }
 
 func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash common.Hash, mainBlockInfo *types.MainBlockInfo) (interface{}, error) {
@@ -141,7 +183,6 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 
 	if err != nil {
 		log.Error("Read Txblock Info fail")
-		//return "Query is not possible"
 		return "", err
 	}
 
@@ -173,11 +214,11 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 		}
 
 		Data0 := struct {
-			TxBlockInfo
+			BlockInfo
 			types.MainBlockInfo
 		}{
-			TxBlockInfo{
-				Status:           blockStatus,
+			BlockInfo{
+				ConfirmStatus:    blockStatus.BlockStatus,
 				ConfirmItsNumber: mutableInfo.ConfirmItsNumber,
 				ConfirmIndex:     mutableInfo.ConfirmItsIndex,
 				Difficulty:       mutableInfo.Difficulty,
@@ -187,8 +228,8 @@ func (q *QueryBlockInfoInterface) GetBlockAndMainInfo(h tosdb.Database, hash com
 				Time:             Block.GetTime(),
 				BlockHash:        Block.GetHash(),
 				Amount:           tempAmount,
-				Receiver:         tempReceiver,
-				Sender:           BlockSend,
+				ReceiverAddr:         tempReceiver,
+				SenderAddr:           BlockSend,
 				GasPrice:         Block.GetGasPrice(),
 				GasLimit:         Block.GetGasLimit(),
 			},
@@ -247,11 +288,4 @@ func (q *QueryBlockInfoInterface) GetFinalMainBlockInfo(h tosdb.Database) (inter
 		Time:           finalMainBlockSlice.Time,
 	}
 	return MainBlickInfo, err
-	//jsonData, err := json.Marshal(MainBlickInfo)
-	//if err != nil {
-	//	return "", err
-	//}
-	//
-	//return string(jsonData), nil
-
 }

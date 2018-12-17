@@ -10,7 +10,7 @@ import (
 type MainBlockInfo struct {
 	Hash         common.Hash //block hash
 	Root         common.Hash //status root
-	ConfirmCount uint64
+	ConfirmCount uint64  //mainblock confirm block count
 }
 
 type TailMainBlockInfo struct {
