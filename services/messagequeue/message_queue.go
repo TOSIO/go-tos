@@ -1,9 +1,9 @@
 package messagequeue
 
 import (
-	fmt "fmt"
+	"fmt"
 	"github.com/streadway/amqp"
-	"log"
+	"github.com/TOSIO/go-tos/devbase/log"
 )
 
 var (
@@ -35,13 +35,13 @@ func CreateMQ() (*MessageQueue , error){
 		}
 	}()
 
-	log.Printf("got Connection, getting Channel")
+	log.Info("got Connection, getting Channel")
 	channel, err := connection.Channel()
 	if err != nil {
 		return nil, fmt.Errorf("Channel: %s", err)
 	}
 
-	log.Printf("got Channel, declaring %q Exchange (%q)", exchangeType, exchangeName)
+	log.Info(fmt.Sprintf("got Channel, declaring %q Exchange (%q)", exchangeType, exchangeName))
 
 	if err := channel.ExchangeDeclare(
 		exchangeName,     // name
@@ -58,7 +58,7 @@ func CreateMQ() (*MessageQueue , error){
 	// Reliable publisher confirms require confirm.select support from the
 	// connection.
 	if reliable {
-		log.Printf("enabling publishing confirms.")
+		log.Info("enabling publishing confirms.")
 		if err := channel.Confirm(false); err != nil {
 			return nil, fmt.Errorf("Channel could not be put into confirm mode: %s", err)
 		}
@@ -86,7 +86,7 @@ func (mq *MessageQueue)Publish(routingKey, body string) error {
 	// all in one go. In a real service, you probably want to maintain a
 	// long-lived connection as state, and publish against that.
 
-	log.Printf("declared Exchange, publishing %dB body (%q)", len(body), body)
+	log.Info(fmt.Sprintf("declared Exchange, publishing %dB body (%q)", len(body), body))
 
 	if err := mq.channel.Publish(
 		exchangeName,   // publish to an exchange
@@ -113,11 +113,11 @@ func (mq *MessageQueue)Publish(routingKey, body string) error {
 // set of unacknowledged sequence numbers and loop until the publishing channel
 // is closed.
 func confirmOne(confirms <-chan amqp.Confirmation) {
-	log.Printf("waiting for confirmation of one publishing")
+	log.Info(fmt.Sprintf("waiting for confirmation of one publishing"))
 
 	if confirmed := <-confirms; confirmed.Ack {
-		log.Printf("confirmed delivery with delivery tag: %d", confirmed.DeliveryTag)
+		log.Info(fmt.Sprintf("confirmed delivery with delivery tag: %d", confirmed.DeliveryTag))
 	} else {
-		log.Printf("failed delivery of delivery tag: %d", confirmed.DeliveryTag)
+		log.Info(fmt.Sprintf("failed delivery of delivery tag: %d", confirmed.DeliveryTag))
 	}
 }
