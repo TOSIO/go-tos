@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"github.com/TOSIO/go-tos/devbase/log"
+	"encoding/json"
 )
 
 var (
 	uri          = "amqp://chen:chen@10.10.10.42:5672/" //flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
-	exchangeName = "test-exchange"//flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
+	exchangeName = "tos-scan"//flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
 	exchangeType = "direct"//flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
 	reliable     = false //flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
 )
@@ -80,13 +81,19 @@ func (mq *MessageQueue) Close() {
 	mq.connection.Close()
 }
 
-func (mq *MessageQueue)Publish(routingKey, body string) error {
+func (mq *MessageQueue)Publish(routingKey string, body interface{}) error {
 
 	// This function dials, connects, declares, publishes, and tears down,
 	// all in one go. In a real service, you probably want to maintain a
 	// long-lived connection as state, and publish against that.
 
-	log.Info(fmt.Sprintf("declared Exchange, publishing %dB body (%q)", len(body), body))
+	by, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(by))
+	log.Info(fmt.Sprintf("declared Exchange, publishing %dB body (%q)", len(by), string(by)))
 
 	if err := mq.channel.Publish(
 		exchangeName,   // publish to an exchange
@@ -97,7 +104,7 @@ func (mq *MessageQueue)Publish(routingKey, body string) error {
 			Headers:         amqp.Table{},
 			ContentType:     "text/plain",
 			ContentEncoding: "",
-			Body:            []byte(body),
+			Body:            by,
 			DeliveryMode:    amqp.Transient, // 1=non-persistent, 2=persistent
 			Priority:        0,              // 0-9
 			// a bunch of application/implementation-specific fields
