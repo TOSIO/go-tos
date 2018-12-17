@@ -26,7 +26,7 @@ var (
 "params":[{"WalletAddr" :"%s"}],
 "id":1
 }`
-	urlString = urlString1
+	urlString = urlString3
 )
 
 type KeyInfo struct {
