@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/common"
 	"github.com/TOSIO/go-tos/devbase/crypto"
 	"github.com/TOSIO/go-tos/node"
 	"io/ioutil"
@@ -29,18 +30,20 @@ var (
 "params":[{"From":{"Address" :"%s","PrivateKey"  :"%s"},"GasPrice":"1000000000","GasLimit":4294967296,"To":"%s","Amount":"%s"}],
 "id":1
 }`
-	urlString               = urlString2
-	passphrase              = "12345"
-	maxRate                 = 10000
-	totalCount     *big.Int = big.NewInt(0)
-	lastTotalCount *big.Int = big.NewInt(0)
-	lastTime       int64
-	numberMinute   = 0
-	lock           sync.Mutex
+	urlString          = urlString2
+	passphrase         = "12345"
+	maxRate            = 10000
+	totalCount         = big.NewInt(0)
+	lastTotalCount     = big.NewInt(0)
+	lastTime           int64
+	numberMinute       = 0
+	lock               sync.Mutex
+	totalAmount        = "100000000"
+	haveBalanceAddress = common.HexToAddress("0xd3307c0345c427088f640b2c0242f70c79daa08e")
 )
 
 type accountInfo struct {
-	Address    string
+	Address    common.Address
 	PrivateKey string
 	Balance    *big.Int
 }
@@ -64,7 +67,7 @@ type informations struct {
 func main() {
 	allAccountList := make([]accountInfo, 0, 10000)
 	haveBalanceAccountList := make([]accountInfo, 0, 10000)
-	haveBalanceAccountMap := map[string]bool{}
+	haveBalanceAccountMap := map[common.Address]bool{}
 
 	var (
 		files []os.FileInfo
@@ -111,7 +114,7 @@ func main() {
 	}
 
 	for info := range ch {
-		allAccountList = append(allAccountList, accountInfo{Address: info.Key.Address.Hex(),
+		allAccountList = append(allAccountList, accountInfo{Address: info.Key.Address,
 			PrivateKey: hex.EncodeToString(crypto.FromECDSA(info.Key.PrivateKey)),
 			Balance:    big.NewInt(0),
 		})
@@ -119,9 +122,20 @@ func main() {
 
 	fmt.Println("Parse all  ReadFile complete")
 
-	allAccountList[0].Balance.SetString("100000000000000000000000000", 10)
+	allAccountList[0].Balance.SetString(totalAmount, 10)
 	haveBalanceAccountList = append(haveBalanceAccountList, allAccountList[0])
-	haveBalanceAccountMap[allAccountList[0].Address] = true
+	var haveBalance bool
+	for _, Account := range allAccountList {
+		if Account.Address == haveBalanceAddress {
+			haveBalance = true
+			break
+		}
+	}
+	if !haveBalance {
+		fmt.Println("no have " + haveBalanceAddress.String() + " key")
+		return
+	}
+	haveBalanceAccountMap[haveBalanceAddress] = true
 	lastTime = time.Now().Unix()
 
 	for {
@@ -145,9 +159,9 @@ func main() {
 		amount := tempInt.Mul(tempInt.Div(fromAccount.Balance, big.NewInt(int64(maxRate))), amountRatio)
 
 		jsonString := fmt.Sprintf(jsonStringFormat,
-			fromAccount.Address,
+			fromAccount.Address.String(),
 			fromAccount.PrivateKey,
-			toAccount.Address,
+			toAccount.Address.String(),
 			amount.String())
 
 		//fmt.Println("send: ", jsonString)
@@ -183,7 +197,7 @@ func main() {
 			total.Add(total, v.Balance)
 		}
 
-		if total.String() != "100000000000000000000000000" {
+		if total.String() != totalAmount {
 			fmt.Println(total.String(), "error------------------------")
 		}
 		totalCount = totalCount.Add(totalCount, big.NewInt(1))
