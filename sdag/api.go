@@ -126,6 +126,7 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{
 	if err == nil {
 		//获取GasUsed
 		blockInfo.GasUsed = Receipt.GasUsed
+		blockInfo.ActualTxFee = new(big.Int).Mul(new(big.Int).SetUint64(Receipt.GasUsed),blockInfo.GasPrice).String()
 	}
 
 	return blockInfo, nil
