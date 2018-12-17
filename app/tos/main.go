@@ -133,7 +133,7 @@ func init() {
 	app.Flags = append(app.Flags, debug.Flags...)
 	app.Flags = append(app.Flags, metricsFlags...)
 
-	app.Before = activePPROF //激活性能分析模块
+	app.Before = activePPROF
 
 	app.After = func(ctx *cli.Context) error {
 		debug.Exit()

@@ -10,15 +10,15 @@ type MQBlockInfo struct {
 	GasPrice       string
 	SenderAddr     string
 	ReceiverAddr   string
-	IsMiner        bool
-	Difficult      string
+	IsMiner        string
+	Difficulty      string
 	CumulativeDiff string
 }
 
 type MQBlockStatus struct {
 	BlockHash string
 	BlockHigh string
-	IsMain bool
+	IsMain string
 	ConfirmStatus string  //accept/ reject / pending
 	ConfirmDate string
 	GasUsed string

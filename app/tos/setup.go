@@ -33,15 +33,16 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-//读取配置文件、各模块应用命令行参数进行配置初始化
-//返回节点对象
+// makeConfigNode read config file and each module applies command line parameters
+// for configuration initialization
+// return node object
 func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	// Load defaults.
 	cfg := tosConfig{
-		// 各模块config变量初始化
-		Sdag:      sdag.DefaultConfig,
-		Node:      defaultNodeConfig(),
-		Dashboard: dashboard.DefaultConfig,
+		//  each module config variable initialization
+		Sdag:       sdag.DefaultConfig,
+		Node:       defaultNodeConfig(),
+		Dashboard:  dashboard.DefaultConfig,
 		Blockboard: blockboard.DefaultConfig,
 	}
 
@@ -57,7 +58,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 		}
 	}*/
 
-	// Apply flags.应用命令行传递进来的参数（参数封装在ctx中）
+	// Apply flags use parameter from cmd
 	utils.ApplyNodeFlags(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)
 	if err != nil {
@@ -68,7 +69,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, tosConfig) {
 	utils.ApplyDashboardConfig(ctx, &cfg.Dashboard)
 	utils.ApplyBlockboardConfig(ctx, &cfg.Blockboard)
 
-	// 其他模块config设置
+	//  set other module config
 	log.Info("Warning! Other moduler config is not yet been")
 	return stack, cfg
 }
@@ -113,11 +114,11 @@ func activePPROF(ctx *cli.Context) error {
 	return nil
 }
 
-//生成节点对象、注册服务
+// makeFullNode make a node object and register service
 func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
 
-	// 服务注册
+	// register service
 	utils.RegisterSdagService(stack, &cfg.Sdag)
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
@@ -128,7 +129,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	return stack
 }
 
-//启动账户相关服务
+// activeAccount start accoount service
 func activeAccount(ctx *cli.Context, stack *node.Node) {
 	log.Info("Starting account service")
 	// Unlock any account specifically requested
@@ -184,12 +185,12 @@ func activeAccount(ctx *cli.Context, stack *node.Node) {
 	//}()
 }
 
-//启动辅助服务
+//startAuxservice start auxiliary service
 func startAuxservice(ctx *cli.Context, stack *node.Node) {
 	log.Info("Starting aux service")
 }
 
-//钱包循环
+//walletloop used for wallet loop
 func walletloop(stack *node.Node) {
 	log.Info("Starting wallet-loop")
 }
@@ -197,20 +198,17 @@ func walletloop(stack *node.Node) {
 // startNode boots up the system node and all registered protocols, after which
 // it unlocks any requested accounts, and starts the RPC/IPC interfaces and the
 // miner.
-// 启动节点（本机）
+//start node(locally)
 func startNode(ctx *cli.Context, stack *node.Node) {
 	debug.Memsize.Add("node", stack)
 
 	// Start up the node itself
 	utils.StartNode(stack)
 
-	// 账户相关
 	activeAccount(ctx, stack)
 
-	// 钱包相关
 	go walletloop(stack)
 
-	// 启动辅助服务（如挖矿、内存交易池等）
 	// Start auxiliary services if enabled
 	startAuxservice(ctx, stack)
 }
