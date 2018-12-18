@@ -23,6 +23,7 @@ var (
 	//8545
 	urlString1       = "http://47.74.255.165:9545"
 	urlString2       = "http://10.10.10.37:8545"
+	urlString3       = "http://10.10.10.13:9545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -122,11 +123,11 @@ func main() {
 
 	fmt.Println("Parse all  ReadFile complete")
 
-	allAccountList[0].Balance.SetString(totalAmount, 10)
-	haveBalanceAccountList = append(haveBalanceAccountList, allAccountList[0])
 	var haveBalance bool
-	for _, Account := range allAccountList {
+	for index, Account := range allAccountList {
 		if Account.Address == haveBalanceAddress {
+			allAccountList[index].Balance.SetString(totalAmount, 10)
+			haveBalanceAccountList = append(haveBalanceAccountList, allAccountList[index])
 			haveBalance = true
 			break
 		}
@@ -140,15 +141,16 @@ func main() {
 
 	for {
 		var (
-			index       int
+			fromIndex   int
+			toIndex     int
 			fromAccount accountInfo
 			toAccount   accountInfo
 		)
 		for {
-			index = rand.Intn(len(haveBalanceAccountList))
-			fromAccount = haveBalanceAccountList[index]
-			index = rand.Intn(len(allAccountList))
-			toAccount = allAccountList[index]
+			fromIndex = rand.Intn(len(haveBalanceAccountList))
+			fromAccount = haveBalanceAccountList[fromIndex]
+			toIndex = rand.Intn(len(allAccountList))
+			toAccount = allAccountList[toIndex]
 			if fromAccount != toAccount {
 				break
 			}
@@ -157,6 +159,9 @@ func main() {
 		amountRatio := big.NewInt(int64(rand.Intn(maxRate)))
 		tempInt := big.NewInt(0)
 		amount := tempInt.Mul(tempInt.Div(fromAccount.Balance, big.NewInt(int64(maxRate))), amountRatio)
+		if amount.Sign() == 0 {
+			amount = new(big.Int).Set(fromAccount.Balance)
+		}
 
 		jsonString := fmt.Sprintf(jsonStringFormat,
 			fromAccount.Address.String(),
@@ -189,6 +194,10 @@ func main() {
 		if v := haveBalanceAccountMap[toAccount.Address]; !v {
 			haveBalanceAccountList = append(haveBalanceAccountList, toAccount)
 			haveBalanceAccountMap[toAccount.Address] = true
+		}
+		if fromAccount.Balance.Sign() == 0 {
+			haveBalanceAccountList = append(haveBalanceAccountList[:fromIndex], haveBalanceAccountList[fromIndex+1:]...)
+			haveBalanceAccountMap[fromAccount.Address] = false
 		}
 		//fmt.Println("--------------------------------------------------------------------------------------------------")
 
