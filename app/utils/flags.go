@@ -423,7 +423,7 @@ var (
 	}
 )
 
-// 为node模块应用命令行参数
+//ApplyNodeFlags set cmd parameter of node module
 func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 	updateP2PConfig(ctx, &cfg.P2P)
 	setIPC(ctx, cfg)
@@ -438,8 +438,8 @@ func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
 	case ctx.GlobalBool(TestnetFlag.Name):
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testnet")
-	case ctx.GlobalBool(RinkebyFlag.Name):
-		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "rinkeby")
+		/*case ctx.GlobalBool(RinkebyFlag.Name):
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "rinkeby")*/
 	}
 
 	if ctx.GlobalIsSet(KeyStoreDirFlag.Name) {
@@ -453,8 +453,9 @@ func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 	}
 }
 
-// 为sdag模块应用命令行参数
+//ApplySdagFlags set cmd parameter of sdag module
 func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
+	checkExclusive(ctx, DeveloperFlag, TestnetFlag, RinkebyFlag)
 	if ctx.GlobalIsSet(NetworkIdFlag.Name) {
 		cfg.NetworkId = ctx.GlobalUint64(NetworkIdFlag.Name)
 	}
@@ -480,17 +481,22 @@ func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
 	switch {
 	case ctx.GlobalBool(TestnetFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 3
+			cfg.NetworkId = 2
 		}
-	case ctx.GlobalBool(RinkebyFlag.Name):
+	/*case ctx.GlobalBool(RinkebyFlag.Name):
+	if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
+		cfg.NetworkId = 4
+	}*/
+	case ctx.GlobalBool(DeveloperFlag.Name):
 		if !ctx.GlobalIsSet(NetworkIdFlag.Name) {
-			cfg.NetworkId = 4
+			cfg.NetworkId = 1337
 		}
+		// Create new developer account or reuse existing one
 	}
 
 }
 
-// MakeDataDir retrieves the currently requested data directory, terminating
+// MakeDataDir retrieves the currently requested data directory,
 // if none (or the empty string) is specified. If the node is starting a testnet,
 // the a subdirectory of the specified datadir will be used.
 func MakeDataDir(ctx *cli.Context) string {
@@ -625,8 +631,8 @@ func setBootstrapNodes(ctx *cli.Context, cfg *p2p.Config) {
 		}
 	case ctx.GlobalBool(TestnetFlag.Name):
 		urls = params.TestnetBootnodes
-	case ctx.GlobalBool(RinkebyFlag.Name):
-		urls = params.RinkebyBootnodes
+		/*	case ctx.GlobalBool(RinkebyFlag.Name):
+			urls = params.RinkebyBootnodes*/
 	case cfg.BootstrapNodes != nil:
 		return // already set, don't apply defaults.
 	}
@@ -655,8 +661,8 @@ func setBootstrapNodesV5(ctx *cli.Context, cfg *p2p.Config) {
 		} else {
 			urls = strings.Split(ctx.GlobalString(BootnodesFlag.Name), ",")
 		}
-	case ctx.GlobalBool(RinkebyFlag.Name):
-		urls = params.RinkebyBootnodes
+	/*case ctx.GlobalBool(RinkebyFlag.Name):
+	urls = params.RinkebyBootnodes*/
 	case cfg.BootstrapNodesV5 != nil:
 		return // already set, don't apply defaults.
 	}

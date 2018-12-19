@@ -26,9 +26,9 @@ import (
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/sdag/core/protocol"
 	"github.com/TOSIO/go-tos/sdag/core/state"
+	"github.com/TOSIO/go-tos/services/messagequeue"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
-	"github.com/TOSIO/go-tos/services/messagequeue"
 )
 
 // Sdag implements the node service.
@@ -91,7 +91,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI
-	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig); err != nil {
+	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig, config.NetworkId); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}

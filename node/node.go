@@ -174,7 +174,7 @@ func (n *Node) Start() error {
 	// Initialize the p2p server. This creates the node key and
 	// discovery databases.
 	n.serverConfig = n.config.P2P
-	n.serverConfig.PrivateKey = n.config.NodeKey() //PrivateKey.publicKey作为p2p模块的nodeID
+	n.serverConfig.PrivateKey = n.config.NodeKey() //PrivateKey.publicKey is the nodeID of p2p module
 	n.serverConfig.Name = n.config.NodeName()
 	n.serverConfig.Logger = n.log
 	if n.serverConfig.StaticNodes == nil {

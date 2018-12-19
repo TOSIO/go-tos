@@ -17,12 +17,13 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
-func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string) (*Genesis, error) {
+func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string, networkId uint64) (*Genesis, error) {
 	var genesis Genesis
 	genesis.db = db
 	genesis.stateDb = stateDb
+	genesis.networkId = networkId
 	if len(InitialFilePath) == 0 {
-		genesis.InitialFilePath = "./Genesis.json"
+		genesis.InitialFilePath = "./999.json"
 	} else {
 		genesis.InitialFilePath = InitialFilePath
 	}
@@ -30,9 +31,9 @@ func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath strin
 	if err != nil {
 		log.Error(err.Error())
 	}
-
 	types.GenesisTime = genesis.InitialGenesisBlockInfo.Time
 	return &genesis, err
+
 }
 
 type InitialAccount struct {
@@ -51,11 +52,24 @@ type Genesis struct {
 	InitialFilePath string
 	InitialGenesisBlockInfo
 	genesisHash common.Hash
+	//	config      sdag.Config
+	networkId uint64
 }
 
 func (genesis *Genesis) ReadGenesisConfiguration() error {
+	var genesisDefault string
 	jsonString, err := ioutil.ReadFile(genesis.InitialFilePath)
 	if err != nil {
+		switch genesis.networkId {
+		case 1:
+			genesisDefault = genesisDev
+		case 2:
+			genesisDefault = genesisTest
+		/*case 4:
+		genesisDefault = genesisRinkby*/
+		default:
+			log.Debug("no find genesis config")
+		}
 		jsonString = []byte(genesisDefault)
 		//return fmt.Errorf("open file fail fileName %s", genesis.InitialFilePath)
 	}

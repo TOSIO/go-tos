@@ -44,6 +44,7 @@ type MainChain struct {
 	LocalBlockNotice   chan LocalBlockNotice
 	LocalAddress       map[common.Address]bool
 	LocalAddressRWLock sync.RWMutex
+	networkId          uint64
 }
 
 func (mainChain *MainChain) AddLocalAddress(address common.Address) {
@@ -73,7 +74,7 @@ func (mainChain *MainChain) LocalBlockNoticeChan() chan LocalBlockNotice {
 
 func (mainChain *MainChain) initTail() error {
 	var err error
-	mainChain.Genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "")
+	mainChain.Genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "", mainChain.networkId)
 	if err != nil {
 		return err
 	}
@@ -129,14 +130,14 @@ func (mainChain *MainChain) setPerv() error {
 	return nil
 }
 
-func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config) (*MainChain, error) {
+func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, networkId uint64) (*MainChain, error) {
 	var mainChain MainChain
 	mainChain.db = chainDb
 	mainChain.stateDb = stateDb
 	mainChain.VMConfig = VMConfig
 	mainChain.LocalBlockNotice = make(chan LocalBlockNotice)
 	mainChain.LocalAddress = make(map[common.Address]bool)
-
+	mainChain.networkId = networkId
 	err := mainChain.initTail()
 	if err != nil {
 		return nil, err
