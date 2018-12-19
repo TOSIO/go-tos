@@ -23,7 +23,7 @@ func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath strin
 	genesis.stateDb = stateDb
 	genesis.networkId = networkId
 	if len(InitialFilePath) == 0 {
-		genesis.InitialFilePath = "./999.json"
+		genesis.InitialFilePath = "./Genesis.json"
 	} else {
 		genesis.InitialFilePath = InitialFilePath
 	}
