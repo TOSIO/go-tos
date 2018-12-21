@@ -21,9 +21,10 @@ import (
 
 var (
 	//8545
+	testNet          = true
 	urlString1       = "http://47.74.255.165:9545"
 	urlString2       = "http://10.10.10.37:8545"
-	urlString3       = "http://10.10.10.13:9545"
+	urlString3       = "http://10.10.10.13:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -71,10 +72,15 @@ func main() {
 	haveBalanceAccountMap := map[common.Address]bool{}
 
 	var (
-		files []os.FileInfo
-		err   error
+		files    []os.FileInfo
+		err      error
+		filePath string
 	)
-	filePath := filepath.Join(node.DefaultDataDir(), "tos", "keystore")
+	if testNet {
+		filePath = filepath.Join(node.DefaultDataDir(), "tos", "keystore")
+	} else {
+		filePath = filepath.Join(node.DefaultDataDir(), "testNet", "tos", "keystore")
+	}
 	files, err = ioutil.ReadDir(filePath)
 
 	if err != nil {
@@ -227,7 +233,7 @@ func main() {
 				//return
 			}
 		}
-		time.Sleep(time.Nanosecond * 1600000)
+		//time.Sleep(time.Nanosecond * 1600000)
 		//fmt.Println("----------------------------------------------", totalCount.String(), "-----------------------------------------------------")
 	}
 }

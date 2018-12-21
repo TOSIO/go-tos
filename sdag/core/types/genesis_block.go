@@ -2,6 +2,7 @@ package types
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -138,4 +139,15 @@ func (self *GenesisBlock) AsMessage() (Message, error) {
 
 func (self *GenesisBlock) GetPayload() []byte {
 	return []byte{}
+}
+
+func (self *GenesisBlock) GetOuts() []TxOut {
+	return []TxOut{}
+}
+
+func (self *GenesisBlock) String() string {
+	str := fmt.Sprintf("hash:%s\n", self.GetHash().String())
+	str += fmt.Sprintf("head:%v\n", self.Header)
+	str += fmt.Sprintf("Nonce:%d\n", self.RootHash)
+	return str
 }

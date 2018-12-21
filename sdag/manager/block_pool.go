@@ -3,6 +3,8 @@ package manager
 import (
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/utils"
+	"github.com/TOSIO/go-tos/services/messagequeue"
+	"strconv"
 	"sync"
 	"time"
 
@@ -46,6 +48,7 @@ type BlockPool struct {
 	db        tosdb.Database
 	emptyC    chan struct{}
 	blockChan chan types.Block
+	mq        *messagequeue.MessageQueue
 
 	MaxSyncTime     uint64
 	MaxSyncTimeLock sync.RWMutex
@@ -83,7 +86,7 @@ type BlockPool struct {
 	mainChainI mainchain.MainChainI
 }
 
-func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Feed, blockEvent *event.TypeMux) *BlockPool {
+func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Feed, blockEvent *event.TypeMux, mq *messagequeue.MessageQueue) *BlockPool {
 	pool := &BlockPool{
 		mainChainI: mainChain,
 		db:         chainDb,
@@ -91,6 +94,7 @@ func New(mainChain mainchain.MainChainI, chainDb tosdb.Database, feed *event.Fee
 		syncStatusFeed: feed,
 		emptyC:         make(chan struct{}, 1),
 		blockChan:      make(chan types.Block, 8),
+		mq:             mq,
 
 		IsolatedBlockMap: make(map[common.Hash]*IsolatedBlock),
 		lackBlockMap:     make(map[common.Hash]*lackBlock),
@@ -441,7 +445,7 @@ func (p *BlockPool) updateSyncTime(time uint64) {
 }
 
 func (p *BlockPool) AddBlock(block types.Block, isRelay bool, isSync bool) error {
-	log.Debug("begin AddBlock", "hash", block.GetHash().String(), "block", block)
+	log.Debug("begin AddBlock\n" + block.String())
 
 	ok := storage.HasBlock(p.db, block.GetHash())
 	if ok {
@@ -518,6 +522,7 @@ func (p *BlockPool) saveBlock(block types.Block) {
 	log.Debug("Save block", "hash", block.GetHash().String())
 	storage.WriteBlock(p.db, block)
 	p.addUnverifiedBlock(block.GetHash())
+	p.sendBlockInfoToCenter(block)
 }
 
 func (p *BlockPool) verifyAncestor(ancestor types.Block) {
@@ -565,4 +570,47 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	}
 	p.listLock.RUnlock()
 	return links
+}
+
+func (p *BlockPool) sendBlockInfoToCenter(block types.Block) {
+	if p.mq == nil {
+		return
+	}
+	var (
+		ReceiverAddr string
+		Amount       string
+	)
+	SenderAddr, _ := block.GetSender()
+	var IsMiner string
+	if block.GetType() == types.BlockTypeMiner {
+		IsMiner = "1"
+	} else {
+		IsMiner = "0"
+	}
+	for _, out := range block.GetOuts() {
+		ReceiverAddr += out.Receiver.String() + ","
+		Amount += out.Amount.String() + ","
+	}
+	if len(ReceiverAddr) > 0 {
+		ReceiverAddr = ReceiverAddr[:len(ReceiverAddr)-1]
+	}
+	if len(Amount) > 0 {
+		Amount = Amount[:len(Amount)-1]
+	}
+
+	message := types.MQBlockInfo{
+		BlockHash:      block.GetHash().String(),
+		TransferDate:   strconv.FormatUint(block.GetTime(), 10),
+		Amount:         Amount,
+		GasLimit:       strconv.FormatUint(block.GetGasLimit(), 10),
+		GasPrice:       block.GetGasPrice().String(),
+		SenderAddr:     SenderAddr.String(),
+		ReceiverAddr:   ReceiverAddr,
+		IsMiner:        IsMiner,
+		Difficulty:     block.GetDiff().String(),
+		CumulativeDiff: block.GetCumulativeDiff().String(),
+	}
+	if err := p.mq.Publish("blockInfo", message); err != nil {
+		log.Error(err.Error())
+	}
 }

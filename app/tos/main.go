@@ -79,6 +79,7 @@ var (
 		utils.RinkebyFlag,
 
 		utils.NetworkIdFlag,
+		utils.MessageQueue,
 		utils.RPCCORSDomainFlag,
 		utils.RPCVirtualHostsFlag,
 		utils.EthStatsURLFlag,

@@ -91,6 +91,8 @@ type Block interface {
 	SetMaxLink(MaxLink common.Hash) // Set the max link
 
 	GetPayload() []byte //Get the Payload
+	GetOuts() []TxOut
+	String() string
 }
 
 type BlockHeader struct {
@@ -169,35 +171,35 @@ func UnMutableRlp(mutableRLP []byte) (*MutableInfo, error) {
 
 type BlockstatusTmp struct {
 	BlockStatus string
-	IsMain bool
-	BType string
+	IsMain      bool
+	BType       string
 }
 
 func GetBlockStatus(blockStatusInfo BlockStatus) *BlockstatusTmp {
 	status := &BlockstatusTmp{
-		BlockStatus:"Pending",
-		IsMain:false,
+		BlockStatus: "Pending",
+		IsMain:      false,
 	}
 	isApply := blockStatusInfo&(BlockApply|BlockConfirm) == (BlockApply | BlockConfirm)
 	isReject := blockStatusInfo&BlockConfirm == BlockConfirm
 
 	if blockStatusInfo&BlockMain == BlockMain {
 		if isApply {
-			status.IsMain=true
-			status.BlockStatus="Accepted"
+			status.IsMain = true
+			status.BlockStatus = "Accepted"
 			return status
 		} else if isReject {
-			status.IsMain=true
-			status.BlockStatus="Rejected"
+			status.IsMain = true
+			status.BlockStatus = "Rejected"
 			return status
 		}
 	} else if isApply {
-		status.IsMain=false
-		status.BlockStatus="Accepted"
+		status.IsMain = false
+		status.BlockStatus = "Accepted"
 		return status
 	} else if isReject {
-		status.IsMain=false
-		status.BlockStatus="Rejected"
+		status.IsMain = false
+		status.BlockStatus = "Rejected"
 		return status
 	}
 	return status

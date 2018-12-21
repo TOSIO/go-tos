@@ -184,7 +184,7 @@ func (transaction *Transaction) RlpTransactionSendToSDAG(rlpData []byte) (hash c
 }
 
 func (transaction *Transaction) transactionSendToSDAG(block types.Block) (common.Hash, error) {
-	log.Debug("block construction success", "hash", block.GetHash().String(), "block", block)
+	log.Debug("block construction success\n" + block.String())
 	err := transaction.pool.EnQueue(block)
 	if err != nil {
 		return block.GetHash(), err
@@ -212,7 +212,7 @@ func (transaction *Transaction) ReceiveTransactionAction() {
 				}
 				txBlock, ok := block.(*types.TxBlock)
 				if !ok {
-					log.Error("block.(*types.TxBlock) error", "block", block)
+					log.Error("block.(*types.TxBlock) error\n" + block.String())
 					continue
 				}
 				amount := transaction.calculateAmount(txBlock.Outs)
@@ -276,14 +276,6 @@ func (transaction *Transaction) calculateAmount(Outs []types.TxOut) *big.Int {
 }
 
 func (transaction *Transaction) GetBalance(address common.Address) (*big.Int, error) {
-	tailMainBlockInfo := transaction.mainChainI.GetMainTail()
-	mainInfo, err := storage.ReadMainBlock(transaction.chainDb, tailMainBlockInfo.Number)
-	if err != nil {
-		return nil, err
-	}
-	stateTrie, err := state.New(mainInfo.Root, transaction.stateDb)
-	if err != nil {
-		return nil, err
-	}
-	return stateTrie.GetBalance(address), nil
+	state := transaction.mainChainI.GetLastState()
+	return new(big.Int).Set(state.GetBalance(address)), nil
 }

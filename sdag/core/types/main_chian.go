@@ -10,7 +10,7 @@ import (
 type MainBlockInfo struct {
 	Hash         common.Hash //block hash
 	Root         common.Hash //status root
-	ConfirmCount uint64  //mainblock confirm block count
+	ConfirmCount uint64      //mainblock confirm block count
 }
 
 type TailMainBlockInfo struct {
@@ -18,6 +18,14 @@ type TailMainBlockInfo struct {
 	CumulativeDiff *big.Int
 	Number         uint64
 	Time           uint64 //
+}
+
+func (tm *TailMainBlockInfo) String() string {
+	str := fmt.Sprintf("hash:%s ", tm.Hash.String())
+	str += fmt.Sprintf("CumulativeDiff:%s ", tm.CumulativeDiff.String())
+	str += fmt.Sprintf("Number:%d ", tm.Number)
+	str += fmt.Sprintf("Time:%d", tm.Time)
+	return str
 }
 
 func (mb *MainBlockInfo) Rlp() []byte {

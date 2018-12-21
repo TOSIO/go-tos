@@ -1,30 +1,29 @@
 package messagequeue
 
 import (
-	"fmt"
-	"github.com/streadway/amqp"
-	"github.com/TOSIO/go-tos/devbase/log"
 	"encoding/json"
+	"fmt"
+	"github.com/TOSIO/go-tos/devbase/log"
+	"github.com/streadway/amqp"
 )
 
 var (
 	uri          = "amqp://chen:chen@10.10.10.42:5672/" //flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
-	exchangeName = "tos-scan"//flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
-	exchangeType = "direct"//flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
-	reliable     = false //flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
+	exchangeName = "tos-scan"                           //flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
+	exchangeType = "direct"                             //flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
+	reliable     = false                                //flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
 )
 
 //func init() {
 //	//flag.Parse()
 //}
 
-type MessageQueue struct  {
+type MessageQueue struct {
 	connection *amqp.Connection
-	channel *amqp.Channel
+	channel    *amqp.Channel
 }
 
-
-func CreateMQ() (*MessageQueue , error){
+func CreateMQ() (*MessageQueue, error) {
 	needClose := true
 	connection, err := amqp.Dial(uri)
 	if err != nil {
@@ -45,7 +44,7 @@ func CreateMQ() (*MessageQueue , error){
 	log.Info(fmt.Sprintf("got Channel, declaring %q Exchange (%q)", exchangeType, exchangeName))
 
 	if err := channel.ExchangeDeclare(
-		exchangeName,     // name
+		exchangeName, // name
 		exchangeType, // type
 		true,         // durable  防止队列丢失
 		false,        // auto-deleted
@@ -81,7 +80,7 @@ func (mq *MessageQueue) Close() {
 	mq.connection.Close()
 }
 
-func (mq *MessageQueue)Publish(routingKey string, body interface{}) error {
+func (mq *MessageQueue) Publish(routingKey string, body interface{}) error {
 
 	// This function dials, connects, declares, publishes, and tears down,
 	// all in one go. In a real service, you probably want to maintain a
@@ -92,14 +91,14 @@ func (mq *MessageQueue)Publish(routingKey string, body interface{}) error {
 		return err
 	}
 
-	fmt.Println(string(by))
+	log.Debug(string(by))
 	log.Info(fmt.Sprintf("declared Exchange, publishing %dB body (%q)", len(by), string(by)))
 
 	if err := mq.channel.Publish(
-		exchangeName,   // publish to an exchange
-		routingKey, // routing to 0 or more queues
-		false,      // mandatory
-		false,      // immediate
+		exchangeName, // publish to an exchange
+		routingKey,   // routing to 0 or more queues
+		false,        // mandatory
+		false,        // immediate
 		amqp.Publishing{
 			Headers:         amqp.Table{},
 			ContentType:     "text/plain",

@@ -202,7 +202,7 @@ func (tx *TxBlock) Validation() error {
 		}
 		if !isContract {
 			if out.Amount.Sign() <= 0 {
-				return fmt.Errorf("the amount must be positive")
+				return fmt.Errorf("the amount=[%s] must be positive", out.Amount.String())
 			}
 			if tx.Outs[0].Receiver == (common.Address{}) {
 				return fmt.Errorf("receiver cannot be empty")
@@ -280,4 +280,41 @@ func (tx *TxBlock) AsMessage() (Message, error) {
 	msg.from, err = tx.GetSender()
 	return msg, err
 
+}
+
+func (tx *TxBlock) GetOuts() []TxOut {
+	return tx.Outs
+}
+
+func (tx *TxBlock) String() string {
+	str := fmt.Sprintf("hash:%s\n", tx.GetHash().String())
+	str += fmt.Sprintf("head:{\n")
+	str += fmt.Sprintf("Type:%d\n", tx.Header.Type)
+	str += fmt.Sprintf("Time:%d\n", tx.Header.Time)
+	str += fmt.Sprintf("GasPrice:%s\n", tx.Header.GasPrice.String())
+	str += fmt.Sprintf("GasLimit:%d\n", tx.Header.GasLimit)
+	str += fmt.Sprintf("}\n")
+	str += fmt.Sprintf("links:{\n")
+	for i, link := range tx.Links {
+		str += fmt.Sprintf("link[%d]:%s\n", i, link.String())
+	}
+	str += fmt.Sprintf("}\n")
+	sender, _ := tx.GetSender()
+	str += fmt.Sprintf("sender:%s\n", sender.String())
+	str += fmt.Sprintf("outs:{\n")
+	for i, out := range tx.Outs {
+		str += fmt.Sprintf("out[%d]:Amount:%s,Receiver:%s\n", i, out.Amount.String(), out.Receiver.String())
+	}
+	str += fmt.Sprintf("}\n")
+	str += fmt.Sprintf("AccountNonce:%d\n", tx.AccountNonce)
+	str += fmt.Sprintf("Payload:%s\n", common.Bytes2Hex(tx.Payload))
+	str += fmt.Sprintf("mutableInfo:{\n")
+	str += fmt.Sprintf("Status:%b\n", tx.mutableInfo.Status)
+	str += fmt.Sprintf("ConfirmItsNumber:%d\n", tx.mutableInfo.ConfirmItsNumber)
+	str += fmt.Sprintf("ConfirmItsIndex:%d\n", tx.mutableInfo.ConfirmItsIndex)
+	str += fmt.Sprintf("Difficulty:%s\n", tx.mutableInfo.Difficulty.String())
+	str += fmt.Sprintf("CumulativeDiff:%s\n", tx.mutableInfo.CumulativeDiff.String())
+	str += fmt.Sprintf("MaxLinkHash:%s\n", tx.mutableInfo.MaxLinkHash.String())
+	str += fmt.Sprintf("}\n")
+	return str
 }

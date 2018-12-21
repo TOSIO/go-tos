@@ -23,12 +23,12 @@ func (reward *ConfirmRewardInfo) Init() {
 	reward.minerReward = big.NewInt(0)
 }
 
-func (mainChain *MainChain) CalculatingAccounts(block types.Block, confirmReward *big.Int, count *uint64, state *state.StateDB) (*big.Int, error) {
+func (mainChain *MainChain) CalculatingAccounts(block types.Block, confirmReward *big.Int, count *uint64, state *state.StateDB) (*big.Int, *types.Receipt, error) {
 	log.Debug("begin CalculatingAccounts", "hash", block.GetHash().String())
 	address, err := block.GetSender()
 	if err != nil {
 		log.Error(err.Error())
-		return confirmReward, err
+		return confirmReward, nil, err
 	}
 	log.Debug("Add confirmReward", "address", address, "confirmReward", confirmReward.String())
 
@@ -42,18 +42,18 @@ func (mainChain *MainChain) CalculatingAccounts(block types.Block, confirmReward
 		gasPool = block.GetGasLimit()
 	}
 
-	cost, err := mainChain.ExecutionTransaction(block, gasPool, count, state)
+	cost, receipt, err := mainChain.ExecutionTransaction(block, gasPool, count, state)
 	log.Debug("ComputeCost", "block", block.GetHash().String(), "cost", cost.String())
 
 	actualCostDeduction := deductCost(address, balance, cost, state)
 	log.Debug("deduct cost", "address", address, "actualCostDeduction", actualCostDeduction.String(), "balance", state.GetBalance(address))
 
-	return actualCostDeduction, err
+	return actualCostDeduction, receipt, err
 }
 
-func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint64, count *uint64, state *state.StateDB) (*big.Int, error) {
+func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint64, count *uint64, state *state.StateDB) (*big.Int, *types.Receipt, error) {
 	needUseGas, IsGasCostOverrun, receipt, err := mainChain.TransferAccounts(block, gasPool, state)
-	useGas := needUseGas
+	actualGas := needUseGas
 	var returnErr error
 	var receiptStatus uint64
 	if err != nil {
@@ -61,11 +61,11 @@ func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint
 		returnErr = err
 	} else if IsGasCostOverrun {
 		returnErr = fmt.Errorf("gas use overrun")
-		useGas = gasPool
+		actualGas = gasPool
 	}
 
 	if (block.GetMutableInfo().Status & types.BlockMain) != 0 {
-		useGas = 0
+		actualGas = 0
 		needUseGas = 0
 	}
 
@@ -79,7 +79,7 @@ func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint
 		receipt = &types.Receipt{
 			TxHash:  block.GetHash(),
 			Status:  receiptStatus,
-			GasUsed: useGas,
+			GasUsed: actualGas,
 			Index:   *count,
 		}
 	}
@@ -89,7 +89,7 @@ func (mainChain *MainChain) ExecutionTransaction(block types.Block, gasPool uint
 		log.Error("ExecutionTransaction error:" + err.Error())
 	}
 
-	return ComputeTransactionCost(needUseGas, block.GetGasPrice()), returnErr
+	return ComputeTransactionCost(needUseGas, block.GetGasPrice()), receipt, returnErr
 }
 
 func (mainChain *MainChain) TransferAccounts(block types.Block, gasPool uint64, state *state.StateDB) (uint64, bool, *types.Receipt, error) {
@@ -102,7 +102,7 @@ func (mainChain *MainChain) TransferAccounts(block types.Block, gasPool uint64, 
 	mainAddress, err := mainChain.CurrentMainBlock.GetSender()
 	if err != nil {
 		log.Error("ComputeCostGas err:" + err.Error())
-		return costGas, false, nil, fmt.Errorf("ComputeCostGas err:" + err.Error())
+		return costGas, gasPool < costGas, nil, fmt.Errorf("ComputeCostGas err:" + err.Error())
 	}
 
 	if block.GetType() == types.BlockTypeTx {
@@ -119,6 +119,9 @@ func (mainChain *MainChain) TransferAccounts(block types.Block, gasPool uint64, 
 				from, _ := block.GetSender()
 				balance := state.GetBalance(from)
 				state.SetNonce(from, state.GetNonce(from)+1)
+				if (block.GetMutableInfo().Status & types.BlockMain) != 0 {
+					costGas = 0
+				}
 				if !CheckTransactionAmount(balance, txBlock.Outs, ComputeTransactionCost(costGas, block.GetGasPrice())) {
 					err = fmt.Errorf("%s insufficient balance", from.String())
 					log.Info(err.Error())
@@ -150,9 +153,10 @@ func ComputeTransactionCost(costGas uint64, gasPrice *big.Int) *big.Int {
 }
 
 func deductCost(address common.Address, balance *big.Int, cost *big.Int, state *state.StateDB) *big.Int {
+	balance = new(big.Int).Set(balance)
 	if balance.Cmp(cost) < 0 {
 		state.SetBalance(address, big.NewInt(0))
-		return new(big.Int).Set(balance)
+		return balance
 	} else {
 		state.SubBalance(address, cost)
 		return new(big.Int).Set(cost)

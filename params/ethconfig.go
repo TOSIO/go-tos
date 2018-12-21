@@ -25,8 +25,8 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xec8a76a97a59a0ba7b83e86abcb2c6f708d3d60fa02c4729235ad740317d26c0")
-	TestnetGenesisHash = common.HexToHash("0xec8a76a97a59a0ba7b83e86abcb2c6f708d3d60fa02c4729235ad740317d26c1")
+	MainnetGenesisHash = common.HexToHash("0x4c84ce90cab13a828b459f95c86ca9283f68e9f2551e7a97c994d91bccdcdcb2")
+	TestnetGenesisHash = common.HexToHash("0xb7b5e65559ab3f39252291a16f6d7b1e45be2028315b50d16d76bf98f3879bfc")
 	//RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 )
 
@@ -38,7 +38,7 @@ var (
 		DAOForkBlock:        big.NewInt(0),
 		DAOForkSupport:      true,
 		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0xec8a76a97a59a0ba7b83e86abcb2c6f708d3d60fa02c4729235ad740317d26c1"),
+		EIP150Hash:          common.HexToHash("0x4c84ce90cab13a828b459f95c86ca9283f68e9f2551e7a97c994d91bccdcdcb2"),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
@@ -57,12 +57,12 @@ var (
 
 	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(3),
+		ChainID:             big.NewInt(2),
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        big.NewInt(0),
 		DAOForkSupport:      true,
 		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0xec8a76a97a59a0ba7b83e86abcb2c6f708d3d60fa02c4729235ad740317d26c1"),
+		EIP150Hash:          common.HexToHash("0xb7b5e65559ab3f39252291a16f6d7b1e45be2028315b50d16d76bf98f3879bfc"),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),

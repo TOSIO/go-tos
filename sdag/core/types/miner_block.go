@@ -214,3 +214,34 @@ func EncodeNonce(i uint64) BlockNonce {
 	binary.BigEndian.PutUint64(n[:], i)
 	return n
 }
+
+func (mb *MinerBlock) GetOuts() []TxOut {
+	return []TxOut{}
+}
+
+func (mb *MinerBlock) String() string {
+	str := fmt.Sprintf("hash:%s\n", mb.GetHash().String())
+	str += fmt.Sprintf("head:{\n")
+	str += fmt.Sprintf("Type:%d\n", mb.Header.Type)
+	str += fmt.Sprintf("Time:%d\n", mb.Header.Time)
+	str += fmt.Sprintf("GasPrice:%s\n", mb.Header.GasPrice.String())
+	str += fmt.Sprintf("GasLimit:%d\n", mb.Header.GasLimit)
+	str += fmt.Sprintf("}\n")
+	str += fmt.Sprintf("links:{\n")
+	for i, link := range mb.Links {
+		str += fmt.Sprintf("link[%d]:%s\n", i, link.String())
+	}
+	str += fmt.Sprintf("}\n")
+	sender, _ := mb.GetSender()
+	str += fmt.Sprintf("sender:%s\n", sender.String())
+	str += fmt.Sprintf("Nonce:%d\n", mb.Nonce)
+	str += fmt.Sprintf("mutableInfo:{\n")
+	str += fmt.Sprintf("Status:%b\n", mb.mutableInfo.Status)
+	str += fmt.Sprintf("ConfirmItsNumber:%d\n", mb.mutableInfo.ConfirmItsNumber)
+	str += fmt.Sprintf("ConfirmItsIndex:%d\n", mb.mutableInfo.ConfirmItsIndex)
+	str += fmt.Sprintf("Difficulty:%s\n", mb.mutableInfo.Difficulty.String())
+	str += fmt.Sprintf("CumulativeDiff:%s\n", mb.mutableInfo.CumulativeDiff.String())
+	str += fmt.Sprintf("MaxLinkHash:%s\n", mb.mutableInfo.MaxLinkHash.String())
+	str += fmt.Sprintf("}\n")
+	return str
+}

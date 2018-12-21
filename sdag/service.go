@@ -89,9 +89,16 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	}
 	stateDB := state.NewDatabase(stateBaseDB)
 
+	var mq *messagequeue.MessageQueue
+	if config.MessageQueue {
+		mq, err = messagequeue.CreateMQ()
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI
-	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig, config.NetworkId); err != nil {
+	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig, config.NetworkId, mq); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
@@ -101,8 +108,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		log.Error("Initialising Sdag protocol failed.")
 		return nil, err
 	}
-	pool := manager.New(chain, chainDB, netFeed, event)
-	minerParam := miner.MinerInfo{}
+	pool := manager.New(chain, chainDB, netFeed, event, mq)
 
 	sdag := &Sdag{
 		// init
@@ -114,22 +120,14 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
-		miner:           miner.New(pool, &minerParam, chain, netFeed),
+		miner:           miner.New(pool, &miner.MinerInfo{}, chain, netFeed),
 		accountManager:  ctx.AccountManager,
 		tosbase:         config.Tosbase,
 		blockPool:       pool,
 		transaction:     transaction.New(pool, chain, chainDB, stateDB),
 		blockPoolEvent:  event,
 		sct:             ctx,
-	}
-
-	if config.MessageQueue {
-		mq, err := messagequeue.CreateMQ()
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			sdag.mq = mq
-		}
+		mq:              mq,
 	}
 
 	log.Info("Initialising Sdag protocol", "versions", protocol.ProtocolVersions, "network", config.NetworkId)

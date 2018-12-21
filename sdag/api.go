@@ -27,11 +27,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/TOSIO/go-tos/devbase/statistics"
-	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/services/accounts/keystore"
 	"github.com/pborman/uuid"
@@ -126,7 +126,7 @@ func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{
 	if err == nil {
 		//获取GasUsed
 		blockInfo.GasUsed = Receipt.GasUsed
-		blockInfo.ActualTxFee = new(big.Int).Mul(new(big.Int).SetUint64(Receipt.GasUsed),blockInfo.GasPrice).String()
+		blockInfo.ActualTxFee = new(big.Int).Mul(new(big.Int).SetUint64(Receipt.GasUsed), blockInfo.GasPrice).String()
 	}
 
 	return blockInfo, nil
@@ -200,7 +200,7 @@ func (api *PublicSdagAPI) Transaction(transactionInfo *TransactionInfo) (interfa
 	}
 	if Amount.Sign() < 0 {
 		log.Error("The amount must be positive", "Amount", transactionInfo.Amount)
-		return nil, fmt.Errorf("the amount must be positive")
+		return nil, fmt.Errorf("the amount=[%s] must be positive", transactionInfo.Amount)
 	}
 	if len(transactionInfo.GasPrice) == 0 {
 		txRequestInfo.GasPrice = params.DefaultGasPrice
@@ -333,23 +333,10 @@ func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) 
 // block numbers are also allowed.
 func (api *PublicSdagAPI) GetBalance(walletadress *WalletAdress) (interface{}, error) {
 	address := common.HexToAddress(walletadress.WalletAddr)
-	//last mainblock info
-	tailMainBlockInfo := api.s.blockchain.GetMainTail()
-	//find the main timeslice
-	//sTime := utils.GetMainTime(tailMainBlockInfo.Time)
-	//get mainblock info
-	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
-	if err != nil {
-		return "", err
-	}
-	//get  statedb
-	state, err := state.New(mainInfo.Root, api.s.stateDb)
-	if err != nil {
-		return "", err
-	}
-	bigbalance := state.GetBalance(address)
+	State := api.s.blockchain.GetLastState()
+	bigbalance := State.GetBalance(address)
 	balance := bigbalance.String()
-	return balance, state.Error()
+	return balance, State.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {
@@ -529,18 +516,9 @@ type GetState struct {
 }
 
 func (api *PublicSdagAPI) GetState(getState GetState) (interface{}, error) {
-	tailMainBlockInfo := api.s.blockchain.GetMainTail()
-	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
-	if err != nil {
-		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
-	}
-
-	state, err := state.New(mainInfo.Root, api.s.stateDb)
-	if err != nil {
-		return nil, err
-	}
-	hash := state.GetState(getState.Address, getState.Hash)
-	return hash, state.Error()
+	State := api.s.blockchain.GetLastState()
+	hash := State.GetState(getState.Address, getState.Hash)
+	return hash, State.Error()
 }
 
 type GetCode struct {
@@ -549,16 +527,31 @@ type GetCode struct {
 }
 
 func (api *PublicSdagAPI) GetCode(getCode GetCode) (interface{}, error) {
-	tailMainBlockInfo := api.s.blockchain.GetMainTail()
-	mainInfo, err := storage.ReadMainBlock(api.s.chainDb, tailMainBlockInfo.Number)
-	if err != nil {
-		return nil, fmt.Errorf("ReadMainBlock error:" + err.Error())
-	}
+	State := api.s.blockchain.GetLastState()
+	code := State.GetCode(getCode.Address)
+	return common.Bytes2Hex(code), State.Error()
+}
 
-	state, err := state.New(mainInfo.Root, api.s.stateDb)
-	if err != nil {
-		return nil, err
+type allBalance struct {
+	BalanceMap   map[common.Address]string
+	TotalBalance string
+	NumberAddr   int
+}
+
+func (api *PublicSdagAPI) GetAllBalance() (interface{}, error) {
+	State := api.s.blockchain.GetLastState()
+	balanceMap := State.GetAllBalance()
+	var keys []string
+	for k := range balanceMap {
+		keys = append(keys, k.String())
 	}
-	code := state.GetCode(getCode.Address)
-	return common.Bytes2Hex(code), state.Error()
+	sort.Strings(keys)
+	totalBalance := big.NewInt(0)
+	balanceStringMap := make(map[common.Address]string)
+	for _, k := range keys {
+		addr := common.HexToAddress(k)
+		totalBalance.Add(totalBalance, balanceMap[addr])
+		balanceStringMap[addr] = balanceMap[addr].String()
+	}
+	return &allBalance{balanceStringMap, totalBalance.String(), len(balanceStringMap)}, nil
 }

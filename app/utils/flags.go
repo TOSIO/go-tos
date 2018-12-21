@@ -120,6 +120,11 @@ var (
 		Usage: "Network identifier (integer, 1=Frontier, 2=Morden (disused), 3=Ropsten, 4=Rinkeby)",
 		Value: sdag.DefaultConfig.NetworkId,
 	}
+	MessageQueue = cli.BoolFlag{
+		Name:        "mq",
+		Usage:       "Open MessageQueue",
+		Destination: &sdag.DefaultConfig.MessageQueue,
+	}
 	TestnetFlag = cli.BoolFlag{
 		Name:  "testnet",
 		Usage: "Ropsten network: pre-configured proof-of-work test network",
@@ -437,7 +442,7 @@ func ApplyNodeFlags(ctx *cli.Context, cfg *node.Config) {
 	case ctx.GlobalBool(DeveloperFlag.Name):
 		cfg.DataDir = "" // unless explicitly requested, use memory databases
 	case ctx.GlobalBool(TestnetFlag.Name):
-		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testnet")
+		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "testNet")
 		/*case ctx.GlobalBool(RinkebyFlag.Name):
 		cfg.DataDir = filepath.Join(node.DefaultDataDir(), "rinkeby")*/
 	}
@@ -502,7 +507,7 @@ func ApplySdagFlags(ctx *cli.Context, cfg *sdag.Config) {
 func MakeDataDir(ctx *cli.Context) string {
 	if path := ctx.GlobalString(DataDirFlag.Name); path != "" {
 		if ctx.GlobalBool(TestnetFlag.Name) {
-			return filepath.Join(path, "testnet")
+			return filepath.Join(path, "testNet")
 		}
 		if ctx.GlobalBool(RinkebyFlag.Name) {
 			return filepath.Join(path, "rinkeby")

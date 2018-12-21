@@ -19,6 +19,7 @@ var (
 	urlString4       = "http://10.10.10.42:8551"
 	urlString5       = "http://47.88.226.204:9545"
 	urlString6       = "http://47.74.255.165:9545"
+	urlString7       = "http://10.10.10.13:8545"
 	jsonStringFormat = `
 {
 "jsonrpc":"2.0",
@@ -26,7 +27,7 @@ var (
 "params":[{"WalletAddr" :"%s"}],
 "id":1
 }`
-	urlString = urlString3
+	urlString = urlString1
 )
 
 type KeyInfo struct {

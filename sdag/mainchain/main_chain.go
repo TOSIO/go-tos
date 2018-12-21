@@ -12,7 +12,9 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/core/types"
 	"github.com/TOSIO/go-tos/sdag/core/vm"
+	"github.com/TOSIO/go-tos/services/messagequeue"
 	"math/big"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -45,6 +47,8 @@ type MainChain struct {
 	LocalAddress       map[common.Address]bool
 	LocalAddressRWLock sync.RWMutex
 	networkId          uint64
+	mq                 *messagequeue.MessageQueue
+	lastState          *state.StateDB
 }
 
 func (mainChain *MainChain) AddLocalAddress(address common.Address) {
@@ -130,7 +134,7 @@ func (mainChain *MainChain) setPerv() error {
 	return nil
 }
 
-func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, networkId uint64) (*MainChain, error) {
+func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, networkId uint64, mq *messagequeue.MessageQueue) (*MainChain, error) {
 	var mainChain MainChain
 	mainChain.db = chainDb
 	mainChain.stateDb = stateDb
@@ -138,11 +142,23 @@ func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, net
 	mainChain.LocalBlockNotice = make(chan LocalBlockNotice)
 	mainChain.LocalAddress = make(map[common.Address]bool)
 	mainChain.networkId = networkId
+	mainChain.mq = mq
+
 	err := mainChain.initTail()
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("mainChain initTail finish", "Tail", mainChain.Tail, "PervTail", mainChain.PervTail, "MainTail", mainChain.MainTail)
+	log.Debug("mainChain initTail finish", "Tail", mainChain.Tail.String(), "PervTail", mainChain.PervTail.String(), "MainTail", mainChain.MainTail.String())
+
+	mainBlock, err := storage.ReadMainBlock(mainChain.db, mainChain.MainTail.Number)
+	if err != nil {
+		return nil, fmt.Errorf("initTail ReadMainBlock lastMainNunber:%d fail", mainChain.MainTail.Number)
+	}
+	state, err := state.New(mainBlock.Root, mainChain.stateDb)
+	if err != nil {
+		return nil, fmt.Errorf("%s state.New fail [%s]", mainBlock.Root.String(), err.Error())
+	}
+	mainChain.lastState = state
 
 	genesisHash, err := mainChain.Genesis.GetGenesisHash()
 	if err != nil {
@@ -194,6 +210,14 @@ func (mainChain *MainChain) GetMainTail() *types.TailMainBlockInfo {
 	return &tail
 }
 
+func (mainChain *MainChain) GetLastState() *state.StateDB {
+	var state *state.StateDB
+	mainChain.mainTailRWLock.RLock()
+	state = mainChain.lastState
+	mainChain.mainTailRWLock.RUnlock()
+	return state
+}
+
 func (mainChain *MainChain) GetGenesisHash() (common.Hash, error) {
 	return mainChain.Genesis.GetGenesisHash()
 }
@@ -227,7 +251,7 @@ func (mainChain *MainChain) GetNextMain(hash common.Hash) (common.Hash, *types.M
 func (mainChain *MainChain) UpdateTail(block types.Block) {
 	mainChain.tailRWLock.RLock()
 	if mainChain.Tail.CumulativeDiff.Cmp(block.GetCumulativeDiff()) < 0 {
-		log.Debug("update tail", "hash", block.GetHash().String(), "block", block)
+		log.Debug("update tail\n" + block.String())
 		mainChain.tailRWLock.RUnlock()
 		mainChain.tailRWLock.Lock()
 		if !IsTheSameTimeSlice(mainChain.Tail.Time, block.GetTime()) {
@@ -241,7 +265,7 @@ func (mainChain *MainChain) UpdateTail(block types.Block) {
 		if err != nil {
 			log.Error(err.Error())
 		}
-		log.Debug("update tail finished", "hash", block.GetHash().String(), "mainChain.Tail", mainChain.Tail, "mainChain.PervTail", mainChain.PervTail)
+		log.Debug("update tail finished", "hash", block.GetHash().String(), "mainChain.Tail", mainChain.Tail.String(), "mainChain.PervTail", mainChain.PervTail.String())
 		mainChain.tailRWLock.Unlock()
 	} else {
 		mainChain.tailRWLock.RUnlock()
@@ -384,7 +408,7 @@ func (mainChain *MainChain) findTheMainBlockThatCanConfirmOtherBlocks(mainTail *
 				break
 			}
 			listBlock = append([]types.Block{block}, listBlock...)
-			log.Debug("findTheMainBlockThatCanConfirmOtherBlocks", "hash", block.GetHash().String(), "block", block)
+			log.Debug("findTheMainBlockThatCanConfirmOtherBlocks\n" + block.String())
 		}
 		hash = block.GetMutableInfo().MaxLinkHash
 	}
@@ -444,14 +468,14 @@ func (mainChain *MainChain) Confirm() error {
 	}
 
 	for index, block := range listMainBlock {
-		log.Debug("the main block confirm", "hash", block.GetHash().String(), "block", block, "index", index)
+		log.Debug("the main block confirm\n"+block.String(), "index", index)
 		number++
 		info := block.GetMutableInfo()
 		info.Status |= types.BlockMain
 		block.SetMutableInfo(info)
 		mainChain.CurrentMainBlock = block
 		count := uint64(0)
-		confirmReward, err := mainChain.singleBlockConfirm(block, number, &count, state)
+		confirmReward, err := mainChain.singleBlockConfirm(block, block, number, &count, state)
 		if err != nil {
 			return err
 		}
@@ -480,15 +504,16 @@ func (mainChain *MainChain) Confirm() error {
 		}
 
 		mainChain.mainTailRWLock.Lock()
-		log.Debug("begin update MainTail", "MainTail", mainChain.MainTail, "block", block)
+		log.Debug("begin update MainTail\n"+block.String(), "MainTail", mainChain.MainTail.String())
 		mainChain.MainTail.Hash = block.GetHash()
 		mainChain.MainTail.Time = block.GetTime()
 		mainChain.MainTail.Number = number
 		mainChain.MainTail.CumulativeDiff = block.GetCumulativeDiff()
+		mainChain.lastState = state
 		if err := storage.WriteTailMainBlockInfo(mainChain.db, &mainChain.MainTail); err != nil {
 			log.Error("Confirm WriteTailMainBlockInfo", "error", err)
 		}
-		log.Debug("update MainTail finished", "MainTail", mainChain.MainTail)
+		log.Debug("update MainTail finished", "MainTail", mainChain.MainTail.String())
 		mainChain.mainTailRWLock.Unlock()
 	}
 	return nil
@@ -504,7 +529,7 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash, number uint64) erro
 	if err != nil {
 		return fmt.Errorf("hash=%s ReadBlockMutableInfo fail. %s", hash.String(), err.Error())
 	}
-	log.Debug("RollBackStatus main block", "block", block, "mutableInfo", mutableInfo)
+	log.Debug("RollBackStatus main block\n"+block.String(), "mutableInfo", mutableInfo)
 
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
@@ -536,7 +561,7 @@ func (mainChain *MainChain) RollBackStatus(hash common.Hash, number uint64) erro
 }
 
 func (mainChain *MainChain) singleRollBackStatus(block types.Block, number uint64) error {
-	log.Debug("singleRollBackStatus", "hash", block.GetHash().String(), "block", block)
+	log.Debug("singleRollBackStatus\n" + block.String())
 	for _, hash := range block.GetLinks() {
 		mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, hash)
 		if err != nil {
@@ -564,7 +589,7 @@ func (mainChain *MainChain) singleRollBackStatus(block types.Block, number uint6
 	return nil
 }
 
-func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64, count *uint64, state *state.StateDB) (*ConfirmRewardInfo, error) {
+func (mainChain *MainChain) singleBlockConfirm(block types.Block, mainBlock types.Block, number uint64, count *uint64, state *state.StateDB) (*ConfirmRewardInfo, error) {
 	var (
 		confirmRewardInfo ConfirmRewardInfo
 	)
@@ -583,7 +608,7 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 			return nil, fmt.Errorf("hash=%s ReadBlock Not found", hash.String())
 		}
 		block.SetMutableInfo(mutableInfo)
-		linksReward, err := mainChain.singleBlockConfirm(block, number, count, state)
+		linksReward, err := mainChain.singleBlockConfirm(block, mainBlock, number, count, state)
 		if err != nil {
 			log.Error(err.Error())
 		}
@@ -593,15 +618,15 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 			confirmRewardInfo.minerReward.Add(confirmRewardInfo.minerReward, linksReward.minerReward)
 		}
 	}
-	log.Debug("singleBlockConfirm self", "hash", block.GetHash().String(),
-		"block", block, "confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String())
+	log.Debug("singleBlockConfirm self\n"+block.String(), "confirmRewardInfo.userReward", confirmRewardInfo.userReward.String(), "confirmRewardInfo.minerReward", confirmRewardInfo.minerReward.String())
 	*count++
 	block.GetMutableInfo().ConfirmItsNumber = number
 	block.GetMutableInfo().Status |= types.BlockConfirm
 	block.GetMutableInfo().ConfirmItsIndex = *count
 
 	var err error
-	confirmRewardInfo.userReward, err = mainChain.CalculatingAccounts(block, confirmRewardInfo.userReward, count, state)
+	var receipt *types.Receipt
+	confirmRewardInfo.userReward, receipt, err = mainChain.CalculatingAccounts(block, confirmRewardInfo.userReward, count, state)
 	if err == nil {
 		block.GetMutableInfo().Status |= types.BlockApply
 	}
@@ -612,6 +637,47 @@ func (mainChain *MainChain) singleBlockConfirm(block types.Block, number uint64,
 
 	from, _ := block.GetSender()
 	mainChain.LocalBlockNoticeSend(block.GetHash(), from, ConfirmAction)
+	mainChain.sendStatusInfoToCenter(block, mainBlock, receipt)
 
+	log.Debug(block.String())
 	return ComputeConfirmReward(&confirmRewardInfo), err
+}
+
+func (mainChain *MainChain) sendStatusInfoToCenter(block types.Block, mainBlock types.Block, receipt *types.Receipt) {
+	if mainChain.mq == nil {
+		return
+	}
+	IsMain := "0"
+	if block == mainBlock {
+		IsMain = "1"
+	}
+
+	var (
+		GasUsed, ConfirmedOrder string
+	)
+
+	if receipt != nil {
+		GasUsed = strconv.FormatUint(receipt.CumulativeGasUsed, 10)
+		ConfirmedOrder = strconv.FormatUint(receipt.Index, 10)
+	}
+
+	ConfirmStatus := "apply"
+	if block.GetStatus()&types.BlockApply == 0 {
+		ConfirmStatus = "reject"
+	}
+
+	blockStatus := types.MQBlockStatus{
+		BlockHash:      block.GetHash().String(),
+		BlockHigh:      strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
+		IsMain:         IsMain,
+		ConfirmStatus:  ConfirmStatus,
+		ConfirmDate:    strconv.FormatUint(utils.GetTimeStamp(), 10),
+		GasUsed:        GasUsed,
+		ConfirmedHash:  mainBlock.GetHash().String(),
+		ConfirmedHigh:  strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
+		ConfirmedOrder: ConfirmedOrder,
+	}
+	if err := mainChain.mq.Publish("blockStatus", blockStatus); err != nil {
+		log.Error(err.Error())
+	}
 }
