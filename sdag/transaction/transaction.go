@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/log"
 	"github.com/TOSIO/go-tos/devbase/storage/tosdb"
-	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/storage"
 	"github.com/TOSIO/go-tos/sdag/mainchain"
 	"math/big"
@@ -29,16 +28,14 @@ type Transaction struct {
 	pool                   core.BlockPoolI
 	mainChainI             mainchain.MainChainI
 	chainDb                tosdb.Database //Block chain database
-	stateDb                state.Database //trie
 }
 
-func New(pool core.BlockPoolI, mainChainI mainchain.MainChainI, chainDb tosdb.Database, stateDb state.Database) *Transaction {
+func New(pool core.BlockPoolI, mainChainI mainchain.MainChainI, chainDb tosdb.Database) *Transaction {
 	transaction := &Transaction{
 		addressTransactionMap: make(map[common.Address]map[common.Hash]*big.Int),
 		pool:                  pool,
 		mainChainI:            mainChainI,
 		chainDb:               chainDb,
-		stateDb:               stateDb,
 	}
 
 	transaction.ReceiveTransactionAction()

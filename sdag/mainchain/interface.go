@@ -2,8 +2,10 @@ package mainchain
 
 import (
 	"github.com/TOSIO/go-tos/devbase/common"
+	"github.com/TOSIO/go-tos/params"
 	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/sdag/core/types"
+	"github.com/TOSIO/go-tos/sdag/core/vm"
 	"math/big"
 )
 
@@ -22,4 +24,10 @@ type MainChainI interface {
 	LocalBlockNoticeSend(hash common.Hash, address common.Address, action int)
 	LocalBlockNoticeChan() chan LocalBlockNotice
 	GetLastState() *state.StateDB
+	GetStateCacheByMainNumber(number int64) (*state.StateDB, error)
+	GetMainBlockByMainNumber(number int64) (types.Block, error)
+	GetMainBlock(number uint64) types.Block
+
+	GetChainConfig() *params.ChainConfig
+	GetVMConfig() vm.Config
 }

@@ -17,10 +17,10 @@ import (
 	"github.com/TOSIO/go-tos/sdag/core/types"
 )
 
-func NewGenesis(db tosdb.Database, stateDb state.Database, InitialFilePath string, networkId uint64) (*Genesis, error) {
+func NewGenesis(db tosdb.Database, stateBaseDB tosdb.Database, InitialFilePath string, networkId uint64) (*Genesis, error) {
 	var genesis Genesis
 	genesis.db = db
-	genesis.stateDb = stateDb
+	genesis.stateBaseDB = stateBaseDB
 	genesis.networkId = networkId
 	if len(InitialFilePath) == 0 {
 		genesis.InitialFilePath = "./genesisConfig.json"
@@ -48,7 +48,7 @@ type InitialGenesisBlockInfo struct {
 
 type Genesis struct {
 	db              tosdb.Database
-	stateDb         state.Database
+	stateBaseDB     tosdb.Database
 	InitialFilePath string
 	InitialGenesisBlockInfo
 	genesisHash common.Hash
@@ -99,7 +99,7 @@ func (genesis *Genesis) Genesis() (*types.TailMainBlockInfo, error) {
 		params.DefaultGasLimit,
 	}
 
-	state, err := state.New(common.Hash{}, genesis.stateDb)
+	state, err := state.New(common.Hash{}, state.NewDatabase(genesis.stateBaseDB))
 	if err != nil {
 		log.Error("state.New fail [%s]", err.Error())
 		return nil, err

@@ -17,11 +17,16 @@
 package sdag
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/TOSIO/go-tos/devbase/common/hexutil"
+	"github.com/TOSIO/go-tos/devbase/common/math"
 	"github.com/TOSIO/go-tos/params"
+	"github.com/TOSIO/go-tos/sdag/core"
 	"github.com/TOSIO/go-tos/sdag/core/types"
+	"github.com/TOSIO/go-tos/sdag/core/vm"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -532,6 +537,12 @@ func (api *PublicSdagAPI) GetCode(getCode GetCode) (interface{}, error) {
 	return common.Bytes2Hex(code), State.Error()
 }
 
+func (api *PublicSdagAPI) GetNonce(getCode GetCode) (interface{}, error) {
+	State := api.s.blockchain.GetLastState()
+	uint64 := State.GetNonce(getCode.Address)
+	return uint64, State.Error()
+}
+
 type allBalance struct {
 	BalanceMap   map[common.Address]string
 	TotalBalance string
@@ -554,4 +565,90 @@ func (api *PublicSdagAPI) GetAllBalance() (interface{}, error) {
 		balanceStringMap[addr] = balanceMap[addr].String()
 	}
 	return &allBalance{balanceStringMap, totalBalance.String(), len(balanceStringMap)}, nil
+}
+
+// CallArgs represents the arguments for a call.
+type CallArgs struct {
+	From     common.Address  `json:"from"`
+	To       *common.Address `json:"to"`
+	Gas      hexutil.Uint64  `json:"gas"`
+	GasPrice hexutil.Big     `json:"gasPrice"`
+	Value    hexutil.Big     `json:"value"`
+	Data     hexutil.Bytes   `json:"data"`
+}
+
+func (api *PublicSdagAPI) Call(ctx context.Context, args CallArgs, blockNumber int64) (hexutil.Bytes, error) {
+	result, _, _, err := api.doCall(ctx, args, blockNumber, vm.Config{}, 5*time.Second)
+	return (hexutil.Bytes)(result), err
+}
+
+func (api *PublicSdagAPI) doCall(ctx context.Context, args CallArgs, blockNumber int64, vmCfg vm.Config, timeout time.Duration) ([]byte, uint64, bool, error) {
+	defer func(start time.Time) { log.Debug("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
+
+	state, err := api.s.blockchain.GetStateCacheByMainNumber(blockNumber)
+	if err != nil {
+		return nil, 0, false, fmt.Errorf("doCall error:" + err.Error())
+	}
+
+	block, err := api.s.blockchain.GetMainBlockByMainNumber(blockNumber)
+	if err != nil {
+		return nil, 0, false, fmt.Errorf("doCall error:" + err.Error())
+	}
+
+	author, err := block.GetSender()
+	if err != nil {
+		log.Error("doCall GetSender err:" + err.Error())
+		return nil, 0, false, fmt.Errorf("doCall GetSender err:" + err.Error())
+	}
+
+	// Set sender address or use a default if none specified
+	addr := args.From
+	if addr == (common.Address{}) {
+		if wallets := api.s.accountManager.Wallets(); len(wallets) > 0 {
+			if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+				addr = accounts[0].Address
+			}
+		}
+	}
+	// Set default gas & gas price if none were set
+	gas, gasPrice := uint64(args.Gas), args.GasPrice.ToInt()
+	if gas == 0 {
+		gas = math.MaxUint64 / 2
+	}
+	if gasPrice.Sign() == 0 {
+		gasPrice = params.DefaultGasPrice
+	}
+
+	// Create new call message
+	msg := types.NewMessage(addr, args.To, 0, args.Value.ToInt(), gas, gasPrice, args.Data, false)
+
+	// Setup context so it may be cancelled the call has completed
+	// or, in case of unmetered gas, setup a context with a timeout.
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	// Make sure the context is cancelled when the call has completed
+	// this makes sure resources are cleaned up.
+	defer cancel()
+
+	state.SetBalance(msg.From(), math.MaxBig256)
+	context := core.NewEVMContext(msg, block, api.s.blockchain, &author)
+	// Create a new environment which holds all relevant information
+	// about the transaction and calling mechanisms.
+	evm := vm.NewEVM(context, state, api.s.blockchain.GetChainConfig(), api.s.blockchain.GetVMConfig())
+	// Wait for the context to be done and cancel the evm. Even if the
+	// EVM has finished, cancelling may be done (repeatedly)
+	go func() {
+		<-ctx.Done()
+		evm.Cancel()
+	}()
+
+	// Setup the gas pool (also for unmetered requests)
+	// and apply the message.
+	gp := new(core.GasPool).AddGas(math.MaxUint64)
+	res, gas, failed, err := core.ApplyMessage(evm, msg, gp)
+	return res, gas, failed, err
 }

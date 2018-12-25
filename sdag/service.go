@@ -25,7 +25,6 @@ import (
 	"github.com/TOSIO/go-tos/internal/tosapi"
 	"github.com/TOSIO/go-tos/node"
 	"github.com/TOSIO/go-tos/sdag/core/protocol"
-	"github.com/TOSIO/go-tos/sdag/core/state"
 	"github.com/TOSIO/go-tos/services/messagequeue"
 	"github.com/TOSIO/go-tos/services/p2p"
 	"github.com/TOSIO/go-tos/services/rpc"
@@ -60,9 +59,6 @@ type Sdag struct {
 	// DB interfaces
 	chainDb tosdb.Database // Block chain database
 
-	//statedb
-	stateDb state.Database //mpt trie
-
 	eventMux       *interface{}
 	accountManager *accounts.Manager
 	tosbase        common.Address
@@ -87,7 +83,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	if err != nil {
 		return nil, err
 	}
-	stateDB := state.NewDatabase(stateBaseDB)
 
 	var mq *messagequeue.MessageQueue
 	if config.MessageQueue {
@@ -98,7 +93,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 	}
 	netFeed := new(event.Feed)
 	var chain mainchain.MainChainI
-	if chain, err = mainchain.New(chainDB, stateDB, config.VMConfig, config.NetworkId, mq); err != nil {
+	if chain, err = mainchain.New(chainDB, stateBaseDB, config.VMConfig, config.NetworkId, mq); err != nil {
 		log.Error("Initialising Sdag blockchain failed.")
 		return nil, err
 	}
@@ -116,7 +111,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		shutdownChan:    make(chan bool),
 		networkID:       config.NetworkId,
 		chainDb:         chainDB,
-		stateDb:         stateDB,
 		protocolManager: protocolManager,
 		blockchain:      chain,
 		networkFeed:     netFeed,
@@ -124,7 +118,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Sdag, error) {
 		accountManager:  ctx.AccountManager,
 		tosbase:         config.Tosbase,
 		blockPool:       pool,
-		transaction:     transaction.New(pool, chain, chainDB, stateDB),
+		transaction:     transaction.New(pool, chain, chainDB),
 		blockPoolEvent:  event,
 		sct:             ctx,
 		mq:              mq,

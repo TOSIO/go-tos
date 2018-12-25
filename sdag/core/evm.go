@@ -37,7 +37,7 @@ type ChainContext interface {
 }
 
 // NewEVMContext creates a new context for use in the EVM.
-func NewEVMContext(msg Message, tx *types.TxBlock, chain ChainContext, author *common.Address) vm.Context {
+func NewEVMContext(msg Message, block types.Block, chain ChainContext, author *common.Address) vm.Context {
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	//var beneficiary common.Address
 	/* 	if author == nil {
@@ -46,7 +46,7 @@ func NewEVMContext(msg Message, tx *types.TxBlock, chain ChainContext, author *c
 	   		beneficiary = *author
 		   } */
 	number := &big.Int{}
-	number.SetUint64(tx.GetMutableInfo().ConfirmItsNumber)
+	number.SetUint64(block.GetMutableInfo().ConfirmItsNumber)
 	return vm.Context{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -54,9 +54,9 @@ func NewEVMContext(msg Message, tx *types.TxBlock, chain ChainContext, author *c
 		Origin:      msg.From(),
 		Coinbase:    *author,
 		BlockNumber: new(big.Int).Set(number),
-		Time:        new(big.Int).SetUint64(tx.GetTime()),
-		Difficulty:  new(big.Int).Set(tx.GetDiff()),
-		GasLimit:    tx.GetGasLimit(),
+		Time:        new(big.Int).SetUint64(block.GetTime()),
+		Difficulty:  new(big.Int).Set(block.GetDiff()),
+		GasLimit:    block.GetGasLimit(),
 		GasPrice:    new(big.Int).Set(msg.GasPrice()),
 	}
 }

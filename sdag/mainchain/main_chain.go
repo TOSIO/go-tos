@@ -33,7 +33,7 @@ const (
 
 type MainChain struct {
 	db                 tosdb.Database
-	stateDb            state.Database
+	stateBaseDB        tosdb.Database
 	Genesis            *core.Genesis
 	Tail               types.TailMainBlockInfo
 	PervTail           types.TailMainBlockInfo
@@ -49,36 +49,12 @@ type MainChain struct {
 	networkId          uint64
 	mq                 *messagequeue.MessageQueue
 	lastState          *state.StateDB
-}
-
-func (mainChain *MainChain) AddLocalAddress(address common.Address) {
-	mainChain.LocalAddressRWLock.RLock()
-	if !mainChain.LocalAddress[address] {
-		mainChain.LocalAddressRWLock.RUnlock()
-		mainChain.LocalAddressRWLock.Lock()
-		mainChain.LocalAddress[address] = true
-		mainChain.LocalAddressRWLock.Unlock()
-	} else {
-		mainChain.LocalAddressRWLock.RUnlock()
-	}
-}
-
-func (mainChain *MainChain) LocalBlockNoticeSend(hash common.Hash, address common.Address, action int) {
-	mainChain.LocalAddressRWLock.RLock()
-	if mainChain.LocalAddress[address] {
-		mainChain.LocalAddressRWLock.RUnlock()
-		mainChain.LocalBlockNotice <- LocalBlockNotice{hash, address, action}
-	} else {
-		mainChain.LocalAddressRWLock.RUnlock()
-	}
-}
-func (mainChain *MainChain) LocalBlockNoticeChan() chan LocalBlockNotice {
-	return mainChain.LocalBlockNotice
+	stateCache         state.Database
 }
 
 func (mainChain *MainChain) initTail() error {
 	var err error
-	mainChain.Genesis, err = core.NewGenesis(mainChain.db, mainChain.stateDb, "", mainChain.networkId)
+	mainChain.Genesis, err = core.NewGenesis(mainChain.db, mainChain.stateBaseDB, "", mainChain.networkId)
 	if err != nil {
 		return err
 	}
@@ -134,15 +110,16 @@ func (mainChain *MainChain) setPerv() error {
 	return nil
 }
 
-func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, networkId uint64, mq *messagequeue.MessageQueue) (*MainChain, error) {
+func New(chainDb tosdb.Database, stateBaseDB tosdb.Database, VMConfig vm.Config, networkId uint64, mq *messagequeue.MessageQueue) (*MainChain, error) {
 	var mainChain MainChain
 	mainChain.db = chainDb
-	mainChain.stateDb = stateDb
+	mainChain.stateBaseDB = stateBaseDB
 	mainChain.VMConfig = VMConfig
 	mainChain.LocalBlockNotice = make(chan LocalBlockNotice)
 	mainChain.LocalAddress = make(map[common.Address]bool)
 	mainChain.networkId = networkId
 	mainChain.mq = mq
+	mainChain.stateCache = state.NewDatabase(stateBaseDB)
 
 	err := mainChain.initTail()
 	if err != nil {
@@ -154,7 +131,8 @@ func New(chainDb tosdb.Database, stateDb state.Database, VMConfig vm.Config, net
 	if err != nil {
 		return nil, fmt.Errorf("initTail ReadMainBlock lastMainNunber:%d fail", mainChain.MainTail.Number)
 	}
-	state, err := state.New(mainBlock.Root, mainChain.stateDb)
+
+	state, err := state.New(mainBlock.Root, state.NewDatabase(mainChain.stateBaseDB))
 	if err != nil {
 		return nil, fmt.Errorf("%s state.New fail [%s]", mainBlock.Root.String(), err.Error())
 	}
@@ -216,6 +194,43 @@ func (mainChain *MainChain) GetLastState() *state.StateDB {
 	state = mainChain.lastState
 	mainChain.mainTailRWLock.RUnlock()
 	return state
+}
+
+func (mainChain *MainChain) GetStateCacheByMainNumber(number int64) (*state.StateDB, error) {
+	if number == -1 {
+		number = int64(mainChain.GetMainTail().Number)
+	}
+
+	mainBlock, err := storage.ReadMainBlock(mainChain.db, uint64(number))
+	if err != nil {
+		return nil, fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail:%s", number, err.Error())
+	}
+	state, err := state.New(mainBlock.Root, mainChain.stateCache)
+	if err != nil {
+		return nil, fmt.Errorf("%s state.New fail [%s]", mainBlock.Root.String(), err.Error())
+	}
+	return state, nil
+}
+
+func (mainChain *MainChain) GetMainBlockByMainNumber(number int64) (types.Block, error) {
+	if number < 0 {
+		number = int64(mainChain.GetMainTail().Number)
+	}
+
+	mainBlock, err := storage.ReadMainBlock(mainChain.db, uint64(number))
+	if err != nil {
+		return nil, fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail:%s", number, err.Error())
+	}
+	block := storage.ReadBlock(mainChain.db, mainBlock.Hash)
+	if block == nil {
+		return nil, fmt.Errorf("GetMainBlockByMainNumber ReadBlock Not found")
+	}
+	mutableInfo, err := storage.ReadBlockMutableInfo(mainChain.db, mainBlock.Hash)
+	if err != nil {
+		return nil, fmt.Errorf(mainBlock.Hash.String() + " " + err.Error())
+	}
+	block.SetMutableInfo(mutableInfo)
+	return block, nil
 }
 
 func (mainChain *MainChain) GetGenesisHash() (common.Hash, error) {
@@ -296,12 +311,45 @@ func (mainChain *MainChain) GetMainBlock(number uint64) types.Block {
 	return block
 }
 
+func (mainChain *MainChain) GetChainConfig() *params.ChainConfig {
+	return mainChain.ChainConfig
+}
+
+func (mainChain *MainChain) GetVMConfig() vm.Config {
+	return mainChain.VMConfig
+}
+
 func IsTheSameTimeSlice(t1, t2 uint64) bool {
 	return utils.GetMainTime(t1) == utils.GetMainTime(t2)
 }
 
 func TimeSliceDifference(t1, t2 uint64) uint64 {
 	return utils.GetMainTime(t1) - utils.GetMainTime(t2)
+}
+
+func (mainChain *MainChain) AddLocalAddress(address common.Address) {
+	mainChain.LocalAddressRWLock.RLock()
+	if !mainChain.LocalAddress[address] {
+		mainChain.LocalAddressRWLock.RUnlock()
+		mainChain.LocalAddressRWLock.Lock()
+		mainChain.LocalAddress[address] = true
+		mainChain.LocalAddressRWLock.Unlock()
+	} else {
+		mainChain.LocalAddressRWLock.RUnlock()
+	}
+}
+
+func (mainChain *MainChain) LocalBlockNoticeSend(hash common.Hash, address common.Address, action int) {
+	mainChain.LocalAddressRWLock.RLock()
+	if mainChain.LocalAddress[address] {
+		mainChain.LocalAddressRWLock.RUnlock()
+		mainChain.LocalBlockNotice <- LocalBlockNotice{hash, address, action}
+	} else {
+		mainChain.LocalAddressRWLock.RUnlock()
+	}
+}
+func (mainChain *MainChain) LocalBlockNoticeChan() chan LocalBlockNotice {
+	return mainChain.LocalBlockNotice
 }
 
 type SingleChainLinkInfo struct {
@@ -462,7 +510,7 @@ func (mainChain *MainChain) Confirm() error {
 	if err != nil {
 		return fmt.Errorf("%d ReadMainBlock lastMainTimeSlice fail", number)
 	}
-	state, err := state.New(mainBlock.Root, mainChain.stateDb)
+	state, err := state.New(mainBlock.Root, state.NewDatabase(mainChain.stateBaseDB))
 	if err != nil {
 		return fmt.Errorf("%s state.New fail [%s]", mainBlock.Root.String(), err.Error())
 	}
