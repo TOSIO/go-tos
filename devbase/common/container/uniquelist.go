@@ -32,7 +32,7 @@ func NewUniqueList(size int) *UniqueList {
 		container: make(map[Elem]*Value)}
 }
 
-func (lm *UniqueList) ContainLen(e Elem) int {
+func (lm *UniqueList) Len() int {
 	return len(lm.container)
 }
 

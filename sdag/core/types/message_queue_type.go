@@ -11,21 +11,19 @@ type MQBlockInfo struct {
 	SenderAddr     string
 	ReceiverAddr   string
 	IsMiner        string
-	Difficulty      string
+	Difficulty     string
 	CumulativeDiff string
 }
 
 type MQBlockStatus struct {
-	BlockHash string
-	BlockHigh string
-	IsMain string
-	ConfirmStatus string  //accept/ reject / pending
-	ConfirmDate string
-	GasUsed string
-	ConfirmedHash string
-	ConfirmedHigh string
-	ConfirmedOrder string
+	BlockHash       string
+	BlockHigh       string
+	IsMain          string
+	ConfirmStatus   string //accept/ reject / pending
+	ConfirmDate     string
+	GasUsed         string
+	ConfirmedHash   string
+	ConfirmedHigh   string
+	ConfirmedOrder  string
+	ContractAddress string
 }
-
-
-

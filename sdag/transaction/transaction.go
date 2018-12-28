@@ -122,6 +122,10 @@ func (transaction *Transaction) GetBlockConstructionParameter() *BlockConstructi
 	AccountNonce := transaction.currentAccountNonce
 	transaction.currentAccountNonce++
 	transaction.nonceLock.Unlock()
+	for index, link := range Links {
+		log.Debug(fmt.Sprintf("GetBlockConstructionParameter link[%d]=%s", index, link.String()))
+	}
+	log.Debug(fmt.Sprintf("GetBlockConstructionParameter AccountNonce=%d", AccountNonce))
 	return &BlockConstructionParameter{
 		Links: Links,
 		Nonce: AccountNonce,
@@ -217,6 +221,15 @@ func (transaction *Transaction) ReceiveTransactionAction() {
 				transaction.addressTransactionMap[transactionAction.Address][transactionAction.Hash] = amount
 				transaction.addressTransactionLock.Unlock()
 			}
+			transaction.addressTransactionLock.RLock()
+			transactionCount := 0
+			for k, v := range transaction.addressTransactionMap {
+				log.Debug(fmt.Sprintf("len(transaction.addressTransactionMap[%s])=%d", k.String(), len(v)))
+				transactionCount += len(v)
+			}
+			log.Debug(fmt.Sprintf("len(transaction.addressTransactionMap)=%d transactionCount=%d", len(transaction.addressTransactionMap), transactionCount))
+			log.Debug(fmt.Sprintf("len(transaction.mainChainI.LocalBlockNoticeChan())=%d", len(transaction.mainChainI.LocalBlockNoticeChan())))
+			transaction.addressTransactionLock.RUnlock()
 		}
 	}()
 }
@@ -260,6 +273,10 @@ func (transaction *Transaction) transactionRecord(address common.Address, hash c
 	} else {
 		transaction.addressTransactionMap[address][hash] = amount
 	}
+	log.Debug(fmt.Sprintf("transactionRecord transaction.addressTransactionMap[%s][%s]=%s", address.String(), hash.String(), amount.String()))
+	log.Debug(fmt.Sprintf("len(transaction.addressTransactionMap)=%d len(transaction.addressTransactionMap[%s])=%d",
+		len(transaction.addressTransactionMap),
+		address.String(), len(transaction.addressTransactionMap[address])))
 	transaction.addressTransactionLock.Unlock()
 }
 

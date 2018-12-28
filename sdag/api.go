@@ -98,11 +98,11 @@ type MainBlockInfo struct {
 	Number uint64
 }
 
-type BolckHashInfo struct {
+type BlockHashInfo struct {
 	BlockHash string
 }
 
-type WalletAdress struct {
+type WalletAddress struct {
 	WalletAddr string
 }
 
@@ -120,14 +120,14 @@ type BaseDataParam struct {
 	data []byte
 }
 
-func (api *PublicSdagAPI) GetBlockInfo(bolckHashInfo *BolckHashInfo) (interface{}, error) {
+func (api *PublicSdagAPI) GetBlockInfo(blockHashInfo *BlockHashInfo) (interface{}, error) {
 
 	db := api.s.chainDb
-	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
+	blockInfo, err := api.s.queryBlockInfo.GetBlockInfo(db, common.HexToHash(blockHashInfo.BlockHash))
 	if err != nil {
 		return "", err
 	}
-	Receipt, err := storage.ReadReceiptInfo(db, common.HexToHash(bolckHashInfo.BlockHash))
+	Receipt, err := storage.ReadReceiptInfo(db, common.HexToHash(blockHashInfo.BlockHash))
 	if err == nil {
 		//获取GasUsed
 		blockInfo.GasUsed = Receipt.GasUsed
@@ -336,12 +336,11 @@ func (api *PublicSdagAPI) GeneraterKeyStore(rpcGenerKeyStore *RpcGenerKeyStore) 
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
-func (api *PublicSdagAPI) GetBalance(walletadress *WalletAdress) (interface{}, error) {
-	address := common.HexToAddress(walletadress.WalletAddr)
+func (api *PublicSdagAPI) GetBalance(walletAddress *WalletAddress) (interface{}, error) {
+	address := common.HexToAddress(walletAddress.WalletAddr)
 	State := api.s.blockchain.GetLastState()
-	bigbalance := State.GetBalance(address)
-	balance := bigbalance.String()
-	return balance, State.Error()
+	balance := State.GetBalance(address)
+	return balance.String(), State.Error()
 }
 
 func (api *PublicSdagAPI) GetLocalNodeID(jsonstring string) string {

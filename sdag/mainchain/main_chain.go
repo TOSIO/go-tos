@@ -340,6 +340,7 @@ func (mainChain *MainChain) AddLocalAddress(address common.Address) {
 }
 
 func (mainChain *MainChain) LocalBlockNoticeSend(hash common.Hash, address common.Address, action int) {
+	log.Debug("LocalBlockNoticeSend", "hash", hash.String(), "address", address.String(), "action", action)
 	mainChain.LocalAddressRWLock.RLock()
 	if mainChain.LocalAddress[address] {
 		mainChain.LocalAddressRWLock.RUnlock()
@@ -347,7 +348,9 @@ func (mainChain *MainChain) LocalBlockNoticeSend(hash common.Hash, address commo
 	} else {
 		mainChain.LocalAddressRWLock.RUnlock()
 	}
+	log.Debug(fmt.Sprintf("len(mainChain.LocalBlockNotice)=%d", len(mainChain.LocalBlockNotice)))
 }
+
 func (mainChain *MainChain) LocalBlockNoticeChan() chan LocalBlockNotice {
 	return mainChain.LocalBlockNotice
 }
@@ -715,15 +718,16 @@ func (mainChain *MainChain) sendStatusInfoToCenter(block types.Block, mainBlock 
 	}
 
 	blockStatus := types.MQBlockStatus{
-		BlockHash:      block.GetHash().String(),
-		BlockHigh:      strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
-		IsMain:         IsMain,
-		ConfirmStatus:  ConfirmStatus,
-		ConfirmDate:    strconv.FormatUint(utils.GetTimeStamp(), 10),
-		GasUsed:        GasUsed,
-		ConfirmedHash:  mainBlock.GetHash().String(),
-		ConfirmedHigh:  strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
-		ConfirmedOrder: ConfirmedOrder,
+		BlockHash:       block.GetHash().String(),
+		BlockHigh:       strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
+		IsMain:          IsMain,
+		ConfirmStatus:   ConfirmStatus,
+		ConfirmDate:     strconv.FormatUint(utils.GetTimeStamp(), 10),
+		GasUsed:         GasUsed,
+		ConfirmedHash:   mainBlock.GetHash().String(),
+		ConfirmedHigh:   strconv.FormatUint(block.GetMutableInfo().ConfirmItsNumber, 10),
+		ConfirmedOrder:  ConfirmedOrder,
+		ContractAddress: receipt.ContractAddress.String(),
 	}
 	if err := mainChain.mq.Publish("blockStatus", blockStatus); err != nil {
 		log.Error(err.Error())

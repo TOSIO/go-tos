@@ -131,8 +131,10 @@ func (p *BlockPool) BlockProcessing() {
 		for {
 			select {
 			case ch := <-p.localNewBlocksSub.Chan():
+				log.Debug("ch := <-p.localNewBlocksSub.Chan()", "len", len(p.localNewBlocksSub.Chan()))
 				if ev, ok := ch.Data.(*core.LocalNewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
+						log.Debug("before localNewBlocks <- block", "len", len(localNewBlocks))
 						localNewBlocks <- block
 					}
 				}
@@ -144,8 +146,10 @@ func (p *BlockPool) BlockProcessing() {
 		for {
 			select {
 			case ch := <-p.isolateResponseSub.Chan():
+				log.Debug("ch := <-p.isolateResponseSub.Chan()", "len", len(p.isolateResponseSub.Chan()))
 				if ev, ok := ch.Data.(*core.IsolateResponseEvent); ok {
 					for _, block := range ev.Blocks {
+						log.Debug("before isolateResponse <- block", "len", len(isolateResponse))
 						isolateResponse <- block
 					}
 				}
@@ -157,8 +161,10 @@ func (p *BlockPool) BlockProcessing() {
 		for {
 			select {
 			case ch := <-p.networkNewBlocksSub.Chan():
+				log.Debug("ch := <-p.networkNewBlocksSub.Chan()", "len", len(p.networkNewBlocksSub.Chan()))
 				if ev, ok := ch.Data.(*core.NetworkNewBlocksEvent); ok {
 					for _, block := range ev.Blocks {
+						log.Debug("before networkNewBlocks <- block", "len", len(networkNewBlocks))
 						networkNewBlocks <- block
 					}
 				}
@@ -170,8 +176,10 @@ func (p *BlockPool) BlockProcessing() {
 		for {
 			select {
 			case ch := <-p.syncResponseSub.Chan():
+				log.Debug("ch := <-p.syncResponseSub.Chan()", "len", len(p.syncResponseSub.Chan()))
 				if ev, ok := ch.Data.(*core.SYNCResponseEvent); ok {
 					for _, block := range ev.Blocks {
+						log.Debug("before syncResponse <- block", "len", len(syncResponse))
 						syncResponse <- block
 					}
 				}
@@ -185,24 +193,28 @@ func (p *BlockPool) BlockProcessing() {
 			for {
 				select {
 				case block := <-localNewBlocks:
+					log.Debug("block := <-localNewBlocks", "len", len(localNewBlocks))
 					p.AddBlock(block, true, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-isolateResponse:
+					log.Debug("block := <-isolateResponse", "len", len(isolateResponse))
 					p.AddBlock(block, false, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-networkNewBlocks:
+					log.Debug("block := <-networkNewBlocks", "len", len(networkNewBlocks))
 					p.AddBlock(block, true, false)
 					continue
 				default:
 				}
 				select {
 				case block := <-syncResponse:
+					log.Debug("block := <-syncResponse", "len", len(syncResponse))
 					p.AddBlock(block, false, true)
 					continue
 				default:
@@ -220,6 +232,7 @@ func (p *BlockPool) TimedRequestForIsolatedBlocks() {
 		for {
 			select {
 			case p.syncStatus = <-p.syncStatusSub:
+				log.Debug("p.syncStatus = <-p.syncStatusSub", "len", len(p.syncStatusSub), "p.syncStatus", p.syncStatus)
 			default:
 			}
 			currentTime = time.Now().Unix()
@@ -267,6 +280,7 @@ func (p *BlockPool) loop() {
 		for {
 			select {
 			case ch := <-p.newAnnounceSub.Chan():
+				log.Debug("ch := <-p.newAnnounceSub.Chan()", "len", len(p.newAnnounceSub.Chan()))
 				if ev, ok := ch.Data.(*core.AnnounceEvent); ok {
 					if inlocal := storage.HasBlock(p.db, ev.Hash); !inlocal {
 						hashes := make([]common.Hash, 0)
@@ -277,16 +291,19 @@ func (p *BlockPool) loop() {
 					}
 				}
 			case ch := <-p.queryUnverifySub.Chan():
+				log.Debug("ch := <-p.queryUnverifySub.Chan()", "len", len(p.queryUnverifySub.Chan()))
 				if ev, ok := ch.Data.(*core.GetUnverifyBlocksEvent); ok {
 					ev.Hashes = p.SelectUnverifiedBlock(4)
 					ev.Done <- struct{}{}
 				}
 			case hash := <-p.unverifiedAddChan:
+				log.Debug("hash := <-p.unverifiedAddChan", "len", len(p.unverifiedAddChan))
 				p.listLock.Lock()
 				p.unverifiedBlocks.Push(hash)
 				p.listLock.Unlock()
 
 			case hash := <-p.unverifiedDelChan:
+				log.Debug("hash := <-p.unverifiedDelChan", "len", len(p.unverifiedDelChan))
 				p.listLock.Lock()
 				p.unverifiedBlocks.Remove(hash)
 				p.listLock.Unlock()
@@ -427,11 +444,6 @@ func (p *BlockPool) EnQueue(block types.Block) error {
 	return nil
 }
 
-func (p *BlockPool) SyncAddBlock(block types.Block) error {
-	p.blockChan <- block
-	return nil
-}
-
 func (p *BlockPool) updateSyncTime(time uint64) {
 	p.MaxSyncTimeLock.RLock()
 	if p.MaxSyncTime < time {
@@ -542,15 +554,19 @@ func (p *BlockPool) deleteUnverifiedBlocks(hashSlice []common.Hash) {
 }
 
 func (p *BlockPool) addUnverifiedBlock(hash common.Hash) {
+	log.Debug("addUnverifiedBlock", "hash", hash.String())
 	select {
 	case p.unverifiedAddChan <- hash:
+		log.Debug("p.unverifiedAddChan <- hash", "len", len(p.unverifiedAddChan))
 		return
 	}
 }
 
 func (p *BlockPool) deleteUnverifiedBlock(hash common.Hash) {
+	log.Debug("deleteUnverifiedBlock", "hash", hash.String())
 	select {
 	case p.unverifiedDelChan <- hash:
+		log.Debug("p.unverifiedDelChan <- hash", "len", len(p.unverifiedDelChan))
 		return
 	}
 }
@@ -558,6 +574,7 @@ func (p *BlockPool) deleteUnverifiedBlock(hash common.Hash) {
 func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 	i := 0
 	var links []common.Hash
+	log.Debug("SelectUnverifiedBlock begin", "p.unverifiedBlocks len", p.unverifiedBlocks.Len())
 	p.listLock.RLock()
 	for itr, _ := p.unverifiedBlocks.Front(); itr != nil && i < number; itr = itr.Next() {
 		if hash, ok := itr.Data().(common.Hash); ok {
@@ -569,6 +586,10 @@ func (p *BlockPool) SelectUnverifiedBlock(number int) []common.Hash {
 		}
 	}
 	p.listLock.RUnlock()
+	log.Debug("SelectUnverifiedBlock end", "p.unverifiedBlocks len", p.unverifiedBlocks.Len(), "links", len(links))
+	for index, _ := range links {
+		log.Debug(fmt.Sprintf("links[%d]=%s", index, links[index].String()))
+	}
 	return links
 }
 
