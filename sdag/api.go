@@ -18,7 +18,6 @@ package sdag
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/TOSIO/go-tos/devbase/common/hexutil"
@@ -426,25 +425,6 @@ func (api *PublicSdagAPI) StartMiner(rpcMinerInfo *RpcMinerInfo) string {
 	api.s.config.Mining = true
 	api.s.miner.Start(rpcMinerInfo.Address, privatekey)
 	return "start ok"
-}
-
-func hexString2Address(in string, out *common.Address) error {
-	if len(in) >= 2 && in[0] == '0' && (in[1] == 'x' || in[1] == 'X') {
-		in = in[2:]
-	}
-	bytes, err := hex.DecodeString(in)
-	if err != nil {
-		log.Error("hexString2Address failed: %s", err)
-		return err
-	}
-	if len(bytes) > common.AddressLength {
-		log.Error("address too length :", "len", len(bytes))
-		return fmt.Errorf("address too length : %d", len(bytes))
-	}
-	for k, byte1 := range bytes {
-		out[k] = byte1
-	}
-	return nil
 }
 
 // PrivateAdminAPI is the collection of Ethereum full node-related APIs
