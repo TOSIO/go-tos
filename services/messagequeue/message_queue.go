@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	uri          = "amqp://chen:chen@10.10.10.42:5672/" //flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
+	uri          = "amqp://admin:admin@localhost:5672/" //flag.String("uri", "amqp://chen:chen@10.10.10.42:5672/", "AMQP URI")
 	exchangeName = "tos-scan"                           //flag.String("exchange", "test-exchange", "Durable AMQP exchange name")
 	exchangeType = "direct"                             //flag.String("exchange-type", "direct", "Exchange type - direct|fanout|topic|x-custom")
 	reliable     = false                                //flag.Bool("reliable", false, "Wait for the publisher confirmation before exiting")
